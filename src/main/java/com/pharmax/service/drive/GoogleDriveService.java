@@ -1,4 +1,4 @@
-﻿package com.pharmax.service.drive;
+package com.pharmax.service.drive;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.auth.oauth2.TokenResponseException;

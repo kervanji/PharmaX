@@ -1,4 +1,4 @@
-﻿package com.pharmax.update;
+package com.pharmax.update;
 
 import java.util.ArrayList;
 import java.util.List;

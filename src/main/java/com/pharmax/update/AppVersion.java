@@ -1,4 +1,4 @@
-﻿package com.pharmax.update;
+package com.pharmax.update;
 
 public final class AppVersion {
     private static final String FALLBACK = "1.2.4";

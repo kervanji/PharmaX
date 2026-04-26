@@ -1,4 +1,4 @@
-﻿package com.pharmax.update;
+package com.pharmax.update;
 
 public final class UpdateCheckResult {
     private final boolean updateAvailable;

@@ -1,4 +1,4 @@
-﻿package com.pharmax.model.dto;
+package com.pharmax.model.dto;
 
 import java.time.LocalDateTime;
 

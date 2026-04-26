@@ -1,4 +1,4 @@
-﻿package com.pharmax.controller;
+package com.pharmax.controller;
 
 import com.pharmax.model.Sale;
 import com.pharmax.service.ReceiptService;

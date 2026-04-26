@@ -1,4 +1,4 @@
-﻿package com.pharmax.update;
+package com.pharmax.update;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

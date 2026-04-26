@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;

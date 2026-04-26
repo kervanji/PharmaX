@@ -1,4 +1,4 @@
-﻿package com.pharmax.database;
+package com.pharmax.database;
 
 import org.hibernate.dialect.Dialect;
 import org.hibernate.dialect.identity.IdentityColumnSupport;

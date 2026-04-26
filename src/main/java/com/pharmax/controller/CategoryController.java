@@ -1,4 +1,4 @@
-﻿package com.pharmax.controller;
+package com.pharmax.controller;
 
 import com.pharmax.model.Category;
 import com.pharmax.service.CategoryService;

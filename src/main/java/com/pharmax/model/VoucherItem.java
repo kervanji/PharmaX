@@ -1,4 +1,4 @@
-﻿package com.pharmax.model;
+package com.pharmax.model;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;

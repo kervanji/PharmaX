@@ -1,4 +1,4 @@
-﻿package com.pharmax.service;
+package com.pharmax.service;
 
 import com.pharmax.model.Customer;
 import com.pharmax.model.Product;

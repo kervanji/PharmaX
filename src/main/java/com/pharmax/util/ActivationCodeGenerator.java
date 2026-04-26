@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

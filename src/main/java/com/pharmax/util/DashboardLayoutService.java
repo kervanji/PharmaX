@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

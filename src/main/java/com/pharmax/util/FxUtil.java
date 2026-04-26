@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import javafx.event.ActionEvent;
 import javafx.scene.Node;

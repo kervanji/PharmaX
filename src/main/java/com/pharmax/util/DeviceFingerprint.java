@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import java.net.NetworkInterface;
 import java.nio.charset.StandardCharsets;

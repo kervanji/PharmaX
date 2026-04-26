@@ -1,4 +1,4 @@
-﻿package com.pharmax.database;
+package com.pharmax.database;
 
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;

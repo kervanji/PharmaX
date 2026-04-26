@@ -1,4 +1,4 @@
-﻿package com.pharmax.model;
+package com.pharmax.model;
 
 /**
  * نوع السند

@@ -1,4 +1,4 @@
-﻿package com.pharmax.controller;
+package com.pharmax.controller;
 
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;

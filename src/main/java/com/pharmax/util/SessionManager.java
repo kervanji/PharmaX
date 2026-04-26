@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import com.pharmax.model.User;
 import com.pharmax.model.UserRole;

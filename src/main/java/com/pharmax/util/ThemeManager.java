@@ -1,4 +1,4 @@
-﻿package com.pharmax.util;
+package com.pharmax.util;
 
 import javafx.collections.ObservableList;
 import javafx.scene.Scene;

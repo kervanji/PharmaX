@@ -1,4 +1,4 @@
-﻿package com.pharmax.model;
+package com.pharmax.model;
 
 public enum UserRole {
     ADMIN("مدير", true, true, true, true, true, true, true, true),

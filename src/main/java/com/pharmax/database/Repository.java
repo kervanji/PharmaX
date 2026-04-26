@@ -1,4 +1,4 @@
-﻿package com.pharmax.database;
+package com.pharmax.database;
 
 import com.pharmax.model.Category;
 import com.pharmax.model.Customer;

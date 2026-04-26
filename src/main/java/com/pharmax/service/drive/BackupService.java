@@ -1,4 +1,4 @@
-﻿package com.pharmax.service.drive;
+package com.pharmax.service.drive;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
