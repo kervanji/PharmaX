@@ -1,10 +1,10 @@
 
 
 Version:	3.50
-CmdLine:	C:\Users\smart\Projects\HisabX\HisabX.exe --l4j-debug
+CmdLine:	C:\Users\smart\Projects\PharmaX\PharmaX.exe --l4j-debug
 JNI:		No
 WOW64:		Yes
-Working dir:	C:\Users\smart\Projects\HisabX\.
+Working dir:	C:\Users\smart\Projects\PharmaX\.
 Requires JDK:	No
 Requires 64-Bit: No
 Java min ver:	
@@ -34,10 +34,10 @@ Check launcher:	C:\src\flutter\bin\javaw.exe (not found)
 Check launcher:	C:\Users\smart\AppData\Roaming\npm\bin\javaw.exe (not found)
 Check launcher:	C:\Program Files\Java\jdk-17\bin\javaw.exe (OK)
 Version string: 1.017.000_012 / 64-Bit (OK)
-Main class:	com.hisabx.MainApp
-Add classpath:	HisabX.jar
+Main class:	com.PharmaX.MainApp
+Add classpath:	PharmaX.jar
 Add classpath:	lib\*
 Launcher:	C:\Program Files\Java\jdk-17\bin\javaw.exe
-Launcher args:	-classpath "C:\Users\smart\Projects\HisabX\HisabX.exe;HisabX.jar" com.hisabx.MainApp
+Launcher args:	-classpath "C:\Users\smart\Projects\PharmaX\PharmaX.exe;PharmaX.jar" com.PharmaX.MainApp
 Args length:	124/32768 chars
 Exit code:	0
