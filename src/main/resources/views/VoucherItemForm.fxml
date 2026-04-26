@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.VoucherItemFormController"
+      stylesheets="@../styles/main.css"
+      spacing="16"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 24; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';">
+
+    <Label fx:id="titleLabel" text="إضافة / تعديل مادة"
+           style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+    <GridPane hgap="12" vgap="12">
+        <columnConstraints>
+            <ColumnConstraints percentWidth="35"/>
+            <ColumnConstraints percentWidth="65"/>
+        </columnConstraints>
+
+        <Label text="المادة من المخزون:" GridPane.rowIndex="0" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <ComboBox fx:id="productCombo" GridPane.rowIndex="0" GridPane.columnIndex="1"
+                  maxWidth="Infinity" promptText="اختر المادة (اختياري)" editable="true"
+                  style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+
+        <Label text="اسم المادة:" GridPane.rowIndex="1" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <TextField fx:id="productNameField" GridPane.rowIndex="1" GridPane.columnIndex="1"
+                   promptText="أدخل اسم المادة إذا لم تكن في المخزون"
+                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+        <Label text="الكمية:*" GridPane.rowIndex="2" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <TextField fx:id="quantityField" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                   promptText="1"
+                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+        <Label text="سعر الوحدة:*" GridPane.rowIndex="3" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <TextField fx:id="unitPriceField" GridPane.rowIndex="3" GridPane.columnIndex="1"
+                   promptText="0.00"
+                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+        <Label text="وحدة القياس:" GridPane.rowIndex="4" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <ComboBox fx:id="unitOfMeasureCombo" GridPane.rowIndex="4" GridPane.columnIndex="1"
+                  maxWidth="Infinity" promptText="اختر وحدة القياس"
+                  style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+
+        <Label text="ملاحظات:" GridPane.rowIndex="5" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <TextArea fx:id="notesArea" GridPane.rowIndex="5" GridPane.columnIndex="1"
+                  promptText="ملاحظات (اختياري)" prefRowCount="2"
+                  style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+
+        <Label text="إضافة للمخزون:" GridPane.rowIndex="6" GridPane.columnIndex="0"
+               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+        <CheckBox fx:id="addToInventoryCheckBox" GridPane.rowIndex="6" GridPane.columnIndex="1"
+                  text="نعم" selected="true" style="-fx-font-size: 14px;"/>
+    </GridPane>
+
+    <Region VBox.vgrow="ALWAYS"/>
+
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <Button text="حفظ" onAction="#handleSave" prefWidth="120"
+                style="-fx-background-color: linear-gradient(to right, -fx-accent-light, -fx-accent-color); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 12 24; -fx-background-radius: 10;"/>
+        <Button text="إلغاء" onAction="#handleCancel" prefWidth="100"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 10; -fx-font-size: 14px; -fx-padding: 12 24; -fx-background-radius: 10;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+    </HBox>
+</VBox>

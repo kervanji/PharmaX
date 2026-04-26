@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+
+    <path d="M170 210l70-70 70 70"/>
+    <path d="M240 140v150"/>
+    <path d="M150 300h180"/>
+    <path d="M140 300v90h232v-90"/>
+    <path d="M372 300l-40-40"/>
+    <path d="M372 300l-40 40"/>
+
+  </g>
+</svg>

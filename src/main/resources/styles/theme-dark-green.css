@@ -1,0 +1,137 @@
+﻿/* =============================================
+   PharmaX Theme Variables - Dark Green
+   =============================================
+   Override variables only – inherits all rules from main.css
+*/
+
+.root {
+    /* ── Background Colors ── */
+    -fx-bg-main:      #0d1f17;
+    -fx-bg-panel:     #0f2a1c;
+    -fx-bg-surface:   #163328;
+    -fx-bg-header:    #1a3d2e;
+    -fx-bg-gradient:  linear-gradient(to bottom right, #0d1f17, #163328);
+
+    /* ── Text Colors ── */
+    -fx-text-main:    #d4e8dc;
+    -fx-text-muted:   #7faa93;
+    -fx-text-hint:    #5c8a72;
+    -fx-text-bright:  #e8f5ee;
+    -fx-text-header:  #81c784;
+
+    /* ── Accent / Primary ── */
+    -fx-accent-color:   #16a34a;
+    -fx-accent-hover:   #15803d;
+    -fx-accent-light:   #22c55e;
+    -fx-accent-bg:      rgba(34,197,94,0.18);
+    -fx-accent-text:    #4ade80;
+
+    /* ── Semantic Colors ── */
+    -fx-success:        #22c55e;
+    -fx-success-dark:   #16a34a;
+    -fx-success-bg:     #0d3a1a;
+    -fx-success-text:   #10b981;
+
+    -fx-danger:         #ef4444;
+    -fx-danger-dark:    #dc2626;
+    -fx-danger-bg:      #501a1a;
+    -fx-danger-text:    #ef4444;
+
+    -fx-warning:        #f59e0b;
+    -fx-warning-dark:   #d97706;
+    -fx-warning-text:   #fbbf24;
+
+    /* ── Border & Hover ── */
+    -fx-border-main:    rgba(255,255,255,0.08);
+    -fx-border-input:   rgba(255,255,255,0.12);
+    -fx-border-focus:   #4ade80;
+    -fx-hover-bg:       #1a4030;
+
+    /* ── Selection ── */
+    -fx-selection-bg:          #1a4a30;
+    -fx-selection-bg-focused:  #225a3a;
+    -fx-selection-text:        #d4e8dc;
+
+    /* ── Scrollbar ── */
+    -fx-scrollbar-thumb:       #2d5040;
+    -fx-scrollbar-thumb-hover: #3a6a54;
+
+    /* ── Dashboard Tiles ── */
+    -fx-tile-bg:        linear-gradient(to bottom right, #1a3d2e, #1e4a38);
+    -fx-tile-hover:     linear-gradient(to bottom right, #225a3a, #2a6a48);
+    -fx-tile-pressed:   linear-gradient(to bottom right, #0f2a1c, #163328);
+    -fx-tile-text:      #b8d8c8;
+    -fx-tile-icon:      #c8f7d8;
+
+    /* ── Table Row Alternate ── */
+    -fx-row-odd:        #112820;
+
+    /* ── Badges ── */
+    -fx-badge-success-bg:   #064e3b;
+    -fx-badge-success-text: #6ee7b7;
+    -fx-badge-warning-bg:   #78350f;
+    -fx-badge-warning-text: #fcd34d;
+    -fx-badge-danger-bg:    #7f1d1d;
+    -fx-badge-danger-text:  #fca5a5;
+    -fx-badge-info-bg:      #1a4a30;
+    -fx-badge-info-text:    #86efac;
+
+    /* ── Shadows ── */
+    -fx-shadow-sm: dropshadow(gaussian, rgba(0,0,0,0.15), 4, 0, 0, 2);
+    -fx-shadow-md: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0, 0, 4);
+    -fx-shadow-lg: dropshadow(gaussian, rgba(0,0,0,0.35), 20, 0, 0, 8);
+
+    /* ── Card ── */
+    -fx-card-bg:    #0f2a1c;
+
+    /* ── Button colors ── */
+    -fx-btn-primary-top:    #22c55e;
+    -fx-btn-primary-bottom: #16a34a;
+    -fx-btn-primary-hover-top:    #16a34a;
+    -fx-btn-primary-hover-bottom: #15803d;
+
+    -fx-btn-success-top:    #22c55e;
+    -fx-btn-success-bottom: #16a34a;
+    -fx-btn-success-hover-top:    #16a34a;
+    -fx-btn-success-hover-bottom: #15803d;
+
+    -fx-btn-warning-top:    #f59e0b;
+    -fx-btn-warning-bottom: #d97706;
+    -fx-btn-warning-hover-top:    #d97706;
+    -fx-btn-warning-hover-bottom: #b45309;
+
+    -fx-btn-danger-top:     #ef4444;
+    -fx-btn-danger-bottom:  #dc2626;
+    -fx-btn-danger-hover-top:     #dc2626;
+    -fx-btn-danger-hover-bottom:  #b91c1c;
+
+    /* ── Secondary Button ── */
+    -fx-btn-secondary-bg:     #163328;
+    -fx-btn-secondary-text:   #d4e8dc;
+    -fx-btn-secondary-border: rgba(255,255,255,0.12);
+    -fx-btn-secondary-hover:  #1a4030;
+
+    /* ── Login Screen ── */
+    -fx-login-bg:       linear-gradient(to bottom right, #0d1f17, #163328);
+    -fx-login-card-bg:  #0f2a1c;
+    -fx-login-title:    #4ade80;
+
+    /* ── Dialog / Alert ── */
+    -fx-dialog-bg:      #0f2a1c;
+    -fx-dialog-header:  #1a3d2e;
+
+    /* ── Stat Card ── */
+    -fx-stat-card-bg:   linear-gradient(to bottom right, #1a4a30, #225a3a);
+
+    /* ── Alert Cards ── */
+    -fx-alert-card-bg:  linear-gradient(to right, #163328, #1a4030);
+
+    /* ── Header/Footer Bar ── */
+    -fx-bar-bg:         #0d1f17;
+    -fx-bar-border:     rgba(255,255,255,0.06);
+
+    /* ── Voucher / Form Sections ── */
+    -fx-form-section-bg:  #0f2a1c;
+    -fx-form-label:       #e8f5ee;
+    -fx-form-sublabel:    #7faa93;
+}

@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane stylesheets="@../styles/main.css"
+            style="-fx-background-color: -fx-login-bg; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';"
+            xmlns:fx="http://javafx.com/fxml" fx:controller="com.pharmax.controller.LoginController"
+            prefWidth="600" prefHeight="650">
+    
+    <center>
+        <VBox alignment="CENTER">
+            <!-- Login Card -->
+            <VBox fx:id="loginContainer" alignment="CENTER" spacing="18" 
+                  style="-fx-background-color: -fx-btn-secondary-bg; -fx-background-radius: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 20, 0, 0, 10);"
+                  maxWidth="480" maxHeight="600">
+                <padding>
+                    <Insets top="35" right="40" bottom="30" left="40"/>
+                </padding>
+                
+                <!-- Logo/Title -->
+                <Label text="PharmaX" style="-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-color;">
+                    <font><Font name="System Bold" size="36"/></font>
+                </Label>
+                
+                <Label fx:id="titleLabel" text="اختر حسابك" 
+                       style="-fx-font-size: 16px; -fx-text-fill: -fx-text-hint;">
+                    <font><Font size="16"/></font>
+                </Label>
+                
+                <!-- User Bubbles Container -->
+                <FlowPane fx:id="userBubblesPane" alignment="CENTER" hgap="14" vgap="14"
+                          style="-fx-padding: 10 0;"
+                          prefWrapLength="400"/>
+                
+                <Separator style="-fx-background-color: -fx-border-main;"/>
+                
+                <!-- Selected User Display -->
+                <HBox fx:id="selectedUserBox" alignment="CENTER" spacing="10" visible="false" managed="false"
+                      style="-fx-background-color: -fx-accent-bg; -fx-background-radius: 10; -fx-padding: 12;">
+                    <Label fx:id="selectedUserIcon" text="" style="-fx-font-size: 28px; -fx-min-width: 40; -fx-alignment: CENTER;"/>
+                    <VBox spacing="2" alignment="CENTER_RIGHT">
+                        <Label fx:id="selectedUserLabel" text="" 
+                               style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-hover;"/>
+                        <Label fx:id="selectedUserRoleLabel" text=""
+                               style="-fx-font-size: 13px; -fx-text-fill: -fx-text-muted; -fx-font-weight: bold;"/>
+                    </VBox>
+                </HBox>
+                
+                <!-- PIN Field (shown after selecting a user) -->
+                <VBox fx:id="pinBox" spacing="8" alignment="CENTER" visible="false" managed="false">
+                    <Label text="الرمز (PIN)" style="-fx-text-fill: -fx-text-main; -fx-font-size: 14px;"/>
+                    <PasswordField fx:id="pinField" promptText="أدخل الرمز"
+                                   prefWidth="300" prefHeight="45"
+                                   style="-fx-background-radius: 10; -fx-border-radius: 10; -fx-border-color: -fx-border-main; -fx-border-width: 1; -fx-font-size: 18px; -fx-padding: 10;"
+                                   alignment="CENTER"/>
+                </VBox>
+                
+                <!-- Username Field (for manual entry / switch user) -->
+                <VBox fx:id="usernameBox" spacing="8" alignment="CENTER_RIGHT" visible="false" managed="false">
+                    <Label text="اسم المستخدم" style="-fx-text-fill: -fx-text-main; -fx-font-size: 14px;"/>
+                    <TextField fx:id="usernameField" promptText="أدخل اسم المستخدم"
+                               prefWidth="300" prefHeight="45"
+                               style="-fx-background-radius: 10; -fx-border-radius: 10; -fx-border-color: -fx-border-main; -fx-border-width: 1; -fx-font-size: 14px; -fx-padding: 10;"
+                               alignment="CENTER_RIGHT"/>
+                </VBox>
+                
+                <!-- Remember User Checkbox -->
+                <CheckBox fx:id="rememberCheckBox" text="تذكرني على هذا الجهاز" selected="true"
+                          style="-fx-text-fill: -fx-text-muted; -fx-font-size: 13px;"
+                          nodeOrientation="RIGHT_TO_LEFT"/>
+                
+                <!-- Error Label -->
+                <Label fx:id="errorLabel" text="" visible="false" managed="false"
+                       style="-fx-text-fill: -fx-danger-text; -fx-font-size: 13px; -fx-background-color: #fef2f2; -fx-padding: 8 15; -fx-background-radius: 8;"/>
+                
+                <!-- Status Label -->
+                <Label fx:id="statusLabel" text="" style="-fx-text-fill: -fx-success-dark; -fx-font-size: 13px;"/>
+                
+                <!-- Login Button -->
+                <Button fx:id="loginButton" text="دخول" onAction="#handleLogin"
+                        prefWidth="300" prefHeight="48" visible="false" managed="false"
+                        style="-fx-background-color: -fx-accent-color; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand;"/>
+                
+                <!-- Switch User Link -->
+                <Button fx:id="switchUserButton" text="تبديل المستخدم" onAction="#handleSwitchUser"
+                        visible="false" managed="false"
+                        style="-fx-background-color: transparent; -fx-text-fill: -fx-accent-color; -fx-font-size: 13px; -fx-cursor: hand; -fx-underline: true;"/>
+                
+                <!-- Exit Button -->
+                <Button text="خروج" onAction="#handleExit"
+                        style="-fx-background-color: transparent; -fx-text-fill: -fx-text-muted; -fx-font-size: 12px; -fx-cursor: hand;"/>
+            </VBox>
+        </VBox>
+    </center>
+    
+    <bottom>
+        <VBox alignment="CENTER">
+            <padding>
+                <Insets bottom="20"/>
+            </padding>
+            <Label text="© 2025 KervanjiHolding" style="-fx-text-fill: rgba(255,255,255,0.5); -fx-font-size: 11px;"/>
+        </VBox>
+    </bottom>
+</BorderPane>

@@ -1,0 +1,211 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.pharmax.controller.SaleFormController"
+            fitToWidth="true" fitToHeight="true"
+            style="-fx-background-color: transparent; -fx-background: transparent;">
+    
+    <VBox stylesheets="@../styles/main.css"
+          spacing="15" alignment="TOP_CENTER"
+          style="-fx-background-color: -fx-bg-gradient; -fx-padding: 20;">
+
+    <!-- Header -->
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="إنشاء فاتورة بيع جديدة" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+    </HBox>
+
+    <!-- Main Content -->
+    <HBox spacing="20" VBox.vgrow="ALWAYS">
+        <!-- Left Panel - Customer and Items -->
+        <VBox spacing="12" HBox.hgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 4);">
+            <padding>
+                <Insets top="15" right="15" bottom="15" left="15"/>
+            </padding>
+
+            <!-- Top Controls Section -->
+            <HBox spacing="20">
+                <!-- Product Selection -->
+                <VBox spacing="8" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="إضافة منتج: (ابحث بالاسم أو الكود أو الباركود)" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                    <HBox spacing="10" alignment="BOTTOM_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <VBox spacing="2">
+                            <Label text="الفئة" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
+                            <ComboBox fx:id="categoryFilterComboBox" promptText="كل الفئات" prefWidth="140" nodeOrientation="RIGHT_TO_LEFT"/>
+                        </VBox>
+                        <VBox spacing="2" HBox.hgrow="ALWAYS">
+                            <Label text="المنتج" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
+                            <ComboBox fx:id="productComboBox" promptText="ابحث عن المنتج..." maxWidth="Infinity" nodeOrientation="RIGHT_TO_LEFT"/>
+                        </VBox>
+                        <VBox spacing="2" HBox.hgrow="ALWAYS">
+                            <Label text="السعر" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
+                            <ComboBox fx:id="priceTypeComboBox" prefWidth="100" nodeOrientation="RIGHT_TO_LEFT"/>
+                        </VBox>
+                        <VBox spacing="2">
+                            <Label text="الكمية للبيع" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
+                            <TextField fx:id="quantityField" promptText="1" prefWidth="70" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                        </VBox>
+                        <Button text="+ إضافة" onAction="#handleAddItem" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;" prefWidth="100"/>
+                    </HBox>
+                    <HBox spacing="15" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <Label fx:id="stockLabel" text="المخزون المتاح: -" textAlignment="RIGHT" style="-fx-text-fill: -fx-form-sublabel;"/>
+                        <Label fx:id="priceLabel" text="السعر: -" textAlignment="RIGHT" style="-fx-text-fill: -fx-form-sublabel;"/>
+                    </HBox>
+                </VBox>
+
+                <!-- Customer Selection -->
+                <VBox spacing="8" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="اختر العميل: (ابحث بالاسم أو الكود أو رقم الهاتف)" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                    <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <ComboBox fx:id="customerComboBox" promptText="ابحث عن العميل..." maxWidth="Infinity" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <Button text="+ عميل جديد" onAction="#handleNewCustomer" style="-fx-background-color: -fx-success; -fx-text-fill: white;"/>
+                    </HBox>
+                    <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <Label text="موقع المشروع:" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-font-weight: bold;"/>
+                        <ComboBox fx:id="projectLocationComboBox" promptText="اختر موقع المشروع..." maxWidth="Infinity" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <TextField fx:id="newProjectLocationField" promptText="أو أضف موقع جديد..." prefWidth="150" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <Button fx:id="addProjectLocationBtn" text="+ إضافة موقع" onAction="#handleAddProjectLocation" style="-fx-background-color: #9b59b6; -fx-text-fill: white;"/>
+                    </HBox>
+                </VBox>
+            </HBox>
+
+            <Separator/>
+
+            <!-- Items Table -->
+            <VBox spacing="8" VBox.vgrow="ALWAYS">
+                <Label text="المنتجات المضافة:" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <TableView fx:id="itemsTable" VBox.vgrow="ALWAYS" minHeight="0" editable="true" nodeOrientation="RIGHT_TO_LEFT">
+                    <columns>
+                        <TableColumn fx:id="productNameColumn" text="المنتج" prefWidth="180"/>
+                        <TableColumn fx:id="quantityColumn" text="الكمية" prefWidth="80"/>
+                        <TableColumn fx:id="unitPriceColumn" text="السعر" prefWidth="90"/>
+                        <TableColumn fx:id="discountColumn" text="الخصم" prefWidth="70"/>
+                        <TableColumn fx:id="totalColumn" text="الإجمالي" prefWidth="90"/>
+                        <TableColumn fx:id="editColumn" text="تعديل" prefWidth="60"/>
+                        <TableColumn fx:id="actionColumn" text="حذف" prefWidth="60"/>
+                    </columns>
+                    <placeholder>
+                        <Label text="لم تتم إضافة منتجات بعد" textAlignment="RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                    </placeholder>
+                </TableView>
+            </VBox>
+        </VBox>
+
+        <!-- Right Panel - Payment and Summary -->
+        <ScrollPane minWidth="280" prefWidth="320" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
+                    style="-fx-background-color: -fx-form-section-bg; -fx-background: -fx-form-section-bg; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 4);">
+            <content>
+                <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10;">
+                    <padding>
+                        <Insets top="10" right="12" bottom="10" left="12"/>
+                    </padding>
+
+            <!-- Payment Method -->
+            <VBox spacing="8" nodeOrientation="RIGHT_TO_LEFT">
+                <Label text="طريقة الدفع:" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <RadioButton fx:id="cashRadio" text="نقدي" toggleGroup="$paymentGroup"/>
+                    <RadioButton fx:id="creditRadio" text="دين" toggleGroup="$paymentGroup"/>
+                </HBox>
+                <fx:define>
+                    <ToggleGroup fx:id="paymentGroup"/>
+                </fx:define>
+            </VBox>
+
+            <VBox spacing="8" nodeOrientation="RIGHT_TO_LEFT">
+                <Label text="عملة الدفع:" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <ComboBox fx:id="currencyComboBox" prefWidth="150" nodeOrientation="RIGHT_TO_LEFT"/>
+            </VBox>
+
+            <VBox fx:id="exchangeRateBox" spacing="8" visible="false" managed="false" nodeOrientation="RIGHT_TO_LEFT">
+                <Label text="سعر الصرف:" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <TextField fx:id="exchangeRateField" promptText="مثال: 1500" prefWidth="150" onKeyReleased="#handleExchangeRateChange" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                    <Label text="دينار لكل دولار"/>
+                </HBox>
+            </VBox>
+
+            <Separator/>
+
+            <!-- Additional Discount + Paid Amount -->
+            <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                <VBox spacing="4" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="خصم إضافي:" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-font-weight: bold;"/>
+                    <HBox spacing="5" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <TextField fx:id="additionalDiscountField" promptText="0" prefWidth="80" onKeyReleased="#handleDiscountChange" HBox.hgrow="ALWAYS" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <Label fx:id="additionalDiscountCurrencyLabel" text="دينار" style="-fx-font-size: 12px;"/>
+                    </HBox>
+                </VBox>
+                <VBox spacing="4" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="المبلغ المدفوع:" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-font-weight: bold;"/>
+                    <HBox spacing="5" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <TextField fx:id="paidAmountField" promptText="0" prefWidth="80" onKeyReleased="#handlePaidAmountChange" HBox.hgrow="ALWAYS" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <Label fx:id="paidAmountCurrencyLabel" text="دينار" style="-fx-font-size: 12px;"/>
+                    </HBox>
+                </VBox>
+            </HBox>
+
+            <Separator/>
+
+            <!-- Summary -->
+            <VBox spacing="8" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-bg-header; -fx-background-radius: 8;">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                
+                <HBox alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="المجموع:" prefWidth="100" textAlignment="RIGHT" style="-fx-font-size: 13px;"/>
+                    <Label fx:id="subtotalLabel" text="0 دينار" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-font-weight: bold;"/>
+                </HBox>
+                
+                <HBox alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="الخصم:" prefWidth="100" textAlignment="RIGHT" style="-fx-font-size: 13px;"/>
+                    <Label fx:id="discountLabel" text="0 دينار" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-text-fill: -fx-danger-text;"/>
+                </HBox>
+                
+                <HBox alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="الإجمالي النهائي:" prefWidth="100" textAlignment="RIGHT" style="-fx-font-size: 15px; -fx-font-weight: bold;"/>
+                    <Label fx:id="finalTotalLabel" text="0 دينار" textAlignment="RIGHT" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;"/>
+                </HBox>
+            </VBox>
+
+            <!-- Balance Display -->
+            <VBox spacing="4" nodeOrientation="RIGHT_TO_LEFT"
+                  style="-fx-background-color: rgba(245, 158, 11, 0.14); -fx-background-radius: 8; -fx-border-color: rgba(245, 158, 11, 0.35); -fx-border-width: 1; -fx-border-radius: 8;">
+                <padding>
+                    <Insets top="8" right="10" bottom="8" left="10"/>
+                </padding>
+                <HBox alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="الرصيد:" prefWidth="100" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                    <Label fx:id="balanceLabel" text="0 دينار" textAlignment="RIGHT" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                </HBox>
+                <Label fx:id="balanceStatusLabel" text="" textAlignment="RIGHT" wrapText="true" style="-fx-font-size: 12px; -fx-font-weight: bold;"/>
+            </VBox>
+
+            <Separator/>
+
+            <!-- Notes -->
+            <TitledPane text="اكتب ملاحظة" expanded="false" collapsible="true" nodeOrientation="RIGHT_TO_LEFT">
+                <content>
+                    <TextArea fx:id="notesArea" promptText="أدخل أي ملاحظات..." prefRowCount="3" nodeOrientation="RIGHT_TO_LEFT"/>
+                </content>
+            </TitledPane>
+
+            <!-- Action Buttons -->
+            <VBox spacing="8" VBox.vgrow="ALWAYS" alignment="BOTTOM_CENTER">
+                <Button text="حفظ وطباعة الفاتورة" onAction="#handleSaveAndPrint" maxWidth="Infinity" prefHeight="40"
+                        style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold;"/>
+                <Button text="إلغاء" onAction="#handleCancel" maxWidth="Infinity" prefHeight="30"
+                        style="-fx-background-color: -fx-danger; -fx-text-fill: white; -fx-font-size: 13px;"/>
+            </VBox>
+                </VBox>
+            </content>
+        </ScrollPane>
+    </HBox>
+</VBox>
+</ScrollPane>

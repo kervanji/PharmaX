@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.ReturnListController"
+      stylesheets="@../styles/main.css"
+      spacing="15" alignment="TOP_CENTER"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="📋 سجل المرتجعات" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+    </HBox>
+
+    <!-- Filters -->
+    <HBox spacing="15" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="البحث:" style="-fx-font-weight: bold;"/>
+        <TextField fx:id="searchField" promptText="رقم المرتجع أو اسم العميل..." prefWidth="200" onKeyReleased="#handleSearch"/>
+        
+        <Separator orientation="VERTICAL"/>
+        
+        <Label text="من:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="fromDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+        
+        <Label text="إلى:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="toDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+        
+        <Button text="🔄 تحديث" onAction="#handleRefresh" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white;"/>
+    </HBox>
+
+    <!-- Returns Table -->
+    <TableView fx:id="returnsTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="returnCodeColumn" text="رقم المرتجع" prefWidth="120"/>
+            <TableColumn fx:id="saleCodeColumn" text="رقم الفاتورة" prefWidth="100"/>
+            <TableColumn fx:id="customerColumn" text="العميل" prefWidth="150"/>
+            <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="120"/>
+            <TableColumn fx:id="amountColumn" text="المبلغ" prefWidth="100"/>
+            <TableColumn fx:id="reasonColumn" text="السبب" prefWidth="120"/>
+            <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="80"/>
+            <TableColumn fx:id="actionsColumn" text="الإجراءات" prefWidth="100"/>
+        </columns>
+        <placeholder>
+            <Label text="لا توجد مرتجعات"/>
+        </placeholder>
+    </TableView>
+
+    <!-- Summary Footer -->
+    <HBox spacing="30" alignment="CENTER" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="إجمالي المرتجعات" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalReturnsLabel" text="0" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="إجمالي المبلغ المرتجع" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalAmountLabel" text="0.00 د.ع" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+        </VBox>
+    </HBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="10" alignment="CENTER">
+        <Button text="❌ إغلاق" onAction="#handleClose" prefHeight="35"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

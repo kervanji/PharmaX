@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.collections.FXCollections?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import java.lang.String?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.SaleListController"
+      stylesheets="@../styles/main.css"
+      spacing="15" alignment="TOP_CENTER"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="💰 قائمة المبيعات" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+    </HBox>
+
+    <!-- Filters -->
+    <HBox spacing="15" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="البحث:" style="-fx-font-weight: bold;"/>
+        <TextField fx:id="searchField" promptText="رقم الفاتورة أو اسم العميل..." prefWidth="200" onKeyReleased="#handleSearch"/>
+        
+        <Separator orientation="VERTICAL"/>
+        
+        <Label text="من:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="fromDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+        
+        <Label text="إلى:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="toDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+        
+        <Separator orientation="VERTICAL"/>
+        
+        <Label text="الحالة:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="statusComboBox" prefWidth="120" onAction="#handleStatusFilter">
+            <items>
+                <FXCollections fx:factory="observableArrayList">
+                    <String fx:value="الكل"/>
+                    <String fx:value="مدفوع"/>
+                    <String fx:value="معلق"/>
+                    <String fx:value="متأخر"/>
+                </FXCollections>
+            </items>
+        </ComboBox>
+        
+        <Button text="🔄 تحديث" onAction="#handleRefresh" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white;"/>
+    </HBox>
+
+    <!-- Sales Table -->
+    <TableView fx:id="salesTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="saleCodeColumn" text="رقم الفاتورة" prefWidth="140"/>
+            <TableColumn fx:id="customerColumn" text="العميل" prefWidth="150"/>
+            <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="120"/>
+            <TableColumn fx:id="totalColumn" text="الإجمالي" prefWidth="100"/>
+            <TableColumn fx:id="paymentMethodColumn" text="طريقة الدفع" prefWidth="100"/>
+            <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="80"/>
+            <TableColumn fx:id="actionsColumn" text="الإجراءات" prefWidth="180"/>
+        </columns>
+        <placeholder>
+            <Label text="لا توجد مبيعات"/>
+        </placeholder>
+    </TableView>
+
+    <!-- Summary Footer -->
+    <HBox spacing="30" alignment="CENTER" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="إجمالي المبيعات" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalSalesLabel" text="0" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="إجمالي المبلغ" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalAmountLabel" text="0.00 دينار" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="المدفوع" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="paidAmountLabel" text="0.00 دينار" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-text;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="المعلق" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="pendingAmountLabel" text="0.00 دينار" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+        </VBox>
+    </HBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="10" alignment="CENTER">
+        <Button text="📊 تقرير المبيعات" onAction="#handleSalesReport" prefHeight="35"
+                style="-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="📥 تصدير Excel" onAction="#handleExportExcel" prefHeight="35"
+                style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="❌ إغلاق" onAction="#handleClose" prefHeight="35"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

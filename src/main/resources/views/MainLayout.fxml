@@ -1,0 +1,154 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.geometry.Insets?>
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.pharmax.controller.MainController" fx:id="mainLayout"
+           stylesheets="@../styles/main.css"
+           style="-fx-background-color: -fx-bg-main;">
+
+    <center>
+        <TabPane fx:id="mainTabPane" styleClass="dashboard-tab-pane">
+            <tabs>
+                <Tab fx:id="dashboardTab" text="الرئيسية" closable="false">
+                    <content>
+                        <BorderPane style="-fx-background-color: -fx-bg-main;">
+                            <!-- Top Header Bar -->
+                            <top>
+                                <HBox alignment="CENTER" spacing="12"
+                                      style="-fx-padding: 12 24; -fx-background-color: -fx-bar-bg; -fx-border-color: -fx-bar-border; -fx-border-width: 0 0 1 0;">
+                                    <ImageView fitWidth="36" fitHeight="36" preserveRatio="true">
+                                        <image>
+                                            <Image url="@../templates/PharmaX_transparent.png"/>
+                                        </image>
+                                    </ImageView>
+                                    <Label text="PharmaX" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-text-bright;">
+                                        <font><Font name="Segoe UI Bold" size="22"/></font>
+                                    </Label>
+                                    <Label fx:id="companyNameLabel" text="" style="-fx-font-size: 13px; -fx-text-fill: -fx-accent-text; -fx-font-weight: 600;">
+                                        <font><Font name="Segoe UI Semibold" size="13"/></font>
+                                    </Label>
+                                    <Region HBox.hgrow="ALWAYS"/>
+                                    <!-- Layout Edit Controls (Admin only) -->
+                                    <HBox fx:id="layoutEditControls" alignment="CENTER" spacing="6" visible="false" managed="false">
+                                        <Button fx:id="editLayoutBtn" text="✏️ تعديل الواجهة" onAction="#handleToggleEditMode" styleClass="header-btn" style="-fx-background-color: rgba(255,193,7,0.15); -fx-text-fill: -fx-warning-text;"/>
+                                        <Button fx:id="sellerLayoutBtn" text="🛍️ تعديل واجهة البائع" onAction="#handleToggleSellerEditMode" styleClass="header-btn" style="-fx-background-color: -fx-accent-bg; -fx-text-fill: -fx-accent-text;"/>
+                                        <Button fx:id="resetLayoutBtn" text="↺ إعادة ترتيب" onAction="#handleResetLayout" styleClass="header-btn" style="-fx-background-color: rgba(244,67,54,0.15); -fx-text-fill: -fx-danger-text;" visible="false" managed="false"/>
+                                    </HBox>
+                                    <!-- User Info -->
+                                    <HBox alignment="CENTER" spacing="8">
+                                        <Label fx:id="currentUserLabel" text="" style="-fx-font-size: 13px; -fx-text-fill: -fx-text-main; -fx-font-weight: 600;"/>
+                                        <Label fx:id="currentRoleLabel" text="" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-header; -fx-background-color: -fx-accent-bg; -fx-padding: 3 10; -fx-background-radius: 12;"/>
+                                        <Button fx:id="lockButton" text="قفل" onAction="#handleLock" styleClass="header-btn" style="-fx-background-color: rgba(255,193,7,0.15); -fx-text-fill: -fx-warning-text;"/>
+                                        <Button fx:id="logoutButton" text="خروج" onAction="#handleLogout" styleClass="header-btn" style="-fx-background-color: rgba(244,67,54,0.15); -fx-text-fill: -fx-danger-text;"/>
+                                    </HBox>
+                                </HBox>
+                            </top>
+
+                            <center>
+                                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" style="-fx-background: transparent; -fx-background-color: transparent;">
+                                    <VBox alignment="TOP_CENTER" spacing="24" style="-fx-padding: 30 40;">
+
+                                        <!-- Statistics Cards Row -->
+                                        <HBox alignment="CENTER" spacing="16">
+                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #4facfe, #00f2fe); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
+                                                <Label text="مبيعات اليوم" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+                                                <Label fx:id="todaySalesAmountLabel" text="0 د.ع" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                                                <Label fx:id="todaySalesCountLabel" text="عدد المبيعات: --" style="-fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.7);"/>
+                                            </VBox>
+                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #7c4dff, #512da8); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
+                                                <Label text="العملاء" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+                                                <Label fx:id="totalCustomersLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                                            </VBox>
+                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #11998e, #38ef7d); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
+                                                <Label text="المنتجات" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+                                                <Label fx:id="totalProductsLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                                            </VBox>
+                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #ffb347, #ff7b54); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
+                                                <Label text="إجمالي المبيعات" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+                                                <Label fx:id="totalSalesLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                                            </VBox>
+                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #ff416c, #ff4b2b); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
+                                                <Label text="قيمة المخزون" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
+                                                <Label fx:id="inventoryValueLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
+                                            </VBox>
+                                        </HBox>
+
+                                        <!-- Alert Cards -->
+                                        <HBox alignment="CENTER" spacing="16">
+                                            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-background-color: linear-gradient(to bottom right, #ff9a9e, #fecfef); -fx-background-radius: 12; -fx-padding: 12 20; -fx-pref-width: 350; -fx-effect: -fx-shadow-sm; -fx-cursor: hand;" onMouseClicked="#handleLowStockAlertClick">
+                                                <VBox alignment="CENTER_RIGHT" spacing="4" HBox.hgrow="ALWAYS">
+                                                    <Label text="تنبيهات المخزون" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #d32f2f;"/>
+                                                    <Label fx:id="lowStockDescLabel" text="راقب المنتجات منخفضة المخزون" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
+                                                    <Label fx:id="lowStockCountLabel" text="لا توجد تنبيهات" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-success-text; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
+                                                </VBox>
+                                            </HBox>
+                                            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-background-color: linear-gradient(to bottom right, #f6d365, #fda085); -fx-background-radius: 12; -fx-padding: 12 20; -fx-pref-width: 350; -fx-effect: -fx-shadow-sm; -fx-cursor: hand;" onMouseClicked="#handlePendingPaymentsAlertClick">
+                                                <VBox alignment="CENTER_RIGHT" spacing="4" HBox.hgrow="ALWAYS">
+                                                    <Label text="المدفوعات المعلقة" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #e65100;"/>
+                                                    <Label fx:id="pendingPaymentsDescLabel" text="فواتير تنتظر الدفع" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
+                                                    <Label fx:id="pendingPaymentsLabel" text="0 فاتورة" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-warning-dark; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
+                                                </VBox>
+                                            </HBox>
+                                            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-background-color: linear-gradient(to bottom right, #e0c3fc, #8ec5fc); -fx-background-radius: 12; -fx-padding: 12 20; -fx-pref-width: 350; -fx-effect: -fx-shadow-sm; -fx-cursor: hand;" onMouseClicked="#handleInstallmentAlertClick">
+                                                <VBox alignment="CENTER_RIGHT" spacing="4" HBox.hgrow="ALWAYS">
+                                                    <HBox alignment="CENTER_RIGHT" spacing="8">
+                                                        <Label fx:id="installmentReminderDaysLabel" text="تنبيه قبل: 3 أيام" style="-fx-font-size: 10px; -fx-text-fill: #4a148c; -fx-background-color: rgba(255,255,255,0.5); -fx-padding: 2 8; -fx-background-radius: 8; -fx-cursor: hand;" onMouseClicked="#handleChangeReminderDays"/>
+                                                        <Label text="تنبيهات الأقساط" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #4a148c;"/>
+                                                    </HBox>
+                                                    <Label fx:id="installmentAlertDescLabel" text="أقساط قادمة ومستحقة" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
+                                                    <Label fx:id="installmentAlertLabel" text="لا توجد أقساط قريبة" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-success-text; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
+                                                </VBox>
+                                            </HBox>
+                                        </HBox>
+
+                                        <!-- Tiles Grid - built programmatically by MainController -->
+                                        <FlowPane fx:id="tilesFlowPane" hgap="16" vgap="16" alignment="CENTER" nodeOrientation="RIGHT_TO_LEFT">
+                                        </FlowPane>
+                                    </VBox>
+                                </ScrollPane>
+                            </center>
+                        </BorderPane>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+
+    <bottom>
+        <HBox alignment="CENTER" spacing="16" style="-fx-padding: 8 20; -fx-background-color: -fx-bar-bg; -fx-border-color: -fx-bar-border; -fx-border-width: 1 0 0 0;">
+            <HBox alignment="CENTER_LEFT" spacing="8" HBox.hgrow="ALWAYS">
+                <Button fx:id="checkUpdateButton" text="فحص التحديثات" onAction="#handleCheckForUpdates" styleClass="header-btn" style="-fx-background-color: -fx-accent-bg; -fx-text-fill: -fx-accent-text;"/>
+                <Label fx:id="updateStatusLabel" text="" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-hint; -fx-font-weight: 600;"/>
+                <ProgressIndicator fx:id="updateProgress" visible="false" prefWidth="16" prefHeight="16"/>
+                <Button fx:id="updateButton" text="تحديث الآن" visible="false" onAction="#handleUpdateNow" styleClass="header-btn" style="-fx-background-color: -fx-accent-bg; -fx-text-fill: -fx-text-header;"/>
+            </HBox>
+            <Separator orientation="VERTICAL" style="-fx-background-color: -fx-border-main;"/>
+            <HBox alignment="CENTER" spacing="6">
+                <Label fx:id="driveStatusIndicator" text="●" style="-fx-font-size: 10px; -fx-text-fill: -fx-danger-text;"/>
+                <Label fx:id="driveStatusLabel" text="Google Drive: غير متصل" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-hint; -fx-font-weight: 600;"/>
+                <Button fx:id="connectDriveButton" text="ربط Google Drive" onAction="#handleConnectGoogleDrive" styleClass="header-btn" style="-fx-background-color: -fx-accent-bg; -fx-text-fill: -fx-accent-text; -fx-font-size: 10px; -fx-padding: 3 10; -fx-background-radius: 8;"/>
+            </HBox>
+            <Separator orientation="VERTICAL" style="-fx-background-color: -fx-border-main;"/>
+            <Label text="© 2025 KervanjiHolding" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-hint;"/>
+            <Label text="•" style="-fx-font-size: 11px; -fx-text-fill: -fx-scrollbar-thumb;"/>
+            <Label text="PharmaX v1.2.4" style="-fx-font-size: 11px; -fx-text-fill: -fx-text-hint; -fx-font-weight: 600;"/>
+        </HBox>
+    </bottom>
+</BorderPane>

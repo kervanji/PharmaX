@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.CategoryController"
+      stylesheets="@../styles/main.css"
+      spacing="16"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 24;">
+    
+    <Label text="إدارة الفئات" 
+           style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+    
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <TextField fx:id="categoryNameField" promptText="اسم الفئة الجديدة" HBox.hgrow="ALWAYS"
+                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+        <TextField fx:id="categoryDescField" promptText="الوصف (اختياري)" prefWidth="200"
+                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+        <Button fx:id="addButton" text="إضافة" onAction="#handleAddCategory"
+                style="-fx-background-color: linear-gradient(to right, -fx-accent-light, -fx-accent-color); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 8;"/>
+    </HBox>
+    
+    <TableView fx:id="categoriesTable" VBox.vgrow="ALWAYS"
+               style="-fx-background-radius: 12; -fx-border-radius: 12;">
+        <columns>
+            <TableColumn fx:id="idColumn" text="#" prefWidth="50"/>
+            <TableColumn fx:id="nameColumn" text="اسم الفئة" prefWidth="200"/>
+            <TableColumn fx:id="descriptionColumn" text="الوصف" prefWidth="180"/>
+            <TableColumn fx:id="productCountColumn" text="عدد المنتجات" prefWidth="100"/>
+            <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="80"/>
+            <TableColumn fx:id="actionsColumn" text="إجراءات" prefWidth="120"/>
+        </columns>
+        <placeholder>
+            <Label text="لا توجد فئات" style="-fx-font-size: 16px; -fx-text-fill: -fx-text-muted;"/>
+        </placeholder>
+    </TableView>
+    
+    <HBox alignment="CENTER_RIGHT" spacing="12">
+        <Label fx:id="totalCategoriesLabel" text="إجمالي الفئات: 0" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="إغلاق" onAction="#handleClose"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-font-size: 14px; -fx-padding: 10 24; -fx-background-radius: 8;"/>
+    </HBox>
+</VBox>
