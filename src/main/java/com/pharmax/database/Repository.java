@@ -3,6 +3,7 @@ package com.pharmax.database;
 import com.pharmax.model.Category;
 import com.pharmax.model.Customer;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductUnit;
 import com.pharmax.model.Sale;
 import com.pharmax.model.SaleItem;
 import com.pharmax.model.Receipt;
@@ -212,6 +213,84 @@ public class Repository<T> {
             } catch (Exception e) {
                 logger.error("Failed to find product by barcode: {}", barcode, e);
                 return Optional.empty();
+            }
+        }
+    }
+
+    public static class ProductUnitRepository extends Repository<ProductUnit> {
+        public ProductUnitRepository() {
+            super(ProductUnit.class);
+        }
+
+        public List<ProductUnit> findByProductId(Long productId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<ProductUnit> query = session.createQuery(
+                    "FROM ProductUnit u WHERE u.product.id = :productId AND u.isActive = true " +
+                    "ORDER BY u.isDefault DESC, u.conversionFactor ASC, u.unitName ASC",
+                    ProductUnit.class
+                );
+                query.setParameter("productId", productId);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find product units by product id: {}", productId, e);
+                throw new RuntimeException("Failed to find product units", e);
+            }
+        }
+
+        public Optional<ProductUnit> findByBarcode(String barcode) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<ProductUnit> query = session.createQuery(
+                    "SELECT u FROM ProductUnit u " +
+                    "LEFT JOIN FETCH u.product p " +
+                    "WHERE u.barcode = :barcode AND u.isActive = true AND p.isActive = true",
+                    ProductUnit.class
+                );
+                query.setParameter("barcode", barcode);
+                return query.uniqueResultOptional();
+            } catch (Exception e) {
+                logger.error("Failed to find product unit by barcode: {}", barcode, e);
+                return Optional.empty();
+            }
+        }
+
+        public void replaceForProduct(Product product, List<ProductUnit> units) {
+            if (product == null || product.getId() == null) {
+                throw new IllegalArgumentException("Product must be saved before assigning units");
+            }
+
+            Transaction transaction = null;
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                transaction = session.beginTransaction();
+                session.createQuery("DELETE FROM ProductUnit u WHERE u.product.id = :productId")
+                        .setParameter("productId", product.getId())
+                        .executeUpdate();
+                session.flush();
+
+                Product managedProduct = session.get(Product.class, product.getId());
+                for (ProductUnit unit : units) {
+                    ProductUnit savedUnit = new ProductUnit();
+                    savedUnit.setProduct(managedProduct);
+                    savedUnit.setUnitName(unit.getUnitName());
+                    savedUnit.setBarcode(unit.getBarcode());
+                    savedUnit.setConversionFactor(unit.getConversionFactor());
+                    savedUnit.setSalePrice(unit.getSalePrice());
+                    savedUnit.setSalePriceUsd(unit.getSalePriceUsd());
+                    savedUnit.setIsDefault(unit.getIsDefault());
+                    savedUnit.setIsActive(unit.getIsActive());
+                    session.save(savedUnit);
+                }
+
+                transaction.commit();
+            } catch (Exception e) {
+                if (transaction != null) {
+                    try {
+                        transaction.rollback();
+                    } catch (Exception rollbackEx) {
+                        logger.error("Failed to rollback product unit replacement", rollbackEx);
+                    }
+                }
+                logger.error("Failed to replace product units for product: {}", product.getId(), e);
+                throw new RuntimeException("Failed to replace product units", e);
             }
         }
     }

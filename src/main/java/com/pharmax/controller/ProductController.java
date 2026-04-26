@@ -2,10 +2,16 @@ package com.pharmax.controller;
 
 import com.pharmax.model.Category;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductUnit;
 import com.pharmax.service.CategoryService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductUnitService;
 import com.pharmax.util.SessionManager;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
@@ -62,6 +68,34 @@ public class ProductController {
     @FXML
     private ComboBox<String> unitOfMeasureComboBox;
     @FXML
+    private ComboBox<String> baseUnitComboBox;
+    @FXML
+    private TableView<ProductUnitRow> packagingTable;
+    @FXML
+    private TableColumn<ProductUnitRow, String> packagingUnitColumn;
+    @FXML
+    private TableColumn<ProductUnitRow, String> packagingBarcodeColumn;
+    @FXML
+    private TableColumn<ProductUnitRow, Double> packagingConversionColumn;
+    @FXML
+    private TableColumn<ProductUnitRow, Double> packagingPriceColumn;
+    @FXML
+    private TableColumn<ProductUnitRow, Double> packagingPriceUsdColumn;
+    @FXML
+    private TableColumn<ProductUnitRow, Boolean> packagingDefaultColumn;
+    @FXML
+    private TextField packagingUnitNameField;
+    @FXML
+    private TextField packagingBarcodeField;
+    @FXML
+    private TextField packagingConversionField;
+    @FXML
+    private TextField packagingPriceField;
+    @FXML
+    private TextField packagingPriceUsdField;
+    @FXML
+    private CheckBox packagingDefaultCheckBox;
+    @FXML
     private CheckBox isActiveCheckBox;
     @FXML
     private Button deleteButton;
@@ -74,6 +108,8 @@ public class ProductController {
     private Double originalUnitPrice = null; // Store original selling price for sellers who can't edit it
     private final InventoryService inventoryService = new InventoryService();
     private final CategoryService categoryService = new CategoryService();
+    private final ProductUnitService productUnitService = new ProductUnitService();
+    private final ObservableList<ProductUnitRow> packagingRows = FXCollections.observableArrayList();
     private final DecimalFormat numberFormat;
 
     public ProductController() {
@@ -86,6 +122,7 @@ public class ProductController {
     private void initialize() {
         loadCategories();
         loadUnitsOfMeasure();
+        setupPackagingSection();
         setupPriceListeners();
         setupPricingModeToggle();
         applyRoleRestrictions();
@@ -141,8 +178,49 @@ public class ProductController {
     }
 
     private void loadUnitsOfMeasure() {
-        List<String> units = Arrays.asList("قطعة", "كيلو", "متر", "لتر", "علبة", "كرتون", "طن", "جرام");
+        List<String> units = Arrays.asList("قطعة", "شريط", "علبة", "كرتون", "كيلو", "متر", "لتر", "طن", "جرام");
         unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(units));
+        if (baseUnitComboBox != null) {
+            baseUnitComboBox.setItems(FXCollections.observableArrayList(units));
+            baseUnitComboBox.setValue("قطعة");
+        }
+        if (unitOfMeasureComboBox.getValue() == null) {
+            unitOfMeasureComboBox.setValue("قطعة");
+        }
+    }
+
+    private void setupPackagingSection() {
+        if (packagingTable == null) {
+            return;
+        }
+
+        packagingUnitColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getUnitName()));
+        packagingBarcodeColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBarcode()));
+        packagingConversionColumn
+                .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getConversionFactor()).asObject());
+        packagingPriceColumn
+                .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getSalePrice()).asObject());
+        packagingPriceUsdColumn
+                .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getSalePriceUsd()).asObject());
+        packagingDefaultColumn
+                .setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().isDefaultUnit()));
+        packagingTable.setItems(packagingRows);
+        if (packagingConversionField != null
+                && (packagingConversionField.getText() == null || packagingConversionField.getText().isBlank())) {
+            packagingConversionField.setText("1");
+        }
+
+        packagingTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, row) -> {
+            if (row == null) {
+                return;
+            }
+            packagingUnitNameField.setText(row.getUnitName());
+            packagingBarcodeField.setText(row.getBarcode());
+            packagingConversionField.setText(String.valueOf(row.getConversionFactor()));
+            packagingPriceField.setText(row.getSalePrice() > 0 ? String.valueOf(row.getSalePrice()) : "");
+            packagingPriceUsdField.setText(row.getSalePriceUsd() > 0 ? String.valueOf(row.getSalePriceUsd()) : "");
+            packagingDefaultCheckBox.setSelected(row.isDefaultUnit());
+        });
     }
 
     private void setupPriceListeners() {
@@ -348,10 +426,100 @@ public class ProductController {
         minimumStockField.setText(product.getMinimumStock() != null ? String.valueOf(product.getMinimumStock()) : "");
         maximumStockField.setText(product.getMaximumStock() != null ? String.valueOf(product.getMaximumStock()) : "");
         unitOfMeasureComboBox.setValue(product.getUnitOfMeasure());
+        if (baseUnitComboBox != null) {
+            String baseUnit = product.getBaseUnit() != null ? product.getBaseUnit() : product.getUnitOfMeasure();
+            baseUnitComboBox.setValue(baseUnit != null ? baseUnit : "قطعة");
+        }
         isActiveCheckBox.setSelected(product.getIsActive());
+        loadPackagingRows(product);
 
         applySellingPriceEditRestriction();
         updateAllProfitMargins();
+    }
+
+    private void loadPackagingRows(Product product) {
+        packagingRows.clear();
+        List<ProductUnit> units = productUnitService.getUnitsForProductOrDefault(product);
+        for (ProductUnit unit : units) {
+            packagingRows.add(ProductUnitRow.fromUnit(unit));
+        }
+    }
+
+    @FXML
+    private void handleAddPackagingUnit() {
+        String unitName = safeTrim(packagingUnitNameField);
+        if (unitName.isEmpty()) {
+            showError("خطأ", "اسم وحدة التعبئة مطلوب");
+            packagingUnitNameField.requestFocus();
+            return;
+        }
+
+        double conversionFactor = parseDouble(packagingConversionField.getText());
+        if (conversionFactor <= 0) {
+            showError("خطأ", "عامل التحويل يجب أن يكون أكبر من صفر");
+            packagingConversionField.requestFocus();
+            return;
+        }
+
+        ProductUnitRow row = new ProductUnitRow(
+                unitName,
+                safeTrim(packagingBarcodeField),
+                conversionFactor,
+                parseDouble(packagingPriceField.getText()),
+                parseDouble(packagingPriceUsdField.getText()),
+                packagingDefaultCheckBox.isSelected()
+        );
+
+        ProductUnitRow selected = packagingTable != null ? packagingTable.getSelectionModel().getSelectedItem() : null;
+        ProductUnitRow existing = packagingRows.stream()
+                .filter(item -> item != selected)
+                .filter(item -> item.getUnitName().equalsIgnoreCase(unitName))
+                .findFirst()
+                .orElse(null);
+
+        if (selected != null && existing != null) {
+            showError("Ø®Ø·Ø£", "ÙˆØ­Ø¯Ø© Ø§Ù„ØªØ¹Ø¨Ø¦Ø© Ù…Ø³Ø¬Ù„Ø© Ù…Ø³Ø¨Ù‚Ø§Ù‹: " + unitName);
+            packagingUnitNameField.requestFocus();
+            return;
+        }
+
+        if (row.isDefaultUnit()) {
+            packagingRows.forEach(item -> item.setDefaultUnit(false));
+        }
+
+        if (selected != null) {
+            int index = packagingRows.indexOf(selected);
+            packagingRows.set(index, row);
+        } else if (existing != null) {
+            int index = packagingRows.indexOf(existing);
+            packagingRows.set(index, row);
+        } else {
+            packagingRows.add(row);
+        }
+        packagingTable.refresh();
+        clearPackagingInputs();
+    }
+
+    @FXML
+    private void handleRemovePackagingUnit() {
+        ProductUnitRow selected = packagingTable != null ? packagingTable.getSelectionModel().getSelectedItem() : null;
+        if (selected != null) {
+            packagingRows.remove(selected);
+            packagingTable.refresh();
+            clearPackagingInputs();
+        }
+    }
+
+    private void clearPackagingInputs() {
+        packagingUnitNameField.clear();
+        packagingBarcodeField.clear();
+        packagingConversionField.setText("1");
+        packagingPriceField.clear();
+        packagingPriceUsdField.clear();
+        packagingDefaultCheckBox.setSelected(false);
+        if (packagingTable != null) {
+            packagingTable.getSelectionModel().clearSelection();
+        }
     }
 
     @FXML
@@ -417,14 +585,21 @@ public class ProductController {
             product.setQuantityInStock(parseDouble(quantityField.getText()));
             product.setMinimumStock(parseDouble(minimumStockField.getText()));
             product.setMaximumStock(parseDoubleOrNull(maximumStockField.getText()));
-            product.setUnitOfMeasure(unitOfMeasureComboBox.getValue());
+            String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
+                    ? baseUnitComboBox.getValue()
+                    : unitOfMeasureComboBox.getValue();
+            product.setBaseUnit(baseUnit);
+            product.setUnitOfMeasure(baseUnit);
             product.setIsActive(isActiveCheckBox.isSelected());
 
+            Product savedProduct;
             if (isEditMode) {
-                inventoryService.updateProduct(product);
+                savedProduct = inventoryService.updateProduct(product);
+                productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
                 showInfo("تم التحديث", "تم تحديث المنتج بنجاح");
             } else {
-                inventoryService.createProduct(product);
+                savedProduct = inventoryService.createProduct(product);
+                productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
                 showInfo("تم الإضافة", "تم إضافة المنتج بنجاح");
             }
 
@@ -445,6 +620,12 @@ public class ProductController {
         } else if (dialogStage != null) {
             dialogStage.close();
         }
+    }
+
+    private List<ProductUnit> buildProductUnits(Product savedProduct) {
+        return packagingRows.stream()
+                .map(row -> row.toProductUnit(savedProduct))
+                .toList();
     }
 
     @FXML
@@ -580,5 +761,76 @@ public class ProductController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    public static class ProductUnitRow {
+        private String unitName;
+        private String barcode;
+        private double conversionFactor;
+        private double salePrice;
+        private double salePriceUsd;
+        private boolean defaultUnit;
+
+        public ProductUnitRow(String unitName, String barcode, double conversionFactor,
+                double salePrice, double salePriceUsd, boolean defaultUnit) {
+            this.unitName = unitName;
+            this.barcode = barcode;
+            this.conversionFactor = conversionFactor;
+            this.salePrice = salePrice;
+            this.salePriceUsd = salePriceUsd;
+            this.defaultUnit = defaultUnit;
+        }
+
+        public static ProductUnitRow fromUnit(ProductUnit unit) {
+            return new ProductUnitRow(
+                    unit.getUnitName(),
+                    unit.getBarcode(),
+                    unit.getEffectiveConversionFactor(),
+                    unit.getSalePrice() != null ? unit.getSalePrice() : 0,
+                    unit.getSalePriceUsd() != null ? unit.getSalePriceUsd() : 0,
+                    Boolean.TRUE.equals(unit.getIsDefault())
+            );
+        }
+
+        public ProductUnit toProductUnit(Product product) {
+            ProductUnit unit = new ProductUnit();
+            unit.setProduct(product);
+            unit.setUnitName(unitName);
+            unit.setBarcode(barcode != null && !barcode.trim().isEmpty() ? barcode.trim() : null);
+            unit.setConversionFactor(conversionFactor);
+            unit.setSalePrice(salePrice > 0 ? salePrice : null);
+            unit.setSalePriceUsd(salePriceUsd > 0 ? salePriceUsd : null);
+            unit.setIsDefault(defaultUnit);
+            unit.setIsActive(true);
+            return unit;
+        }
+
+        public String getUnitName() {
+            return unitName != null ? unitName : "";
+        }
+
+        public String getBarcode() {
+            return barcode != null ? barcode : "";
+        }
+
+        public double getConversionFactor() {
+            return conversionFactor;
+        }
+
+        public double getSalePrice() {
+            return salePrice;
+        }
+
+        public double getSalePriceUsd() {
+            return salePriceUsd;
+        }
+
+        public boolean isDefaultUnit() {
+            return defaultUnit;
+        }
+
+        public void setDefaultUnit(boolean defaultUnit) {
+            this.defaultUnit = defaultUnit;
+        }
     }
 }

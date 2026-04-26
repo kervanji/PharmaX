@@ -1,4 +1,4 @@
-﻿/* PharmaX Modern UI Stylesheet */
+/* PharmaX Modern UI Stylesheet */
 /* All colors reference variables from theme.css */
 
 /* Font Implementation (Removed BoutrosNewsH1 to fix Arabic characters on Mac) */
@@ -35,6 +35,10 @@
 
     font-family: "Geeza Pro", "SF Arabic", "Arial", "Tahoma", sans-serif;
     -fx-text-fill: -fx-text-bright;
+}
+
+.login-pane {
+    -fx-background-color: -fx-login-bg;
 }
 
 /* Menu Bar Styling */

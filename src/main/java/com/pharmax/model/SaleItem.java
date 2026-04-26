@@ -35,10 +35,21 @@ public class SaleItem {
     @Column(name = "price_type")
     private String priceType;
 
+    @Column(name = "sold_unit")
+    private String soldUnit;
+
+    @Column(name = "conversion_factor")
+    private Double conversionFactor;
+
+    @Column(name = "base_quantity")
+    private Double baseQuantity;
+
     public SaleItem() {
         this.discountPercentage = 0.0;
         this.discountAmount = 0.0;
         this.priceType = "مفرد";
+        this.conversionFactor = 1.0;
+        this.baseQuantity = 0.0;
     }
 
     // Getters and Setters
@@ -68,4 +79,25 @@ public class SaleItem {
     
     public String getPriceType() { return priceType; }
     public void setPriceType(String priceType) { this.priceType = priceType; }
+
+    public String getSoldUnit() { return soldUnit; }
+    public void setSoldUnit(String soldUnit) { this.soldUnit = soldUnit; }
+
+    public Double getConversionFactor() { return conversionFactor; }
+    public void setConversionFactor(Double conversionFactor) { this.conversionFactor = conversionFactor; }
+
+    public Double getBaseQuantity() { return baseQuantity; }
+    public void setBaseQuantity(Double baseQuantity) { this.baseQuantity = baseQuantity; }
+
+    public double getEffectiveConversionFactor() {
+        return conversionFactor != null && conversionFactor > 0 ? conversionFactor : 1.0;
+    }
+
+    public double getEffectiveBaseQuantity() {
+        if (baseQuantity != null && baseQuantity > 0) {
+            return baseQuantity;
+        }
+        double qty = quantity != null ? quantity : 0.0;
+        return qty * getEffectiveConversionFactor();
+    }
 }

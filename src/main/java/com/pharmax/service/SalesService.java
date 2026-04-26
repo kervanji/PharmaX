@@ -63,8 +63,14 @@ public class SalesService {
             }
             
             Product product = productOpt.get();
+            double conversionFactor = itemRequest.getConversionFactor() != null && itemRequest.getConversionFactor() > 0
+                    ? itemRequest.getConversionFactor()
+                    : 1.0;
+            double baseQuantity = itemRequest.getBaseQuantity() != null && itemRequest.getBaseQuantity() > 0
+                    ? itemRequest.getBaseQuantity()
+                    : itemRequest.getQuantity() * conversionFactor;
 
-            if (!inventoryService.isStockAvailable(product.getId(), itemRequest.getQuantity())) {
+            if (!inventoryService.isStockAvailable(product.getId(), baseQuantity)) {
                 throw new IllegalArgumentException("الكمية غير متوفرة للمنتج: " + product.getName());
             }
             
@@ -74,6 +80,9 @@ public class SalesService {
             saleItem.setProduct(product);
             saleItem.setQuantity(itemRequest.getQuantity());
             saleItem.setPriceType(itemRequest.getPriceType() != null ? itemRequest.getPriceType() : "مفرد");
+            saleItem.setSoldUnit(itemRequest.getSoldUnit());
+            saleItem.setConversionFactor(conversionFactor);
+            saleItem.setBaseQuantity(baseQuantity);
             
             // Use price from request; fallback respects the sale currency so USD-only
             // products do not become zero/blank in USD receipts.
@@ -94,7 +103,7 @@ public class SalesService {
             totalAmount += saleItem.getTotalPrice();
             
             // Update inventory
-            inventoryService.removeStock(product.getId(), itemRequest.getQuantity());
+            inventoryService.removeStock(product.getId(), baseQuantity);
         }
         
         // Set sale totals (no tax)
@@ -161,7 +170,7 @@ public class SalesService {
             
             // Restore inventory
             for (SaleItem item : sale.getSaleItems()) {
-                inventoryService.addStock(item.getProduct().getId(), item.getQuantity());
+                inventoryService.addStock(item.getProduct().getId(), item.getEffectiveBaseQuantity());
             }
             
             // Revert customer balance effect of this sale
@@ -278,6 +287,9 @@ public class SalesService {
         private Double unitPrice;
         private Double discountPercentage;
         private String priceType;
+        private String soldUnit;
+        private Double conversionFactor;
+        private Double baseQuantity;
         
         // Getters and Setters
         public Long getProductId() { return productId; }
@@ -294,5 +306,14 @@ public class SalesService {
         
         public String getPriceType() { return priceType; }
         public void setPriceType(String priceType) { this.priceType = priceType; }
+
+        public String getSoldUnit() { return soldUnit; }
+        public void setSoldUnit(String soldUnit) { this.soldUnit = soldUnit; }
+
+        public Double getConversionFactor() { return conversionFactor; }
+        public void setConversionFactor(Double conversionFactor) { this.conversionFactor = conversionFactor; }
+
+        public Double getBaseQuantity() { return baseQuantity; }
+        public void setBaseQuantity(Double baseQuantity) { this.baseQuantity = baseQuantity; }
     }
 }

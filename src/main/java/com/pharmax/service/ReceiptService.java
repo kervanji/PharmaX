@@ -805,9 +805,11 @@ public class ReceiptService {
             String productName = item.getProduct() != null && item.getProduct().getName() != null
                     ? item.getProduct().getName()
                     : "-";
-            String unitOfMeasure = item.getProduct() != null && item.getProduct().getUnitOfMeasure() != null
-                    ? item.getProduct().getUnitOfMeasure()
-                    : "-";
+            String unitOfMeasure = item.getSoldUnit() != null && !item.getSoldUnit().trim().isEmpty()
+                    ? item.getSoldUnit()
+                    : item.getProduct() != null && item.getProduct().getUnitOfMeasure() != null
+                            ? item.getProduct().getUnitOfMeasure()
+                            : "-";
 
             table.addCell(createBodyCell(String.valueOf(rowNo), arabicFont, Element.ALIGN_CENTER));
             table.addCell(createBodyCell(productName, arabicFont, Element.ALIGN_RIGHT));

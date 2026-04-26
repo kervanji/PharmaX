@@ -60,7 +60,10 @@ public class ReturnService {
 
                 // Update inventory - add returned items back to stock
                 if ("GOOD".equals(item.getConditionStatus())) {
-                    inventoryService.addStock(item.getProduct().getId(), item.getQuantity());
+                    double conversionFactor = item.getOriginalSaleItem() != null
+                            ? item.getOriginalSaleItem().getEffectiveConversionFactor()
+                            : 1.0;
+                    inventoryService.addStock(item.getProduct().getId(), item.getQuantity() * conversionFactor);
                 }
             }
 

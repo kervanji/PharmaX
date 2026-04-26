@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +53,8 @@ public class SaleFormController {
     private ComboBox<String> categoryFilterComboBox;
     @FXML
     private ComboBox<Product> productComboBox;
+    @FXML
+    private ComboBox<ProductUnit> unitComboBox;
     @FXML
     private ComboBox<String> priceTypeComboBox;
     @FXML
@@ -112,12 +115,16 @@ public class SaleFormController {
     private Stage dialogStage;
     private final SalesService salesService;
     private final ReceiptService receiptService;
+    private final ProductUnitService productUnitService;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final ObservableList<SaleItemRow> saleItems = FXCollections.observableArrayList();
     private FilteredList<Product> filteredProducts;
     private String productSearchQuery = "";
     private Product selectedProduct = null;
+    private ProductUnit selectedUnit = null;
+    private ProductUnit pendingBarcodeUnit = null;
+    private final Map<Long, List<ProductUnit>> unitsByProduct = new HashMap<>();
     private final DecimalFormat numberFormatter;
     private com.pharmax.MainApp mainApp;
     private boolean tabMode = false;
@@ -129,6 +136,7 @@ public class SaleFormController {
     public SaleFormController() {
         this.salesService = new SalesService();
         this.receiptService = new ReceiptService();
+        this.productUnitService = new ProductUnitService();
         this.customerRepository = new CustomerRepository();
         this.productRepository = new ProductRepository();
 
@@ -143,6 +151,7 @@ public class SaleFormController {
         setupCurrencyComboBox();
         setupCustomerComboBox();
         setupProductComboBox();
+        setupUnitComboBox();
         setupPriceTypeComboBox();
         setupItemsTable();
         setupDefaults();
@@ -189,6 +198,33 @@ public class SaleFormController {
                 updateSelectedProductPriceLabel();
             });
         }
+    }
+
+    private void setupUnitComboBox() {
+        if (unitComboBox == null) {
+            return;
+        }
+        unitComboBox.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ProductUnit unit) {
+                if (unit == null) {
+                    return "";
+                }
+                String name = unit.getUnitName() != null ? unit.getUnitName() : "وحدة";
+                double factor = unit.getEffectiveConversionFactor();
+                return factor == 1.0 ? name : name + " × " + numberFormatter.format(factor);
+            }
+
+            @Override
+            public ProductUnit fromString(String string) {
+                return null;
+            }
+        });
+        unitComboBox.valueProperty().addListener((obs, oldUnit, newUnit) -> {
+            selectedUnit = newUnit;
+            updateSelectedProductStockLabel();
+            updateSelectedProductPriceLabel();
+        });
     }
 
     private void updateExchangeRateVisibility(String currency) {
@@ -316,7 +352,13 @@ public class SaleFormController {
             String name = p.getName() != null ? p.getName().toLowerCase() : "";
             String code = p.getProductCode() != null ? p.getProductCode().toLowerCase() : "";
             String barcode = p.getBarcode() != null ? p.getBarcode().toLowerCase() : "";
-            return name.contains(query) || code.contains(query) || barcode.contains(query);
+            boolean matchesUnit = unitsByProduct.getOrDefault(p.getId(), List.of()).stream()
+                    .anyMatch(unit -> {
+                        String unitName = unit.getUnitName() != null ? unit.getUnitName().toLowerCase() : "";
+                        String unitBarcode = unit.getBarcode() != null ? unit.getBarcode().toLowerCase() : "";
+                        return unitName.contains(query) || unitBarcode.contains(query);
+                    });
+            return name.contains(query) || code.contains(query) || barcode.contains(query) || matchesUnit;
         });
     }
 
@@ -433,6 +475,10 @@ public class SaleFormController {
         List<Product> products = productRepository.findAll().stream()
                 .filter(Product::getIsActive)
                 .toList();
+        unitsByProduct.clear();
+        for (Product product : products) {
+            unitsByProduct.put(product.getId(), productUnitService.getUnitsForProductOrDefault(product));
+        }
 
         filteredProducts = new FilteredList<>(FXCollections.observableArrayList(products), p -> true);
         productComboBox.setItems(filteredProducts);
@@ -468,27 +514,79 @@ public class SaleFormController {
                     productComboBox.show();
                 }
             });
+            productComboBox.getEditor().setOnAction(e -> handleProductBarcodeLookup(productComboBox.getEditor().getText()));
         }
 
         productComboBox.setOnAction(e -> {
             Product selected = productComboBox.getValue();
             if (selected != null) {
-                selectedProduct = selected;
-                String unit = selected.getUnitOfMeasure();
-                if (unit == null || unit.trim().isEmpty()) {
-                    unit = "وحدة";
-                }
-                double stock = selected.getQuantityInStock();
-                if (stock <= 0) {
-                    stockLabel.setText("المخزون المتاح: 0 " + unit + " (نفذ المخزون)");
-                    stockLabel.setStyle("-fx-text-fill: -fx-danger-text; -fx-font-weight: bold;");
-                } else {
-                    stockLabel.setText("المخزون المتاح: " + stock + " " + unit);
-                    stockLabel.setStyle("-fx-text-fill: -fx-text-hint;");
-                }
-                updateSelectedProductPriceLabel();
+                handleProductSelection(selected);
             }
         });
+    }
+
+    private void handleProductBarcodeLookup(String barcodeText) {
+        if (barcodeText == null || barcodeText.trim().isEmpty()) {
+            return;
+        }
+        productUnitService.findProductOrUnitByBarcode(barcodeText.trim()).ifPresent(result -> {
+            pendingBarcodeUnit = result.getProductUnit();
+            Product product = result.getProduct();
+            selectedProduct = product;
+            productComboBox.setValue(product);
+            handleProductSelection(product);
+            productComboBox.hide();
+        });
+    }
+
+    private void handleProductSelection(Product product) {
+        selectedProduct = product;
+        List<ProductUnit> units = unitsByProduct.computeIfAbsent(product.getId(),
+                id -> productUnitService.getUnitsForProductOrDefault(product));
+        if (unitComboBox != null) {
+            unitComboBox.setItems(FXCollections.observableArrayList(units));
+            ProductUnit barcodeUnit = pendingBarcodeUnit != null && pendingBarcodeUnit.getId() != null
+                    ? units.stream()
+                            .filter(unit -> pendingBarcodeUnit.getId().equals(unit.getId()))
+                            .findFirst()
+                            .orElse(pendingBarcodeUnit)
+                    : pendingBarcodeUnit;
+            ProductUnit unitToSelect = barcodeUnit != null
+                    && pendingBarcodeUnit.getProduct() != null
+                    && pendingBarcodeUnit.getProduct().getId().equals(product.getId())
+                            ? barcodeUnit
+                            : units.stream().filter(unit -> Boolean.TRUE.equals(unit.getIsDefault())).findFirst()
+                                    .orElse(units.isEmpty() ? null : units.get(0));
+            pendingBarcodeUnit = null;
+            unitComboBox.setValue(unitToSelect);
+            selectedUnit = unitToSelect;
+        } else {
+            selectedUnit = units.isEmpty() ? null : units.get(0);
+        }
+        updateSelectedProductStockLabel();
+        updateSelectedProductPriceLabel();
+    }
+
+    private void updateSelectedProductStockLabel() {
+        if (selectedProduct == null || stockLabel == null) {
+            return;
+        }
+
+        ProductUnit unit = getSelectedSaleUnit();
+        String baseUnit = productUnitService.resolveBaseUnit(selectedProduct);
+        String saleUnit = unit != null && unit.getUnitName() != null ? unit.getUnitName() : baseUnit;
+        double factor = unit != null ? unit.getEffectiveConversionFactor() : 1.0;
+        double stock = selectedProduct.getQuantityInStock() != null ? selectedProduct.getQuantityInStock() : 0.0;
+        double availableByUnit = factor > 0 ? stock / factor : stock;
+
+        if (stock <= 0) {
+            stockLabel.setText("المخزون المتاح: 0 " + baseUnit + " (نفذ المخزون)");
+            stockLabel.setStyle("-fx-text-fill: -fx-danger-text; -fx-font-weight: bold;");
+        } else {
+            stockLabel.setText("المخزون المتاح: " + numberFormatter.format(stock) + " " + baseUnit
+                    + " / " + numberFormatter.format(availableByUnit) + " " + saleUnit);
+            stockLabel.setStyle("-fx-text-fill: -fx-text-hint;");
+        }
     }
 
     private void updateSelectedProductPriceLabel() {
@@ -501,7 +599,8 @@ public class SaleFormController {
             return;
         }
 
-        String saleCurrency = resolveProductCurrency(selectedProduct);
+        ProductUnit saleUnit = getSelectedSaleUnit();
+        String saleCurrency = resolveProductCurrency(selectedProduct, saleUnit);
         Double price = getSelectedPrice(saleCurrency);
         if (price == null || price <= 0) {
             priceLabel.setText("السعر: غير محدد");
@@ -514,39 +613,66 @@ public class SaleFormController {
     private Double getSelectedPrice(String currency) {
         if (selectedProduct == null)
             return null;
-        return getSelectedPrice(selectedProduct, currency);
+        return getSelectedPrice(selectedProduct, getSelectedSaleUnit(), currency);
     }
 
     private Double getSelectedPrice(Product product, String currency) {
+        return getSelectedPrice(product, product == selectedProduct ? getSelectedSaleUnit() : null, currency);
+    }
+
+    private Double getSelectedPrice(Product product, ProductUnit saleUnit, String currency) {
         if (product == null)
             return null;
         String priceType = priceTypeComboBox != null ? priceTypeComboBox.getValue() : "مفرد";
+        double conversionFactor = saleUnit != null ? saleUnit.getEffectiveConversionFactor() : 1.0;
+
+        if (isRetailPriceType(priceType) && saleUnit != null) {
+            Double unitPrice = "دولار".equals(currency) ? saleUnit.getSalePriceUsd() : saleUnit.getSalePrice();
+            if (hasPositiveValue(unitPrice)) {
+                return unitPrice;
+            }
+        }
 
         if ("دولار".equals(currency)) {
             if ("جملة".equals(priceType) && hasPositiveValue(product.getWholesalePriceUsd())) {
-                return product.getWholesalePriceUsd();
+                return product.getWholesalePriceUsd() * conversionFactor;
             } else if ("خاص".equals(priceType) && hasPositiveValue(product.getSpecialPriceUsd())) {
-                return product.getSpecialPriceUsd();
+                return product.getSpecialPriceUsd() * conversionFactor;
             }
-            return hasPositiveValue(product.getUnitPriceUsd()) ? product.getUnitPriceUsd() : null;
+            return hasPositiveValue(product.getUnitPriceUsd()) ? product.getUnitPriceUsd() * conversionFactor : null;
         }
 
         if ("جملة".equals(priceType) && hasPositiveValue(product.getWholesalePrice())) {
-            return product.getWholesalePrice();
+            return product.getWholesalePrice() * conversionFactor;
         } else if ("خاص".equals(priceType) && hasPositiveValue(product.getSpecialPrice())) {
-            return product.getSpecialPrice();
+            return product.getSpecialPrice() * conversionFactor;
         }
-        return hasPositiveValue(product.getUnitPrice()) ? product.getUnitPrice() : null;
+        return hasPositiveValue(product.getUnitPrice()) ? product.getUnitPrice() * conversionFactor : null;
+    }
+
+    private ProductUnit getSelectedSaleUnit() {
+        if (unitComboBox != null && unitComboBox.getValue() != null) {
+            return unitComboBox.getValue();
+        }
+        return selectedUnit;
+    }
+
+    private boolean isRetailPriceType(String priceType) {
+        return priceType == null || "مفرد".equals(priceType);
     }
 
     private String resolveProductCurrency(Product product) {
+        return resolveProductCurrency(product, product == selectedProduct ? getSelectedSaleUnit() : null);
+    }
+
+    private String resolveProductCurrency(Product product, ProductUnit saleUnit) {
         String requestedCurrency = currencyComboBox != null ? currencyComboBox.getValue() : "دينار";
-        if (hasPositiveValue(getSelectedPrice(product, requestedCurrency))) {
+        if (hasPositiveValue(getSelectedPrice(product, saleUnit, requestedCurrency))) {
             return requestedCurrency;
         }
 
         String otherCurrency = "دولار".equals(requestedCurrency) ? "دينار" : "دولار";
-        if (hasPositiveValue(getSelectedPrice(product, otherCurrency))) {
+        if (hasPositiveValue(getSelectedPrice(product, saleUnit, otherCurrency))) {
             return otherCurrency;
         }
 
@@ -1144,9 +1270,16 @@ public class SaleFormController {
             return;
         }
 
+        ProductUnit saleUnit = getSelectedSaleUnit();
+        double conversionFactor = saleUnit != null ? saleUnit.getEffectiveConversionFactor() : 1.0;
+        String soldUnit = saleUnit != null && saleUnit.getUnitName() != null
+                ? saleUnit.getUnitName()
+                : productUnitService.resolveBaseUnit(product);
+        double baseQuantity = quantity * conversionFactor;
+
         double discountPercent = 0;
-        String itemCurrency = resolveProductCurrency(product);
-        Double itemPrice = getSelectedPrice(product, itemCurrency);
+        String itemCurrency = resolveProductCurrency(product, saleUnit);
+        Double itemPrice = getSelectedPrice(product, saleUnit, itemCurrency);
         if (itemPrice == null || itemPrice <= 0) {
             showError("خطأ", "لا يوجد سعر لهذا المنتج بالدينار أو بالدولار");
             return;
@@ -1158,6 +1291,7 @@ public class SaleFormController {
                 .filter(item -> item.getProductId().equals(productId))
                 .filter(item -> item.getCurrency().equals(itemCurrency))
                 .filter(item -> item.getPriceType().equals(priceType))
+                .filter(item -> item.getSoldUnit().equals(soldUnit))
                 .findFirst()
                 .orElse(null);
 
@@ -1171,10 +1305,13 @@ public class SaleFormController {
                     product.getId(),
                     product.getName(),
                     quantity,
-                    getSelectedPrice(product, "دينار") != null ? getSelectedPrice(product, "دينار") : 0.0,
+                    getSelectedPrice(product, saleUnit, "دينار") != null ? getSelectedPrice(product, saleUnit, "دينار") : 0.0,
                     discountPercent,
-                    priceType);
-            newItem.setSavedUnitPriceUsd(getSelectedPrice(product, "دولار"));
+                    priceType,
+                    soldUnit,
+                    conversionFactor);
+            newItem.setSavedUnitPriceUsd(getSelectedPrice(product, saleUnit, "دولار"));
+            newItem.setBaseQuantity(baseQuantity);
             newItem.setCurrencyAndRate(itemCurrency, getExchangeRateOrDefault());
             newItem.recalculate();
             saleItems.add(newItem);
@@ -1186,8 +1323,13 @@ public class SaleFormController {
 
     private void clearProductSelection() {
         selectedProduct = null;
+        selectedUnit = null;
         productComboBox.setValue(null);
         productComboBox.getEditor().clear();
+        if (unitComboBox != null) {
+            unitComboBox.getItems().clear();
+            unitComboBox.setValue(null);
+        }
         quantityField.setText("1");
         stockLabel.setText("المخزون المتاح: -");
         priceLabel.setText("السعر: -");
@@ -1206,7 +1348,7 @@ public class SaleFormController {
     private boolean validateAllStockAvailable() {
         Map<Long, Double> requiredByProduct = new LinkedHashMap<>();
         for (SaleItemRow row : saleItems) {
-            requiredByProduct.merge(row.getProductId(), row.getQuantity(), Double::sum);
+            requiredByProduct.merge(row.getProductId(), row.getBaseQuantity(), Double::sum);
         }
 
         for (Map.Entry<Long, Double> entry : requiredByProduct.entrySet()) {
@@ -1226,7 +1368,7 @@ public class SaleFormController {
     private double getRequiredQuantityForProduct(Long productId) {
         return saleItems.stream()
                 .filter(row -> row.getProductId() != null && row.getProductId().equals(productId))
-                .mapToDouble(SaleItemRow::getQuantity)
+                .mapToDouble(SaleItemRow::getBaseQuantity)
                 .sum();
     }
 
@@ -1451,6 +1593,9 @@ public class SaleFormController {
                     itemRequest.setUnitPrice(row.getUnitPrice());
                     itemRequest.setDiscountPercentage(row.getDiscountPercent());
                     itemRequest.setPriceType(row.getPriceType());
+                    itemRequest.setSoldUnit(row.getSoldUnit());
+                    itemRequest.setConversionFactor(row.getConversionFactor());
+                    itemRequest.setBaseQuantity(row.getBaseQuantity());
                     items.add(itemRequest);
                     groupTotal += row.getTotalPrice();
                 }
@@ -1570,19 +1715,25 @@ public class SaleFormController {
         private double discountAmount;
         private double totalPrice;
         private String priceType;
+        private String soldUnit;
+        private double conversionFactor = 1.0;
+        private double baseQuantity;
 
         private String currency = "دينار";
         private double exchangeRate = 1500.0;
         private Double savedUnitPriceUsd = null;
 
         public SaleItemRow(Long productId, String productName, double quantity, double unitPriceIqd,
-                double discountPercent, String priceType) {
+                double discountPercent, String priceType, String soldUnit, double conversionFactor) {
             this.productId = productId;
             this.productName = productName;
             this.quantity = quantity;
             this.baseUnitPriceIqd = unitPriceIqd;
             this.discountPercent = discountPercent;
             this.priceType = priceType;
+            this.soldUnit = soldUnit != null ? soldUnit : "وحدة";
+            this.conversionFactor = conversionFactor > 0 ? conversionFactor : 1.0;
+            this.baseQuantity = quantity * this.conversionFactor;
             recalculate();
         }
 
@@ -1603,6 +1754,7 @@ public class SaleFormController {
 
         public void recalculate() {
             double unitPrice = getUnitPrice();
+            this.baseQuantity = quantity * conversionFactor;
             double gross = unitPrice * quantity;
             this.discountAmount = gross * (discountPercent / 100.0);
             this.totalPrice = gross - discountAmount;
@@ -1613,7 +1765,7 @@ public class SaleFormController {
         }
 
         public String getProductName() {
-            return productName;
+            return productName + " (" + getSoldUnit() + ")";
         }
 
         public double getQuantity() {
@@ -1622,10 +1774,27 @@ public class SaleFormController {
 
         public void setQuantity(double quantity) {
             this.quantity = quantity;
+            this.baseQuantity = quantity * conversionFactor;
         }
 
         public String getPriceType() {
             return priceType;
+        }
+
+        public String getSoldUnit() {
+            return soldUnit != null ? soldUnit : "وحدة";
+        }
+
+        public double getConversionFactor() {
+            return conversionFactor;
+        }
+
+        public double getBaseQuantity() {
+            return baseQuantity;
+        }
+
+        public void setBaseQuantity(double baseQuantity) {
+            this.baseQuantity = baseQuantity;
         }
 
         public double getUnitPrice() {

@@ -54,6 +54,10 @@ public class InventoryService {
     public Optional<Product> getProductByBarcode(String barcode) {
         return productRepository.findByBarcode(barcode);
     }
+
+    public Optional<ProductUnitService.BarcodeLookupResult> getProductOrUnitByBarcode(String barcode) {
+        return new ProductUnitService().findProductOrUnitByBarcode(barcode);
+    }
     
     public List<Product> getAllProducts() {
         return productRepository.findAll();
@@ -131,6 +135,14 @@ public class InventoryService {
         double stock = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
         return stock >= requiredQuantity && Boolean.TRUE.equals(product.getIsActive());
     }
+
+    public boolean isStockAvailableForUnit(Long productId, Double soldQuantity, Double conversionFactor) {
+        if (soldQuantity == null || soldQuantity <= 0) {
+            return false;
+        }
+        double factor = conversionFactor != null && conversionFactor > 0 ? conversionFactor : 1.0;
+        return isStockAvailable(productId, soldQuantity * factor);
+    }
     
     private String generateProductCode() {
         return "PROD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -139,6 +151,14 @@ public class InventoryService {
     public void validateProduct(Product product) {
         if (product.getName() == null || product.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("اسم المنتج مطلوب");
+        }
+
+        if (product.getBaseUnit() == null || product.getBaseUnit().trim().isEmpty()) {
+            String fallbackUnit = product.getUnitOfMeasure();
+            product.setBaseUnit(fallbackUnit != null && !fallbackUnit.trim().isEmpty() ? fallbackUnit : "قطعة");
+        }
+        if (product.getUnitOfMeasure() == null || product.getUnitOfMeasure().trim().isEmpty()) {
+            product.setUnitOfMeasure(product.getBaseUnit());
         }
         
         validateCurrencyPricePair("سعر التكلفة", product.getCostPrice(), product.getCostPriceUsd(), false);

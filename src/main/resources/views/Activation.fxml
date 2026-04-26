@@ -1,12 +1,12 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane stylesheets="@../styles/main.css"
-            style="-fx-background-color: -fx-login-bg; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';"
+<BorderPane stylesheets="@../styles/main.css" styleClass="login-pane"
+            style="-fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';"
             xmlns:fx="http://javafx.com/fxml" fx:controller="com.pharmax.controller.ActivationController"
             prefWidth="520" prefHeight="520">
 

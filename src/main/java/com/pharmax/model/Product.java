@@ -59,6 +59,9 @@ public class Product {
     @Column(name = "unit_of_measure")
     private String unitOfMeasure;
 
+    @Column(name = "base_unit")
+    private String baseUnit;
+
     @Column(name = "barcode")
     private String barcode;
 
@@ -73,6 +76,9 @@ public class Product {
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SaleItem> saleItems;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ProductUnit> productUnits;
 
     public Product() {
         this.createdAt = LocalDateTime.now();
@@ -219,6 +225,14 @@ public class Product {
         this.unitOfMeasure = unitOfMeasure;
     }
 
+    public String getBaseUnit() {
+        return baseUnit;
+    }
+
+    public void setBaseUnit(String baseUnit) {
+        this.baseUnit = baseUnit;
+    }
+
     public String getBarcode() {
         return barcode;
     }
@@ -257,6 +271,14 @@ public class Product {
 
     public void setSaleItems(List<SaleItem> saleItems) {
         this.saleItems = saleItems;
+    }
+
+    public List<ProductUnit> getProductUnits() {
+        return productUnits;
+    }
+
+    public void setProductUnits(List<ProductUnit> productUnits) {
+        this.productUnits = productUnits;
     }
 
     @PreUpdate

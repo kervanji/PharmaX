@@ -117,6 +117,83 @@ public class DatabaseManager {
             stmt.execute("ALTER TABLE products ADD COLUMN special_price_usd REAL");
         } catch (SQLException ignored) {
         }
+
+        try {
+            stmt.execute("ALTER TABLE products ADD COLUMN base_unit TEXT");
+        } catch (SQLException ignored) {
+        }
+
+        try {
+            stmt.execute("ALTER TABLE sale_items ADD COLUMN sold_unit TEXT");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.execute("ALTER TABLE sale_items ADD COLUMN conversion_factor REAL DEFAULT 1");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.execute("ALTER TABLE sale_items ADD COLUMN base_quantity REAL DEFAULT 0");
+        } catch (SQLException ignored) {
+        }
+
+        try {
+            stmt.execute("""
+                    UPDATE products
+                    SET base_unit = COALESCE(NULLIF(base_unit, ''), NULLIF(unit_of_measure, ''), 'قطعة')
+                    WHERE base_unit IS NULL OR TRIM(base_unit) = ''
+                    """);
+        } catch (SQLException ignored) {
+        }
+
+        try {
+            stmt.execute("""
+                    UPDATE sale_items
+                    SET conversion_factor = 1
+                    WHERE conversion_factor IS NULL OR conversion_factor <= 0
+                    """);
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.execute("""
+                    UPDATE sale_items
+                    SET base_quantity = COALESCE(quantity, 0) * COALESCE(conversion_factor, 1)
+                    WHERE base_quantity IS NULL OR base_quantity <= 0
+                    """);
+        } catch (SQLException ignored) {
+        }
+
+        try {
+            stmt.execute("""
+                    INSERT OR IGNORE INTO product_units (
+                        product_id,
+                        unit_name,
+                        barcode,
+                        conversion_factor,
+                        sale_price,
+                        sale_price_usd,
+                        is_default,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    SELECT
+                        p.id,
+                        COALESCE(NULLIF(p.base_unit, ''), NULLIF(p.unit_of_measure, ''), 'قطعة'),
+                        NULLIF(p.barcode, ''),
+                        1,
+                        p.unit_price,
+                        p.unit_price_usd,
+                        1,
+                        1,
+                        CURRENT_TIMESTAMP,
+                        CURRENT_TIMESTAMP
+                    FROM products p
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM product_units u WHERE u.product_id = p.id
+                    )
+                    """);
+        } catch (SQLException ignored) {
+        }
     }
 
     private static void createTables(Statement stmt) throws SQLException {
@@ -152,6 +229,7 @@ public class DatabaseManager {
                         minimum_stock INTEGER DEFAULT 0,
                         maximum_stock INTEGER,
                         unit_of_measure TEXT,
+                        base_unit TEXT,
                         barcode TEXT,
                         is_active BOOLEAN DEFAULT 1,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -193,7 +271,30 @@ public class DatabaseManager {
                         total_price REAL NOT NULL,
                         discount_percentage REAL DEFAULT 0,
                         discount_amount REAL DEFAULT 0,
+                        price_type TEXT,
+                        sold_unit TEXT,
+                        conversion_factor REAL DEFAULT 1,
+                        base_quantity REAL DEFAULT 0,
                         FOREIGN KEY (sale_id) REFERENCES sales(id),
+                        FOREIGN KEY (product_id) REFERENCES products(id)
+                    )
+                """);
+
+        // Product units / packaging table
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS product_units (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        unit_name TEXT NOT NULL,
+                        barcode TEXT UNIQUE,
+                        conversion_factor REAL NOT NULL DEFAULT 1,
+                        sale_price REAL,
+                        sale_price_usd REAL,
+                        is_default BOOLEAN DEFAULT 0,
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(product_id, unit_name),
                         FOREIGN KEY (product_id) REFERENCES products(id)
                     )
                 """);
@@ -383,6 +484,8 @@ public class DatabaseManager {
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_product_units_product ON product_units(product_id)");
+        stmt.execute("CREATE INDEX IF NOT EXISTS idx_product_units_barcode ON product_units(barcode)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_sales_code ON sales(sale_code)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)");
         stmt.execute("CREATE INDEX IF NOT EXISTS idx_receipts_number ON receipts(receipt_number)");
@@ -422,6 +525,7 @@ public class DatabaseManager {
             // Add entity classes
             configuration.addAnnotatedClass(com.pharmax.model.Customer.class);
             configuration.addAnnotatedClass(com.pharmax.model.Product.class);
+            configuration.addAnnotatedClass(com.pharmax.model.ProductUnit.class);
             configuration.addAnnotatedClass(com.pharmax.model.Sale.class);
             configuration.addAnnotatedClass(com.pharmax.model.SaleItem.class);
             configuration.addAnnotatedClass(com.pharmax.model.Receipt.class);

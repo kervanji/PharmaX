@@ -324,6 +324,8 @@ public class MainController {
                     "linear-gradient(to bottom right, #f5576c, #f093fb)", "handleLowStock"),
             new TileDef("add-stock", "➕", "add_stock.svg", "إضافة مخزون",
                     "linear-gradient(to bottom right, #00c6ff, #0072ff)", "handleAddStock"),
+            new TileDef("barcode-print", "▥", null, "طباعة باركود",
+                    "linear-gradient(to bottom right, #16a085, #f4d03f)", "handleBarcodePrint"),
             new TileDef("user-management", "👤", "user_management.svg", "إدارة المستخدمين",
                     "linear-gradient(to bottom right, #fccb90, #d57eeb)", "handleUserManagement",
                     true, false, false),
@@ -1306,6 +1308,15 @@ public class MainController {
                 "add_stock.svg",
                 "/views/AddStockDialog.fxml",
                 (AddStockController controller) -> controller.setTabMode(true));
+    }
+
+    @FXML
+    private void handleBarcodePrint() {
+        TabManager.getInstance().openTab(
+                "barcode-print",
+                "طباعة باركود",
+                "/views/BarcodePrint.fxml",
+                null);
     }
 
     @FXML
