@@ -17,6 +17,8 @@ import javafx.scene.input.DataFormat;
 import javafx.scene.input.Dragboard;
 
 import javafx.scene.input.TransferMode;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -25,9 +27,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import com.pharmax.util.DashboardLayoutService;
 import com.pharmax.util.SessionManager;
-import com.pharmax.util.SvgImageLoader;
 import com.pharmax.util.TabManager;
-import com.pharmax.util.ThemeManager;
 import com.pharmax.MainApp;
 import com.pharmax.update.AppVersion;
 import com.pharmax.update.UpdateCheckResult;
@@ -47,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import java.text.DecimalFormat;
 import java.time.LocalDate;
@@ -167,7 +168,7 @@ public class MainController {
     private static class TileDef {
         final String id;
         final String icon; // Fallback emoji or text
-        final String iconFile; // SVG filename
+        final String iconFile; // PNG filename
         final String label;
         final String style;
         final String handlerMethod;
@@ -299,40 +300,40 @@ public class MainController {
     }
 
     private final List<TileDef> defaultTileDefinitions = List.of(
-            new TileDef("pos", "🛒", "pos.svg", "نقطة بيع",
+            new TileDef("pos", "🛒", "point_of_sale.png", "نقطة بيع",
                     "linear-gradient(to bottom right, #4facfe, #00f2fe)", "handleNewSale"),
-            new TileDef("view-sales", "📄", "view_sales.svg", "عرض المبيعات",
+            new TileDef("view-sales", "📄", "sales_reports.png", "عرض المبيعات",
                     "linear-gradient(to bottom right, #43e97b, #38f9d7)", "handleViewSales"),
-            new TileDef("view-inventory", "📦", "view_inventory.svg", "عرض المخزون",
+            new TileDef("view-inventory", "📦", "inventory_view.png", "عرض المخزون",
                     "linear-gradient(to bottom right, #fa709a, #fee140)", "handleViewInventory"),
-            new TileDef("new-product", "➕", "add_product.svg", "إضافة منتج",
+            new TileDef("new-product", "➕", "add_product.png", "إضافة منتج",
                     "linear-gradient(to bottom right, #f83600, #f9d423)", "handleNewProduct"),
-            new TileDef("receipt-voucher", "📥", "receipt_voucher.svg", "سند قبض",
+            new TileDef("receipt-voucher", "📥", "accounts.png", "سند قبض",
                     "linear-gradient(to bottom right, #30cfd0, #330867)", "handleReceiptVoucher"),
-            new TileDef("payment-voucher", "📤", "payment_voucher.svg", "سند دفع",
+            new TileDef("payment-voucher", "📤", "payment_voucher.png", "سند دفع",
                     "linear-gradient(to bottom right, #ff0844, #ffb199)", "handlePaymentVoucher"),
-            new TileDef("purchase", "🛍️", "purchase.svg", "المشتريات",
+            new TileDef("purchase", "🛍️", "purchases.png", "المشتريات",
                     "linear-gradient(to bottom right, #c471f5, #fa71cd)", "handlePurchase"),
-            new TileDef("accounts", "📊", "statement.svg", "حسابات",
+            new TileDef("accounts", "📊", "accounts.png", "حسابات",
                     "linear-gradient(to bottom right, #48c6ef, #6f86d6)", "handleAccounts"),
-            new TileDef("product-return", "↩️", "return_items.svg", "إرجاع مواد",
+            new TileDef("product-return", "↩️", "returns.png", "إرجاع مواد",
                     "linear-gradient(to bottom right, #f78ca0, #f9748f)", "handleProductReturn"),
-            new TileDef("sales-report", "📊", "sales_reports.svg", "تقارير المبيعات",
+            new TileDef("sales-report", "📊", "sales_reports.png", "تقارير المبيعات",
                     "linear-gradient(to bottom right, #6a11cb, #2575fc)", "handleSalesReport",
                     false, true, false),
-            new TileDef("low-stock", "⚠️", "low_stock.svg", "منخفض المخزون",
+            new TileDef("low-stock", "⚠️", "low_stock_alert.png", "منخفض المخزون",
                     "linear-gradient(to bottom right, #f5576c, #f093fb)", "handleLowStock"),
-            new TileDef("add-stock", "➕", "add_stock.svg", "إضافة مخزون",
+            new TileDef("add-stock", "➕", "add_warehouse.png", "إضافة مخزون",
                     "linear-gradient(to bottom right, #00c6ff, #0072ff)", "handleAddStock"),
-            new TileDef("barcode-print", "▥", null, "طباعة باركود",
+            new TileDef("barcode-print", "▥", "barcode_printing.png", "طباعة باركود",
                     "linear-gradient(to bottom right, #16a085, #f4d03f)", "handleBarcodePrint"),
-            new TileDef("user-management", "👤", "user_management.svg", "إدارة المستخدمين",
+            new TileDef("user-management", "👤", "user_management.png", "إدارة المستخدمين",
                     "linear-gradient(to bottom right, #fccb90, #d57eeb)", "handleUserManagement",
                     true, false, false),
-            new TileDef("settings", "⚙️", "settings.svg", "الإعدادات",
+            new TileDef("settings", "⚙️", "settings.png", "الإعدادات",
                     "linear-gradient(to bottom right, #89f7fe, #66a6ff)", "handleSettings",
                     false, false, true),
-            new TileDef("about", "ℹ️", "about.svg", "عن البرنامج",
+            new TileDef("about", "ℹ️", "about_system.png", "عن البرنامج",
                     "linear-gradient(to bottom right, #1e3c72, #2a5298)", "handleAbout"));
 
     private Map<String, TileDef> tileDefMap;
@@ -517,27 +518,18 @@ public class MainController {
         String iconFile = def.iconFile;
 
         if (iconFile != null && !iconFile.isEmpty()) {
-            javafx.scene.image.Image iconImage = SvgImageLoader.loadSvgImage("/icons/" + iconFile, 64, 64);
+            Image iconImage = loadPngIcon(iconFile, 72, 72);
             if (iconImage != null) {
-                javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView(iconImage);
-                imageView.setFitWidth(64);
-                imageView.setFitHeight(64);
+                ImageView imageView = new ImageView(iconImage);
+                imageView.setFitWidth(72);
+                imageView.setFitHeight(72);
                 imageView.setPreserveRatio(true);
-
-                // SVG color logic: always white for gradient tiles, otherwise based on theme
-                javafx.scene.effect.ColorAdjust colorAdjust = new javafx.scene.effect.ColorAdjust();
-                if (def.style != null) {
-                    colorAdjust.setBrightness(1.0); // White on colorful gradients
-                } else if (ThemeManager.getInstance().isDarkTheme()) {
-                    colorAdjust.setBrightness(1.0); // White in dark themes
-                } else {
-                    colorAdjust.setBrightness(-1.0); // Black in light theme for tiles without gradients
-                }
-                imageView.setEffect(colorAdjust);
+                imageView.setSmooth(true);
+                imageView.setCache(true);
 
                 iconNode = imageView;
             } else {
-                // Fallback to text emoji if SVG fails
+                // Fallback to text emoji if PNG fails
                 Label iconLabel = new Label(icon);
                 iconLabel.getStyleClass().add("tile-icon");
                 iconNode = iconLabel;
@@ -567,6 +559,26 @@ public class MainController {
         });
 
         return tile;
+    }
+
+    private Image loadPngIcon(String iconFile, double width, double height) {
+        String resourcePath = "/images/icons/" + iconFile;
+        try (InputStream inputStream = getClass().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                logger.warn("Dashboard icon resource not found: {}", resourcePath);
+                return null;
+            }
+
+            Image image = new Image(inputStream, width, height, true, true);
+            if (image.isError()) {
+                logger.warn("Failed to load dashboard icon: {}", resourcePath, image.getException());
+                return null;
+            }
+            return image;
+        } catch (Exception e) {
+            logger.warn("Failed to load dashboard icon: {}", resourcePath, e);
+            return null;
+        }
     }
 
     private void invokeTileHandler(String methodName) {
