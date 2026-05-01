@@ -1497,6 +1497,7 @@ public class ReceiptService {
         return df.format(v);
     }
 
+    @SuppressWarnings("unused")
     private String formatCurrency(Double value) {
         return formatCurrency(value, "دينار");
     }

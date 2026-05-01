@@ -29,7 +29,7 @@ import java.util.Optional;
 public class VoucherService {
     private static final Logger logger = LoggerFactory.getLogger(VoucherService.class);
     private final CustomerService customerService;
-    private final InventoryService inventoryService;
+    @SuppressWarnings("unused") private final InventoryService inventoryService;
     private final ProductBatchService productBatchService;
     private final InventoryMovementService inventoryMovementService;
     
@@ -231,6 +231,7 @@ public class VoucherService {
         table.addCell(valueCell);
     }
 
+    @SuppressWarnings("unused")
     private PdfPCell signatureCell(String title, Font font) {
         PdfPCell cell = new PdfPCell();
         cell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
@@ -262,6 +263,7 @@ public class VoucherService {
         return cell;
     }
 
+    @SuppressWarnings("unused")
     private void addTotalRow(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
         PdfPCell c1 = new PdfPCell(new Phrase(label, labelFont));
         c1.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
@@ -308,6 +310,7 @@ public class VoucherService {
      * Determines the amount to show in PDF totals.
      * If voucher items exist, use their summed total_price; otherwise fall back to net amount, then amount.
      */
+    @SuppressWarnings("unused")
     private double getDisplayAmount(Voucher voucher) {
         if (voucher != null && voucher.getItems() != null && !voucher.getItems().isEmpty()) {
             double sum = 0.0;
@@ -804,6 +807,7 @@ public class VoucherService {
         // لا نغير amount هنا؛ يبقى مدفوع المستخدم (مثلاً دفعة جزئية)
     }
     
+    @SuppressWarnings("unused")
     private void updateCustomerBalance(Voucher voucher) {
         if (voucher.getCustomer() == null) return;
         
@@ -821,6 +825,7 @@ public class VoucherService {
         }
     }
     
+    @SuppressWarnings("unused")
     private void reverseCustomerBalance(Voucher voucher) {
         if (voucher.getCustomer() == null) return;
         

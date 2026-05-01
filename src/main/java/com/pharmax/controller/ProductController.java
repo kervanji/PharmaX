@@ -305,6 +305,7 @@ public class ProductController {
     /**
      * Gets the effective selling price for a given IQD/USD pair.
      */
+    @SuppressWarnings("unused")
     private double getEffectiveSellingPrice(TextField iqdField, TextField usdField) {
         double priceIqd = parseDouble(iqdField.getText());
         if (priceIqd > 0) {

@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.prefs.Preferences;
 
 public class ReturnController {
     private static final Logger logger = LoggerFactory.getLogger(ReturnController.class);
@@ -259,7 +258,7 @@ public class ReturnController {
                             }
                             Long saleItemId = ri.getOriginalSaleItem().getId();
                             double quantity = ri.getQuantity() != null ? ri.getQuantity() : 0.0;
-                            previousReturns.merge(saleItemId, quantity, Double::sum);
+                            previousReturns.merge(saleItemId, quantity, (a, b) -> a + b);
                         }
                     }
                 }

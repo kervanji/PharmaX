@@ -300,7 +300,6 @@ public class DatabaseManager {
     }
 
     private static List<String> splitSqlStatements(String sql) {
-        List<String> statements = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 
         for (String line : sql.split("\n")) {

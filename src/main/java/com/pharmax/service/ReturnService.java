@@ -40,7 +40,7 @@ public class ReturnService {
     private static final double EPSILON = 1e-9;
 
     private final SaleReturnRepository returnRepository;
-    private final InventoryService inventoryService;
+    @SuppressWarnings("unused") private final InventoryService inventoryService;
     private final ProductBatchService productBatchService;
     private final InventoryMovementService inventoryMovementService;
 
@@ -1006,8 +1006,8 @@ public class ReturnService {
             }
         }
 
-        double originalTotal = sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
-        double originalPaid = sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
+        double originalTotal = sale != null && sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
+        double originalPaid = sale != null && sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
 
         double totalReturnsUpToLast = 0.0;
         for (SaleReturn ret : returns) {
@@ -1041,6 +1041,7 @@ public class ReturnService {
         return baos.toByteArray();
     }
 
+    @SuppressWarnings("unused")
     private Double getTotalReturnsBySale(Long saleId) {
         if (saleId == null)
             return 0.0;

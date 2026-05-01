@@ -144,7 +144,7 @@ public class SaleFormController {
     private ProductUnit pendingBarcodeUnit = null;
     private final Map<Long, List<ProductUnit>> unitsByProduct = new HashMap<>();
     private final DecimalFormat numberFormatter;
-    private com.pharmax.MainApp mainApp;
+    @SuppressWarnings("unused") private com.pharmax.MainApp mainApp;
     private boolean tabMode = false;
 
     public void setMainApp(com.pharmax.MainApp mainApp) {
@@ -702,6 +702,7 @@ public class SaleFormController {
         return getSelectedPrice(selectedProduct, getSelectedSaleUnit(), currency);
     }
 
+    @SuppressWarnings("unused")
     private Double getSelectedPrice(Product product, String currency) {
         return getSelectedPrice(product, product == selectedProduct ? getSelectedSaleUnit() : null, currency);
     }
@@ -747,6 +748,7 @@ public class SaleFormController {
         return priceType == null || "مفرد".equals(priceType);
     }
 
+    @SuppressWarnings("unused")
     private String resolveProductCurrency(Product product) {
         return resolveProductCurrency(product, product == selectedProduct ? getSelectedSaleUnit() : null);
     }
@@ -1428,7 +1430,7 @@ public class SaleFormController {
     private boolean validateAllStockAvailable() {
         Map<Long, Double> requiredByProduct = new LinkedHashMap<>();
         for (SaleItemRow row : saleItems) {
-            requiredByProduct.merge(row.getProductId(), row.getBaseQuantity(), Double::sum);
+            requiredByProduct.merge(row.getProductId(), row.getBaseQuantity(), (a, b) -> a + b);
         }
 
         for (Map.Entry<Long, Double> entry : requiredByProduct.entrySet()) {

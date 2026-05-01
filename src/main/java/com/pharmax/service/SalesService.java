@@ -23,9 +23,9 @@ import java.util.Optional;
 public class SalesService {
     private static final Logger logger = LoggerFactory.getLogger(SalesService.class);
     private final SaleRepository saleRepository;
-    private final SaleItemRepository saleItemRepository;
-    private final CustomerRepository customerRepository;
-    private final ProductRepository productRepository;
+    @SuppressWarnings("unused") private final SaleItemRepository saleItemRepository;
+    @SuppressWarnings("unused") private final CustomerRepository customerRepository;
+    @SuppressWarnings("unused") private final ProductRepository productRepository;
     private final InventoryService inventoryService;
     private final CustomerService customerService;
     private final ProductBatchService productBatchService;

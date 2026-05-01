@@ -153,7 +153,7 @@ public class MainController {
     private Set<String> sellerHiddenTileIds = new HashSet<>(); // hidden from sellers only
 
     private MainApp mainApp;
-    private final CustomerService customerService = new CustomerService();
+    @SuppressWarnings("unused") private final CustomerService customerService = new CustomerService();
     private final InventoryService inventoryService = new InventoryService();
     private final SalesService salesService = new SalesService();
     private final VoucherService voucherService = new VoucherService();
@@ -1047,6 +1047,7 @@ public class MainController {
         }
     }
 
+    @SuppressWarnings("unused")
     private void showInstallmentStartupAlert() {
         Platform.runLater(() -> {
             try {
