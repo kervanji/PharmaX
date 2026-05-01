@@ -1,5 +1,6 @@
 package com.pharmax.service;
 
+import com.pharmax.database.DatabaseManager;
 import com.pharmax.database.Repository.SaleReturnRepository;
 import com.pharmax.model.*;
 import com.itextpdf.text.BaseColor;
@@ -14,6 +15,9 @@ import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
+import org.hibernate.query.Query;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,58 +28,384 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.prefs.Preferences;
 
 public class ReturnService {
     private static final Logger logger = LoggerFactory.getLogger(ReturnService.class);
+    private static final double EPSILON = 1e-9;
 
     private final SaleReturnRepository returnRepository;
-    private final InventoryService inventoryService;
+    @SuppressWarnings("unused") private final InventoryService inventoryService;
+    private final ProductBatchService productBatchService;
+    private final InventoryMovementService inventoryMovementService;
 
     public ReturnService() {
         this.returnRepository = new SaleReturnRepository();
         this.inventoryService = new InventoryService();
+        this.productBatchService = new ProductBatchService();
+        this.inventoryMovementService = new InventoryMovementService();
     }
 
     public SaleReturn createReturn(Sale sale, List<ReturnItem> items, String reason, String processedBy) {
-        try {
+        Transaction transaction = null;
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            Sale managedSale = session.get(Sale.class, sale != null ? sale.getId() : null);
+            if (managedSale == null) {
+                throw new IllegalArgumentException("الفاتورة الأصلية غير موجودة");
+            }
+            if (items == null || items.isEmpty()) {
+                throw new IllegalArgumentException("لا توجد عناصر للإرجاع");
+            }
+
+            List<PreparedReturnItem> preparedItems = new ArrayList<>();
+            double totalReturnAmount = 0.0;
+            for (ReturnItem item : items) {
+                SaleItem originalSaleItem = session.get(
+                        SaleItem.class,
+                        item.getOriginalSaleItem() != null ? item.getOriginalSaleItem().getId() : null);
+                if (originalSaleItem == null) {
+                    throw new IllegalArgumentException("العنصر الأصلي غير موجود");
+                }
+
+                validateReturnRequest(session, managedSale, originalSaleItem, item);
+                List<BatchRestorePlan> restorePlans = List.of();
+                boolean restoreToStock = "GOOD".equalsIgnoreCase(item.getConditionStatus());
+                if (restoreToStock) {
+                    restorePlans = buildRestorePlan(session, originalSaleItem, item.getQuantity());
+                }
+                double unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : originalSaleItem.getUnitPrice();
+                totalReturnAmount += safe(item.getQuantity()) * safe(unitPrice);
+                preparedItems.add(new PreparedReturnItem(item, originalSaleItem, restoreToStock, restorePlans, unitPrice));
+            }
+
             SaleReturn saleReturn = new SaleReturn();
             saleReturn.setReturnCode(returnRepository.generateReturnCode());
-            saleReturn.setSale(sale);
-            saleReturn.setCustomer(sale.getCustomer());
+            saleReturn.setSale(managedSale);
+            saleReturn.setCustomer(managedSale.getCustomer());
             saleReturn.setReturnDate(LocalDateTime.now());
             saleReturn.setReturnReason(reason);
             saleReturn.setProcessedBy(processedBy);
             saleReturn.setReturnStatus("COMPLETED");
+            saleReturn.setTotalReturnAmount(0.0);
 
-            double totalReturnAmount = 0.0;
+            transaction = session.beginTransaction();
+            session.save(saleReturn);
+            session.flush();
+
             List<ReturnItem> returnItems = new ArrayList<>();
 
-            for (ReturnItem item : items) {
-                item.setSaleReturn(saleReturn);
-                item.setTotalPrice(item.getQuantity() * item.getUnitPrice());
-                totalReturnAmount += item.getTotalPrice();
-                returnItems.add(item);
+            for (PreparedReturnItem prepared : preparedItems) {
+                ReturnItem managedReturnItem = new ReturnItem();
+                managedReturnItem.setSaleReturn(saleReturn);
+                managedReturnItem.setProduct(prepared.originalSaleItem.getProduct());
+                managedReturnItem.setOriginalSaleItem(prepared.originalSaleItem);
+                managedReturnItem.setQuantity(prepared.requestItem.getQuantity());
+                managedReturnItem.setUnitPrice(prepared.unitPrice);
+                managedReturnItem.setReturnReason(prepared.requestItem.getReturnReason());
+                managedReturnItem.setConditionStatus(prepared.requestItem.getConditionStatus());
+                managedReturnItem.setTotalPrice(managedReturnItem.getQuantity() * managedReturnItem.getUnitPrice());
 
-                // Update inventory - add returned items back to stock
-                if ("GOOD".equals(item.getConditionStatus())) {
-                    double conversionFactor = item.getOriginalSaleItem() != null
-                            ? item.getOriginalSaleItem().getEffectiveConversionFactor()
-                            : 1.0;
-                    inventoryService.addStock(item.getProduct().getId(), item.getQuantity() * conversionFactor);
+                if (prepared.restoreToStock) {
+                    for (BatchRestorePlan plan : prepared.restorePlans) {
+                        if (plan.batch.getId() == null) {
+                            session.save(plan.batch);
+                            session.flush();
+                        }
+                    }
+                    applyReturnSnapshot(managedReturnItem, prepared.restorePlans);
                 }
+
+                session.save(managedReturnItem);
+                session.flush();
+
+                if (prepared.restoreToStock) {
+                    for (BatchRestorePlan plan : prepared.restorePlans) {
+                        double quantityBefore = safe(plan.batch.getQuantity());
+                        double quantityAfter = quantityBefore + plan.quantityReturned;
+                        plan.batch.setQuantity(quantityAfter);
+                        plan.batch.setStatus("ACTIVE");
+                        plan.batch.setUpdatedAt(LocalDateTime.now());
+                        session.saveOrUpdate(plan.batch);
+
+                        ReturnItemBatch restoration = new ReturnItemBatch();
+                        restoration.setReturnItem(managedReturnItem);
+                        restoration.setSaleItemBatch(plan.saleItemBatch);
+                        restoration.setBatch(plan.batch);
+                        restoration.setQuantityReturned(plan.quantityReturned);
+                        restoration.setBatchNumberSnapshot(plan.batch.getBatchNumber());
+                        restoration.setExpirationDateSnapshot(plan.batch.getExpiryDate() != null
+                                ? plan.batch.getExpiryDate().toString()
+                                : null);
+                        restoration.setQuantityBefore(quantityBefore);
+                        restoration.setQuantityAfter(quantityAfter);
+                        session.save(restoration);
+
+                        inventoryMovementService.recordMovement(
+                                session,
+                                managedReturnItem.getProduct(),
+                                plan.batch,
+                                "sale_return",
+                                "sale_return",
+                                saleReturn.getId(),
+                                managedReturnItem.getId(),
+                                plan.quantityReturned,
+                                quantityBefore,
+                                quantityAfter,
+                                plan.batch.getUnitCost(),
+                                buildReturnMovementNote(saleReturn, managedReturnItem, plan),
+                                processedBy);
+                    }
+
+                    productBatchService.syncProductSummaryQuantity(session, managedReturnItem.getProduct().getId());
+                }
+
+                returnItems.add(managedReturnItem);
             }
 
             saleReturn.setTotalReturnAmount(totalReturnAmount);
             saleReturn.setReturnItems(returnItems);
+            session.saveOrUpdate(saleReturn);
 
-            SaleReturn savedReturn = returnRepository.save(saleReturn);
-            logger.info("Created return: {} with amount: {}", savedReturn.getReturnCode(), totalReturnAmount);
-            return savedReturn;
+            // Returns reverse the sale's balance effect. For unpaid sales this reduces debt
+            // (moves the balance toward zero). For fully paid sales it creates a customer credit
+            // until the cash refund is settled elsewhere.
+            applyCustomerBalanceCorrection(managedSale.getCustomer(), totalReturnAmount, managedSale.getCurrency());
+
+            transaction.commit();
+            logger.info("Created return: {} with amount: {}", saleReturn.getReturnCode(), totalReturnAmount);
+            return saleReturn;
         } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                try {
+                    transaction.rollback();
+                } catch (Exception rollbackEx) {
+                    logger.error("Failed to rollback return transaction", rollbackEx);
+                }
+            }
             logger.error("Failed to create return", e);
             throw new RuntimeException("Failed to create return: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateReturnRequest(Session session, Sale sale, SaleItem originalSaleItem, ReturnItem requestItem) {
+        if (originalSaleItem.getSale() == null || !originalSaleItem.getSale().getId().equals(sale.getId())) {
+            throw new IllegalArgumentException("عنصر الإرجاع لا ينتمي إلى الفاتورة المحددة");
+        }
+        double requestedQty = safe(requestItem.getQuantity());
+        if (requestedQty <= EPSILON) {
+            throw new IllegalArgumentException("كمية الإرجاع يجب أن تكون أكبر من صفر");
+        }
+        double soldQty = safe(originalSaleItem.getQuantity());
+        double previouslyReturned = getPreviouslyReturnedQuantity(session, originalSaleItem.getId());
+        double remaining = soldQty - previouslyReturned;
+        if (requestedQty - remaining > EPSILON) {
+            throw new IllegalArgumentException("لا يمكن إرجاع كمية أكبر من الكمية المباعة المتبقية");
+        }
+    }
+
+    private List<BatchRestorePlan> buildRestorePlan(Session session, SaleItem originalSaleItem, Double returnQuantity) {
+        double conversionFactor = originalSaleItem.getEffectiveConversionFactor();
+        double requiredBaseQuantity = safe(returnQuantity) * conversionFactor;
+        if (requiredBaseQuantity <= EPSILON) {
+            return List.of();
+        }
+
+        List<SaleItemBatch> originalAllocations = new ArrayList<>(originalSaleItem.getBatchAllocations() != null
+                ? originalSaleItem.getBatchAllocations()
+                : List.of());
+        originalAllocations.sort(Comparator
+                .comparing((SaleItemBatch allocation) -> allocation.getCreatedAt() != null ? allocation.getCreatedAt() : LocalDateTime.MIN)
+                .thenComparing(allocation -> allocation.getId() != null ? allocation.getId() : Long.MAX_VALUE));
+
+        if (!originalAllocations.isEmpty()) {
+            return allocateAcrossOriginalBatches(session, originalSaleItem, originalAllocations, requiredBaseQuantity);
+        }
+
+        ProductBatch directBatch = resolveLegacyBatch(session, originalSaleItem);
+        return List.of(new BatchRestorePlan(null, directBatch, requiredBaseQuantity));
+    }
+
+    private List<BatchRestorePlan> allocateAcrossOriginalBatches(Session session,
+                                                                 SaleItem originalSaleItem,
+                                                                 List<SaleItemBatch> originalAllocations,
+                                                                 double requiredBaseQuantity) {
+        Map<Long, Double> alreadyReturnedBySaleItemBatch = getAttributedReturnedBySaleItemBatch(session, originalSaleItem.getId());
+        double attributedTotal = alreadyReturnedBySaleItemBatch.values().stream().mapToDouble(Double::doubleValue).sum();
+        double totalReturnedBase = getPreviouslyReturnedQuantity(session, originalSaleItem.getId()) * originalSaleItem.getEffectiveConversionFactor();
+        double unattributedLegacyBase = Math.max(0.0, totalReturnedBase - attributedTotal);
+
+        List<BatchRestorePlan> plans = new ArrayList<>();
+        double remainingToRestore = requiredBaseQuantity;
+
+        for (SaleItemBatch allocation : originalAllocations) {
+            if (remainingToRestore <= EPSILON) {
+                break;
+            }
+
+            double alreadyReturned = alreadyReturnedBySaleItemBatch.getOrDefault(allocation.getId(), 0.0);
+            double allocSold = safe(allocation.getQuantitySold());
+            double legacyShare = Math.min(Math.max(0.0, allocSold - alreadyReturned), unattributedLegacyBase);
+            alreadyReturned += legacyShare;
+            unattributedLegacyBase -= legacyShare;
+
+            double restorable = allocSold - alreadyReturned;
+            if (restorable <= EPSILON) {
+                continue;
+            }
+
+            double quantityToRestore = Math.min(remainingToRestore, restorable);
+            plans.add(new BatchRestorePlan(allocation, allocation.getBatch(), quantityToRestore));
+            remainingToRestore -= quantityToRestore;
+        }
+
+        if (remainingToRestore > EPSILON) {
+            throw new IllegalArgumentException("لا يمكن توزيع الكمية المرتجعة على دفعات البيع الأصلية");
+        }
+
+        return plans;
+    }
+
+    private ProductBatch resolveLegacyBatch(Session session, SaleItem originalSaleItem) {
+        if (originalSaleItem.getBatch() != null) {
+            return session.get(ProductBatch.class, originalSaleItem.getBatch().getId());
+        }
+
+        String batchNumber = originalSaleItem.getBatchNumberSnapshot();
+        if (batchNumber != null && !batchNumber.isBlank() && !"MULTI".equalsIgnoreCase(batchNumber)) {
+            Optional<ProductBatch> batchOpt = productBatchService.findByProductIdAndBatchNumber(
+                    session,
+                    originalSaleItem.getProduct().getId(),
+                    batchNumber.trim());
+            if (batchOpt.isPresent()) {
+                return batchOpt.get();
+            }
+        }
+
+        ProductBatch batch = new ProductBatch();
+        batch.setProduct(originalSaleItem.getProduct());
+        batch.setBatchNumber("LEGACY-RETURN-SALEITEM-" + originalSaleItem.getId());
+        batch.setExpiryDate(parseSnapshotDate(originalSaleItem.getExpirationDateSnapshot()));
+        batch.setUnitCost(originalSaleItem.getUnitCostSnapshot());
+        batch.setCurrency(originalSaleItem.getSale() != null ? originalSaleItem.getSale().getCurrency() : "دينار");
+        batch.setQuantity(0.0);
+        batch.setOriginalQuantity(0.0);
+        batch.setStatus("ACTIVE");
+        batch.setIsOpeningBatch(false);
+        batch.setCreatedAt(LocalDateTime.now());
+        batch.setUpdatedAt(LocalDateTime.now());
+        return batch;
+    }
+
+    private void applyReturnSnapshot(ReturnItem returnItem, List<BatchRestorePlan> restorePlans) {
+        if (restorePlans.size() == 1) {
+            BatchRestorePlan plan = restorePlans.get(0);
+            returnItem.setBatch(plan.batch);
+            returnItem.setSaleItemBatch(plan.saleItemBatch);
+            returnItem.setBatchNumberSnapshot(plan.batch.getBatchNumber());
+            returnItem.setExpirationDateSnapshot(plan.batch.getExpiryDate() != null ? plan.batch.getExpiryDate().toString() : null);
+            return;
+        }
+
+        returnItem.setBatch(null);
+        returnItem.setSaleItemBatch(null);
+        returnItem.setBatchNumberSnapshot("MULTI");
+        returnItem.setExpirationDateSnapshot(null);
+    }
+
+    private double getPreviouslyReturnedQuantity(Session session, Long saleItemId) {
+        Query<Double> query = session.createQuery(
+                "SELECT COALESCE(SUM(ri.quantity), 0) FROM ReturnItem ri " +
+                        "WHERE ri.originalSaleItem.id = :saleItemId " +
+                        "AND ri.saleReturn.returnStatus = :status",
+                Double.class);
+        query.setParameter("saleItemId", saleItemId);
+        query.setParameter("status", "COMPLETED");
+        Double returned = query.uniqueResult();
+        return returned != null ? returned : 0.0;
+    }
+
+    private Map<Long, Double> getAttributedReturnedBySaleItemBatch(Session session, Long saleItemId) {
+        Query<Object[]> query = session.createQuery(
+                "SELECT rib.saleItemBatch.id, COALESCE(SUM(rib.quantityReturned), 0) " +
+                        "FROM ReturnItemBatch rib " +
+                        "WHERE rib.returnItem.originalSaleItem.id = :saleItemId " +
+                        "GROUP BY rib.saleItemBatch.id",
+                Object[].class);
+        query.setParameter("saleItemId", saleItemId);
+
+        Map<Long, Double> returned = new HashMap<>();
+        for (Object[] row : query.list()) {
+            if (row[0] != null) {
+                returned.put((Long) row[0], row[1] != null ? ((Number) row[1]).doubleValue() : 0.0);
+            }
+        }
+        return returned;
+    }
+
+    private void applyCustomerBalanceCorrection(Customer customer, double amount, String currency) {
+        if ("دولار".equals(currency) || "USD".equalsIgnoreCase(currency)) {
+            customer.setBalanceUsd(customer.getBalanceUsd() + amount);
+        } else {
+            customer.setBalanceIqd(customer.getBalanceIqd() + amount);
+            customer.setCurrentBalance(customer.getCurrentBalance() + amount);
+        }
+    }
+
+    private String buildReturnMovementNote(SaleReturn saleReturn, ReturnItem returnItem, BatchRestorePlan plan) {
+        String productName = returnItem.getProduct() != null ? returnItem.getProduct().getName() : "-";
+        String batchNumber = plan.batch != null ? plan.batch.getBatchNumber() : "-";
+        return "Sale return " + saleReturn.getReturnCode() + " - " + productName + " - batch " + batchNumber;
+    }
+
+    private java.time.LocalDate parseSnapshotDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return java.time.LocalDate.parse(value.trim());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private double safe(Double value) {
+        return value != null ? value : 0.0;
+    }
+
+    private static class BatchRestorePlan {
+        private final SaleItemBatch saleItemBatch;
+        private final ProductBatch batch;
+        private final double quantityReturned;
+
+        private BatchRestorePlan(SaleItemBatch saleItemBatch, ProductBatch batch, double quantityReturned) {
+            this.saleItemBatch = saleItemBatch;
+            this.batch = batch;
+            this.quantityReturned = quantityReturned;
+        }
+    }
+
+    private static class PreparedReturnItem {
+        private final ReturnItem requestItem;
+        private final SaleItem originalSaleItem;
+        private final boolean restoreToStock;
+        private final List<BatchRestorePlan> restorePlans;
+        private final double unitPrice;
+
+        private PreparedReturnItem(ReturnItem requestItem,
+                                   SaleItem originalSaleItem,
+                                   boolean restoreToStock,
+                                   List<BatchRestorePlan> restorePlans,
+                                   double unitPrice) {
+            this.requestItem = requestItem;
+            this.originalSaleItem = originalSaleItem;
+            this.restoreToStock = restoreToStock;
+            this.restorePlans = restorePlans;
+            this.unitPrice = unitPrice;
         }
     }
 
@@ -676,8 +1006,8 @@ public class ReturnService {
             }
         }
 
-        double originalTotal = sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
-        double originalPaid = sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
+        double originalTotal = sale != null && sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
+        double originalPaid = sale != null && sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
 
         double totalReturnsUpToLast = 0.0;
         for (SaleReturn ret : returns) {
@@ -711,6 +1041,7 @@ public class ReturnService {
         return baos.toByteArray();
     }
 
+    @SuppressWarnings("unused")
     private Double getTotalReturnsBySale(Long saleId) {
         if (saleId == null)
             return 0.0;

@@ -29,11 +29,15 @@ import java.util.Optional;
 public class VoucherService {
     private static final Logger logger = LoggerFactory.getLogger(VoucherService.class);
     private final CustomerService customerService;
-    private final InventoryService inventoryService;
+    @SuppressWarnings("unused") private final InventoryService inventoryService;
+    private final ProductBatchService productBatchService;
+    private final InventoryMovementService inventoryMovementService;
     
     public VoucherService() {
         this.customerService = new CustomerService();
         this.inventoryService = new InventoryService();
+        this.productBatchService = new ProductBatchService();
+        this.inventoryMovementService = new InventoryMovementService();
     }
 
     public File generateVoucherReceiptPdf(Long voucherId, String printedBy) {
@@ -227,6 +231,7 @@ public class VoucherService {
         table.addCell(valueCell);
     }
 
+    @SuppressWarnings("unused")
     private PdfPCell signatureCell(String title, Font font) {
         PdfPCell cell = new PdfPCell();
         cell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
@@ -258,6 +263,7 @@ public class VoucherService {
         return cell;
     }
 
+    @SuppressWarnings("unused")
     private void addTotalRow(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
         PdfPCell c1 = new PdfPCell(new Phrase(label, labelFont));
         c1.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
@@ -304,6 +310,7 @@ public class VoucherService {
      * Determines the amount to show in PDF totals.
      * If voucher items exist, use their summed total_price; otherwise fall back to net amount, then amount.
      */
+    @SuppressWarnings("unused")
     private double getDisplayAmount(Voucher voucher) {
         if (voucher != null && voucher.getItems() != null && !voucher.getItems().isEmpty()) {
             double sum = 0.0;
@@ -434,14 +441,16 @@ public class VoucherService {
             }
             
             session.saveOrUpdate(voucher);
+            session.flush();
             
             // تحديث رصيد العميل (داخل نفس Session/Transaction لتجنب SQLITE_BUSY)
             if (voucher.getCustomer() != null && voucher.getCustomer().getId() != null) {
                 updateCustomerBalanceInSession(session, voucher);
             }
 
-            // إضافة المواد للمخزون (داخل نفس Session/Transaction لتجنب SQLITE_BUSY)
-            if ((voucher.getVoucherType() == VoucherType.PAYMENT || voucher.getVoucherType() == VoucherType.PURCHASE) && voucher.getItems() != null) {
+            if (voucher.getVoucherType() == VoucherType.PURCHASE) {
+                processPurchaseInventoryInSession(session, voucher);
+            } else if (voucher.getVoucherType() == VoucherType.PAYMENT && voucher.getItems() != null) {
                 for (VoucherItem item : voucher.getItems()) {
                     if (Boolean.TRUE.equals(item.getAddToInventory()) && item.getProduct() != null && item.getProduct().getId() != null) {
                         addStockInSession(session, item.getProduct().getId(), item.getQuantity());
@@ -484,6 +493,7 @@ public class VoucherService {
             voucher.setTotalInstallments(numberOfInstallments);
             
             session.saveOrUpdate(voucher);
+            session.flush();
             
             // إنشاء الأقساط
             double installmentAmount = voucher.getNetAmount() / numberOfInstallments;
@@ -509,8 +519,9 @@ public class VoucherService {
                 updateCustomerBalanceInSession(session, voucher);
             }
 
-            // إضافة المواد للمخزون (داخل نفس Session/Transaction لتجنب SQLITE_BUSY)
-            if ((voucher.getVoucherType() == VoucherType.PAYMENT || voucher.getVoucherType() == VoucherType.PURCHASE) && voucher.getItems() != null) {
+            if (voucher.getVoucherType() == VoucherType.PURCHASE) {
+                processPurchaseInventoryInSession(session, voucher);
+            } else if (voucher.getVoucherType() == VoucherType.PAYMENT && voucher.getItems() != null) {
                 for (VoucherItem item : voucher.getItems()) {
                     if (Boolean.TRUE.equals(item.getAddToInventory()) && item.getProduct() != null && item.getProduct().getId() != null) {
                         addStockInSession(session, item.getProduct().getId(), item.getQuantity());
@@ -796,6 +807,7 @@ public class VoucherService {
         // لا نغير amount هنا؛ يبقى مدفوع المستخدم (مثلاً دفعة جزئية)
     }
     
+    @SuppressWarnings("unused")
     private void updateCustomerBalance(Voucher voucher) {
         if (voucher.getCustomer() == null) return;
         
@@ -813,6 +825,7 @@ public class VoucherService {
         }
     }
     
+    @SuppressWarnings("unused")
     private void reverseCustomerBalance(Voucher voucher) {
         if (voucher.getCustomer() == null) return;
         
@@ -909,6 +922,105 @@ public class VoucherService {
         double current = product.getQuantityInStock() == null ? 0.0 : product.getQuantityInStock();
         product.setQuantityInStock(current + quantity);
         session.saveOrUpdate(product);
+    }
+
+    private void processPurchaseInventoryInSession(Session session, Voucher voucher) {
+        if (voucher.getItems() == null || voucher.getItems().isEmpty()) {
+            return;
+        }
+
+        List<Long> touchedProductIds = new ArrayList<>();
+        for (VoucherItem item : voucher.getItems()) {
+            if (!Boolean.TRUE.equals(item.getAddToInventory()) || item.getProduct() == null || item.getProduct().getId() == null) {
+                continue;
+            }
+            if (item.getId() == null) {
+                session.flush();
+            }
+
+            Long voucherId = voucher.getId();
+            Long voucherItemId = item.getId();
+            if (voucherId == null || voucherItemId == null) {
+                throw new IllegalArgumentException("تعذر تحديد سطر المشتريات لحفظ حركة المخزون");
+            }
+
+            if (inventoryMovementService.existsByReference(session, "purchase", "voucher_purchase", voucherId, voucherItemId, null)) {
+                logger.info("Skipping already-processed purchase inventory for voucher {} item {}", voucherId, voucherItemId);
+                continue;
+            }
+
+            Product product = session.get(Product.class, item.getProduct().getId());
+            if (product == null) {
+                throw new IllegalArgumentException("المنتج غير موجود");
+            }
+
+            LocalDate expiryDate = parseOptionalExpirationDate(item.getExpirationDate());
+            String effectiveBatchNumber = resolveEffectiveBatchNumber(voucher, item);
+            ProductBatch batch = productBatchService.createOrUpdateBatch(
+                    session,
+                    product,
+                    effectiveBatchNumber,
+                    expiryDate,
+                    item.getQuantity(),
+                    item.getUnitPrice(),
+                    voucher.getCurrency(),
+                    voucher.getCustomer(),
+                    false);
+
+            item.setBatch(batch);
+            if (item.getBatchNumber() == null || item.getBatchNumber().trim().isEmpty()) {
+                item.setBatchNumber(null);
+            }
+            if (expiryDate != null) {
+                item.setExpirationDate(expiryDate.toString());
+            }
+            session.saveOrUpdate(item);
+
+            inventoryMovementService.recordMovement(
+                    session,
+                    product,
+                    batch,
+                    "purchase",
+                    "voucher_purchase",
+                    voucherId,
+                    voucherItemId,
+                    item.getQuantity(),
+                    null,
+                    null,
+                    item.getUnitPrice(),
+                    buildPurchaseMovementNote(voucher, item, batch),
+                    voucher.getCreatedBy());
+
+            touchedProductIds.add(product.getId());
+        }
+
+        for (Long productId : touchedProductIds.stream().distinct().toList()) {
+            productBatchService.syncProductSummaryQuantity(session, productId);
+        }
+    }
+
+    private LocalDate parseOptionalExpirationDate(String expirationDate) {
+        if (expirationDate == null || expirationDate.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(expirationDate.trim());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("تاريخ الصلاحية يجب أن يكون بصيغة YYYY-MM-DD");
+        }
+    }
+
+    private String resolveEffectiveBatchNumber(Voucher voucher, VoucherItem item) {
+        if (item.getBatchNumber() != null && !item.getBatchNumber().trim().isEmpty()) {
+            return item.getBatchNumber().trim();
+        }
+        return "PURCHASE-" + voucher.getId() + "-" + item.getId();
+    }
+
+    private String buildPurchaseMovementNote(Voucher voucher, VoucherItem item, ProductBatch batch) {
+        String productName = item.getProductName() != null ? item.getProductName() : "-";
+        String batchNumber = batch != null ? batch.getBatchNumber() : "-";
+        return "Purchase voucher " + voucher.getVoucherNumber() + " - " + productName + " - batch " + batchNumber;
     }
     
     private String generateDescription(Voucher voucher) {

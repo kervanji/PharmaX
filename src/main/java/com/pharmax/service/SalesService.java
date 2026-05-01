@@ -1,26 +1,35 @@
 package com.pharmax.service;
 
+import com.pharmax.database.DatabaseManager;
 import com.pharmax.database.Repository.SaleRepository;
 import com.pharmax.database.Repository.CustomerRepository;
 import com.pharmax.database.Repository.ProductRepository;
+import com.pharmax.database.Repository.ProductBatchRepository;
 import com.pharmax.database.Repository.SaleItemRepository;
 import com.pharmax.model.*;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class SalesService {
     private static final Logger logger = LoggerFactory.getLogger(SalesService.class);
     private final SaleRepository saleRepository;
-    private final SaleItemRepository saleItemRepository;
-    private final CustomerRepository customerRepository;
-    private final ProductRepository productRepository;
+    @SuppressWarnings("unused") private final SaleItemRepository saleItemRepository;
+    @SuppressWarnings("unused") private final CustomerRepository customerRepository;
+    @SuppressWarnings("unused") private final ProductRepository productRepository;
     private final InventoryService inventoryService;
     private final CustomerService customerService;
+    private final ProductBatchService productBatchService;
+    private final InventoryMovementService inventoryMovementService;
     
     public SalesService() {
         this.saleRepository = new SaleRepository();
@@ -29,110 +38,114 @@ public class SalesService {
         this.productRepository = new ProductRepository();
         this.inventoryService = new InventoryService();
         this.customerService = new CustomerService();
+        this.productBatchService = new ProductBatchService();
+        this.inventoryMovementService = new InventoryMovementService();
     }
     
     public Sale createSale(SaleRequest saleRequest) {
         logger.info("Creating new sale for customer: {}", saleRequest.getCustomerId());
-        
-        // Validate customer exists
-        Optional<Customer> customerOpt = customerRepository.findById(saleRequest.getCustomerId());
-        if (customerOpt.isEmpty()) {
-            throw new IllegalArgumentException("العميل غير موجود");
-        }
-        
-        Customer customer = customerOpt.get();
-        
-        // Create sale
-        Sale sale = new Sale();
-        sale.setSaleCode(generateSaleCode());
-        sale.setCustomer(customer);
-        sale.setProjectLocation(saleRequest.getProjectLocation());
-        sale.setPaymentMethod(saleRequest.getPaymentMethod());
-        sale.setCurrency(saleRequest.getCurrency() != null ? saleRequest.getCurrency() : "دينار");
-        sale.setNotes(saleRequest.getNotes());
-        sale.setCreatedBy(saleRequest.getCreatedBy());
-        
-        List<SaleItem> saleItems = new ArrayList<>();
-        double totalAmount = 0.0;
-        
-        // Process sale items
-        for (SaleItemRequest itemRequest : saleRequest.getItems()) {
-            Optional<Product> productOpt = productRepository.findById(itemRequest.getProductId());
-            if (productOpt.isEmpty()) {
-                throw new IllegalArgumentException("المنتج غير موجود: " + itemRequest.getProductId());
+        Transaction transaction = null;
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            Customer customer = session.get(Customer.class, saleRequest.getCustomerId());
+            if (customer == null) {
+                throw new IllegalArgumentException("العميل غير موجود");
             }
-            
-            Product product = productOpt.get();
-            double conversionFactor = itemRequest.getConversionFactor() != null && itemRequest.getConversionFactor() > 0
-                    ? itemRequest.getConversionFactor()
-                    : 1.0;
-            double baseQuantity = itemRequest.getBaseQuantity() != null && itemRequest.getBaseQuantity() > 0
-                    ? itemRequest.getBaseQuantity()
-                    : itemRequest.getQuantity() * conversionFactor;
 
-            if (!inventoryService.isStockAvailable(product.getId(), baseQuantity)) {
-                throw new IllegalArgumentException("الكمية غير متوفرة للمنتج: " + product.getName());
+            Sale sale = new Sale();
+            sale.setSaleCode(generateSaleCode());
+            sale.setCustomer(customer);
+            sale.setProjectLocation(saleRequest.getProjectLocation());
+            sale.setPaymentMethod(saleRequest.getPaymentMethod());
+            sale.setCurrency(saleRequest.getCurrency() != null ? saleRequest.getCurrency() : "دينار");
+            sale.setNotes(saleRequest.getNotes());
+            sale.setCreatedBy(saleRequest.getCreatedBy());
+
+            List<PreparedSaleItem> preparedItems = buildSalePlan(session, saleRequest, sale.getCurrency());
+            double totalAmount = preparedItems.stream().mapToDouble(p -> p.saleItem.getTotalPrice()).sum();
+
+            transaction = session.beginTransaction();
+
+            sale.setTotalAmount(totalAmount);
+            sale.setDiscountAmount(saleRequest.getAdditionalDiscount() != null ? saleRequest.getAdditionalDiscount() : 0.0);
+            sale.setTaxAmount(0.0);
+            sale.setFinalAmount(totalAmount - sale.getDiscountAmount());
+
+            double paidAmount = saleRequest.getPaidAmount() != null ? saleRequest.getPaidAmount() : 0.0;
+            sale.setPaidAmount(paidAmount);
+            sale.setPaymentStatus(paidAmount + 1e-9 >= sale.getFinalAmount() ? "PAID" : "PENDING");
+
+            session.save(sale);
+            session.flush();
+
+            List<SaleItem> savedItems = new ArrayList<>();
+            for (PreparedSaleItem prepared : preparedItems) {
+                prepared.saleItem.setSale(sale);
+                applySaleItemSnapshot(prepared.saleItem, prepared.allocations);
+                session.save(prepared.saleItem);
+                session.flush();
+
+                for (BatchAllocationPlan allocation : prepared.allocations) {
+                    double quantityBefore = allocation.batch.getQuantity();
+                    double quantityAfter = quantityBefore - allocation.quantitySold;
+                    if (quantityAfter < -1e-9) {
+                        throw new IllegalArgumentException("الكمية المطلوبة غير متوفرة للمنتج: " + prepared.product.getName());
+                    }
+
+                    allocation.batch.setQuantity(quantityAfter);
+                    allocation.batch.setStatus(quantityAfter > 0 ? "ACTIVE" : "DEPLETED");
+                    allocation.batch.setUpdatedAt(LocalDateTime.now());
+                    session.saveOrUpdate(allocation.batch);
+
+                    SaleItemBatch saleItemBatch = new SaleItemBatch();
+                    saleItemBatch.setSaleItem(prepared.saleItem);
+                    saleItemBatch.setBatch(allocation.batch);
+                    saleItemBatch.setQuantitySold(allocation.quantitySold);
+                    saleItemBatch.setBatchNumberSnapshot(allocation.batch.getBatchNumber());
+                    saleItemBatch.setExpirationDateSnapshot(allocation.batch.getExpiryDate() != null
+                            ? allocation.batch.getExpiryDate().toString()
+                            : null);
+                    saleItemBatch.setUnitCostSnapshot(allocation.batch.getUnitCost());
+                    saleItemBatch.setQuantityBefore(quantityBefore);
+                    saleItemBatch.setQuantityAfter(quantityAfter);
+                    session.save(saleItemBatch);
+
+                    inventoryMovementService.recordMovement(
+                            session,
+                            prepared.product,
+                            allocation.batch,
+                            "sale",
+                            "sale",
+                            sale.getId(),
+                            prepared.saleItem.getId(),
+                            -allocation.quantitySold,
+                            quantityBefore,
+                            quantityAfter,
+                            allocation.batch.getUnitCost(),
+                            buildSaleMovementNote(sale, prepared.saleItem, allocation),
+                            sale.getCreatedBy());
+                }
+
+                productBatchService.syncProductSummaryQuantity(session, prepared.product.getId());
+                savedItems.add(prepared.saleItem);
             }
-            
-            // Create sale item
-            SaleItem saleItem = new SaleItem();
-            saleItem.setSale(sale);
-            saleItem.setProduct(product);
-            saleItem.setQuantity(itemRequest.getQuantity());
-            saleItem.setPriceType(itemRequest.getPriceType() != null ? itemRequest.getPriceType() : "مفرد");
-            saleItem.setSoldUnit(itemRequest.getSoldUnit());
-            saleItem.setConversionFactor(conversionFactor);
-            saleItem.setBaseQuantity(baseQuantity);
-            
-            // Use price from request; fallback respects the sale currency so USD-only
-            // products do not become zero/blank in USD receipts.
-            double unitPrice = itemRequest.getUnitPrice() != null
-                    ? itemRequest.getUnitPrice()
-                    : getProductPriceForCurrency(product, sale.getCurrency());
-            saleItem.setUnitPrice(unitPrice);
-            
-            saleItem.setDiscountPercentage(itemRequest.getDiscountPercentage());
-            
-            // Calculate total price with discount
-            double itemTotal = unitPrice * itemRequest.getQuantity();
-            double discountAmount = itemTotal * (itemRequest.getDiscountPercentage() / 100.0);
-            saleItem.setDiscountAmount(discountAmount);
-            saleItem.setTotalPrice(itemTotal - discountAmount);
-            
-            saleItems.add(saleItem);
-            totalAmount += saleItem.getTotalPrice();
-            
-            // Update inventory
-            inventoryService.removeStock(product.getId(), baseQuantity);
+
+            updateCustomerBalanceInSession(customer, paidAmount - sale.getFinalAmount(), sale.getCurrency());
+            sale.setSaleItems(savedItems);
+
+            transaction.commit();
+            logger.info("Sale created successfully: {}", sale.getSaleCode());
+            return sale;
+        } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                try {
+                    transaction.rollback();
+                } catch (Exception rollbackEx) {
+                    logger.error("Failed to rollback sale transaction", rollbackEx);
+                }
+            }
+            logger.error("Failed to create sale", e);
+            throw new RuntimeException("فشل في إنشاء الفاتورة: " + e.getMessage(), e);
         }
-        
-        // Set sale totals (no tax)
-        sale.setTotalAmount(totalAmount);
-        sale.setDiscountAmount(saleRequest.getAdditionalDiscount() != null ? saleRequest.getAdditionalDiscount() : 0.0);
-        sale.setTaxAmount(0.0);
-        sale.setFinalAmount(totalAmount - sale.getDiscountAmount());
-
-        double paidAmount = saleRequest.getPaidAmount() != null ? saleRequest.getPaidAmount() : 0.0;
-        sale.setPaidAmount(paidAmount);
-        sale.setPaymentStatus(paidAmount + 1e-9 >= sale.getFinalAmount() ? "PAID" : "PENDING");
-        
-        // Save sale and items
-        Sale savedSale = saleRepository.save(sale);
-        saleItems.forEach(item -> {
-            item.setSale(savedSale);
-            saleItemRepository.save(item);
-        });
-
-        // Update customer balance by the difference (credit/debt)
-        // current_balance > 0 => credit for customer (we owe), < 0 => debt on customer
-        customerService.updateCustomerBalanceByCurrency(
-            customer.getId(),
-            paidAmount - sale.getFinalAmount(),
-            sale.getCurrency()
-        );
-        
-        logger.info("Sale created successfully: {}", savedSale.getSaleCode());
-        return savedSale;
     }
     
     public Optional<Sale> getSaleById(Long id) {
@@ -170,7 +183,19 @@ public class SalesService {
             
             // Restore inventory
             for (SaleItem item : sale.getSaleItems()) {
-                inventoryService.addStock(item.getProduct().getId(), item.getEffectiveBaseQuantity());
+                if (item.getBatchAllocations() != null && !item.getBatchAllocations().isEmpty()) {
+                    for (SaleItemBatch allocation : item.getBatchAllocations()) {
+                        ProductBatch batch = allocation.getBatch();
+                        if (batch != null && batch.getId() != null) {
+                            batch.setQuantity(batch.getQuantity() + allocation.getQuantitySold());
+                            batch.setStatus("ACTIVE");
+                            new ProductBatchRepository().save(batch);
+                        }
+                    }
+                    inventoryService.syncProductQuantityFromBatches(item.getProduct().getId());
+                } else {
+                    inventoryService.addStock(item.getProduct().getId(), item.getEffectiveBaseQuantity());
+                }
             }
             
             // Revert customer balance effect of this sale
@@ -217,6 +242,145 @@ public class SalesService {
             throw new IllegalArgumentException("لا يوجد سعر صالح للمنتج: " + product.getName());
         }
         return price;
+    }
+
+    private List<PreparedSaleItem> buildSalePlan(Session session, SaleRequest saleRequest, String saleCurrency) {
+        List<PreparedSaleItem> preparedItems = new ArrayList<>();
+        Map<Long, List<ProductBatch>> availableBatchesByProduct = new HashMap<>();
+        Map<Long, Double> remainingByBatchId = new HashMap<>();
+
+        for (SaleItemRequest itemRequest : saleRequest.getItems()) {
+            Product product = session.get(Product.class, itemRequest.getProductId());
+            if (product == null) {
+                throw new IllegalArgumentException("المنتج غير موجود: " + itemRequest.getProductId());
+            }
+
+            double conversionFactor = itemRequest.getConversionFactor() != null && itemRequest.getConversionFactor() > 0
+                    ? itemRequest.getConversionFactor()
+                    : 1.0;
+            double baseQuantity = itemRequest.getBaseQuantity() != null && itemRequest.getBaseQuantity() > 0
+                    ? itemRequest.getBaseQuantity()
+                    : itemRequest.getQuantity() * conversionFactor;
+
+            List<ProductBatch> availableBatches = availableBatchesByProduct.computeIfAbsent(
+                    product.getId(),
+                    id -> productBatchService.getAvailableBatches(session, id, LocalDate.now()));
+
+            List<BatchAllocationPlan> allocations = allocateAcrossBatches(product, availableBatches, remainingByBatchId, baseQuantity);
+            if (allocations.isEmpty()) {
+                throw new IllegalArgumentException("الكمية غير متوفرة للمنتج: " + product.getName());
+            }
+
+            SaleItem saleItem = new SaleItem();
+            saleItem.setProduct(product);
+            saleItem.setQuantity(itemRequest.getQuantity());
+            saleItem.setPriceType(itemRequest.getPriceType() != null ? itemRequest.getPriceType() : "مفرد");
+            saleItem.setSoldUnit(itemRequest.getSoldUnit());
+            saleItem.setConversionFactor(conversionFactor);
+            saleItem.setBaseQuantity(baseQuantity);
+
+            double unitPrice = itemRequest.getUnitPrice() != null
+                    ? itemRequest.getUnitPrice()
+                    : getProductPriceForCurrency(product, saleCurrency);
+            saleItem.setUnitPrice(unitPrice);
+
+            double discountPercent = itemRequest.getDiscountPercentage() != null ? itemRequest.getDiscountPercentage() : 0.0;
+            saleItem.setDiscountPercentage(discountPercent);
+            double itemTotal = unitPrice * itemRequest.getQuantity();
+            double discountAmount = itemTotal * (discountPercent / 100.0);
+            saleItem.setDiscountAmount(discountAmount);
+            saleItem.setTotalPrice(itemTotal - discountAmount);
+
+            preparedItems.add(new PreparedSaleItem(product, saleItem, allocations));
+        }
+
+        return preparedItems;
+    }
+
+    private List<BatchAllocationPlan> allocateAcrossBatches(Product product,
+                                                            List<ProductBatch> availableBatches,
+                                                            Map<Long, Double> remainingByBatchId,
+                                                            double requiredQuantity) {
+        double remainingRequired = requiredQuantity;
+        List<BatchAllocationPlan> allocations = new ArrayList<>();
+
+        for (ProductBatch batch : availableBatches) {
+            if (remainingRequired <= 1e-9) {
+                break;
+            }
+
+            double remainingInBatch = remainingByBatchId.computeIfAbsent(
+                    batch.getId(),
+                    id -> batch.getQuantity() != null ? batch.getQuantity() : 0.0);
+            if (remainingInBatch <= 1e-9) {
+                continue;
+            }
+
+            double quantityToSell = Math.min(remainingRequired, remainingInBatch);
+            allocations.add(new BatchAllocationPlan(batch, quantityToSell));
+            remainingByBatchId.put(batch.getId(), remainingInBatch - quantityToSell);
+            remainingRequired -= quantityToSell;
+        }
+
+        if (remainingRequired > 1e-9) {
+            throw new IllegalArgumentException("الكمية غير متوفرة للمنتج: " + product.getName());
+        }
+
+        return allocations;
+    }
+
+    private void applySaleItemSnapshot(SaleItem saleItem, List<BatchAllocationPlan> allocations) {
+        if (allocations.size() == 1) {
+            ProductBatch batch = allocations.get(0).batch;
+            saleItem.setBatch(batch);
+            saleItem.setBatchNumberSnapshot(batch.getBatchNumber());
+            saleItem.setExpirationDateSnapshot(batch.getExpiryDate() != null ? batch.getExpiryDate().toString() : null);
+            saleItem.setUnitCostSnapshot(batch.getUnitCost());
+            return;
+        }
+
+        saleItem.setBatch(null);
+        saleItem.setBatchNumberSnapshot("MULTI");
+        saleItem.setExpirationDateSnapshot(null);
+        saleItem.setUnitCostSnapshot(null);
+    }
+
+    private String buildSaleMovementNote(Sale sale, SaleItem saleItem, BatchAllocationPlan allocation) {
+        String productName = saleItem.getProduct() != null ? saleItem.getProduct().getName() : "-";
+        String batchNumber = allocation.batch != null ? allocation.batch.getBatchNumber() : "-";
+        return "Sale " + sale.getSaleCode() + " - " + productName + " - batch " + batchNumber;
+    }
+
+    private void updateCustomerBalanceInSession(Customer customer, Double amount, String currency) {
+        double safeAmount = amount != null ? amount : 0.0;
+        if ("دولار".equals(currency) || "USD".equalsIgnoreCase(currency)) {
+            customer.setBalanceUsd(customer.getBalanceUsd() + safeAmount);
+        } else {
+            customer.setBalanceIqd(customer.getBalanceIqd() + safeAmount);
+            customer.setCurrentBalance(customer.getCurrentBalance() + safeAmount);
+        }
+    }
+
+    private static class PreparedSaleItem {
+        private final Product product;
+        private final SaleItem saleItem;
+        private final List<BatchAllocationPlan> allocations;
+
+        private PreparedSaleItem(Product product, SaleItem saleItem, List<BatchAllocationPlan> allocations) {
+            this.product = product;
+            this.saleItem = saleItem;
+            this.allocations = allocations;
+        }
+    }
+
+    private static class BatchAllocationPlan {
+        private final ProductBatch batch;
+        private final double quantitySold;
+
+        private BatchAllocationPlan(ProductBatch batch, double quantitySold) {
+            this.batch = batch;
+            this.quantitySold = quantitySold;
+        }
     }
     
     

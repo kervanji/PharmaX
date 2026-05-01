@@ -11,7 +11,6 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.VBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 public class UserManagementController {
-    private static final Logger logger = LoggerFactory.getLogger(UserManagementController.class);
+    @SuppressWarnings("unused") private static final Logger logger = LoggerFactory.getLogger(UserManagementController.class);
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @FXML
@@ -46,7 +45,7 @@ public class UserManagementController {
 
     private final AuthService authService = new AuthService();
     private final ObservableList<User> usersList = FXCollections.observableArrayList();
-    private boolean tabMode = false;
+    @SuppressWarnings("unused") private boolean tabMode = false;
 
     @FXML
     private void initialize() {

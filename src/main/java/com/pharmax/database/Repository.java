@@ -3,12 +3,16 @@ package com.pharmax.database;
 import com.pharmax.model.Category;
 import com.pharmax.model.Customer;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductBatch;
 import com.pharmax.model.ProductUnit;
 import com.pharmax.model.Sale;
+import com.pharmax.model.SaleItemBatch;
 import com.pharmax.model.SaleItem;
 import com.pharmax.model.Receipt;
 import com.pharmax.model.SaleReturn;
 import com.pharmax.model.ReturnItem;
+import com.pharmax.model.ReturnItemBatch;
+import com.pharmax.model.InventoryMovement;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
@@ -16,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -292,6 +297,136 @@ public class Repository<T> {
                 logger.error("Failed to replace product units for product: {}", product.getId(), e);
                 throw new RuntimeException("Failed to replace product units", e);
             }
+        }
+    }
+
+    public static class ProductBatchRepository extends Repository<ProductBatch> {
+        public ProductBatchRepository() {
+            super(ProductBatch.class);
+        }
+
+        public List<ProductBatch> findByProductId(Long productId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<ProductBatch> query = session.createQuery(
+                        "FROM ProductBatch b WHERE b.product.id = :productId ORDER BY " +
+                                "CASE WHEN b.expiryDate IS NULL THEN 1 ELSE 0 END, b.expiryDate ASC, b.createdAt ASC, b.id ASC",
+                        ProductBatch.class);
+                query.setParameter("productId", productId);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find batches by product id: {}", productId, e);
+                throw new RuntimeException("Failed to find product batches", e);
+            }
+        }
+
+        public List<ProductBatch> findSellableByProductId(Long productId, LocalDate today) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<ProductBatch> query = session.createQuery(
+                        "FROM ProductBatch b WHERE b.product.id = :productId " +
+                                "AND COALESCE(b.quantity, 0) > 0 " +
+                                "AND b.status = :status " +
+                                "AND (b.expiryDate IS NULL OR b.expiryDate >= :today) " +
+                                "ORDER BY CASE WHEN b.expiryDate IS NULL THEN 1 ELSE 0 END, b.expiryDate ASC, b.createdAt ASC, b.id ASC",
+                        ProductBatch.class);
+                query.setParameter("productId", productId);
+                query.setParameter("status", "ACTIVE");
+                query.setParameter("today", today);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find sellable batches by product id: {}", productId, e);
+                throw new RuntimeException("Failed to find sellable product batches", e);
+            }
+        }
+
+        public Optional<ProductBatch> findByProductIdAndBatchNumber(Long productId, String batchNumber) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<ProductBatch> query = session.createQuery(
+                        "FROM ProductBatch b WHERE b.product.id = :productId AND b.batchNumber = :batchNumber",
+                        ProductBatch.class);
+                query.setParameter("productId", productId);
+                query.setParameter("batchNumber", batchNumber);
+                return query.uniqueResultOptional();
+            } catch (Exception e) {
+                logger.error("Failed to find batch by product and batch number: {} / {}", productId, batchNumber, e);
+                return Optional.empty();
+            }
+        }
+
+        public double getTotalQuantityByProductId(Long productId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<Double> query = session.createQuery(
+                        "SELECT COALESCE(SUM(b.quantity), 0) FROM ProductBatch b " +
+                                "WHERE b.product.id = :productId AND b.status = :status",
+                        Double.class);
+                query.setParameter("productId", productId);
+                query.setParameter("status", "ACTIVE");
+                Double result = query.uniqueResult();
+                return result != null ? result : 0.0;
+            } catch (Exception e) {
+                logger.error("Failed to total batches by product id: {}", productId, e);
+                throw new RuntimeException("Failed to total product batches", e);
+            }
+        }
+    }
+
+    public static class InventoryMovementRepository extends Repository<InventoryMovement> {
+        public InventoryMovementRepository() {
+            super(InventoryMovement.class);
+        }
+
+        public List<InventoryMovement> findByProductId(Long productId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<InventoryMovement> query = session.createQuery(
+                        "FROM InventoryMovement m WHERE m.product.id = :productId ORDER BY m.createdAt DESC, m.id DESC",
+                        InventoryMovement.class);
+                query.setParameter("productId", productId);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find movements by product id: {}", productId, e);
+                throw new RuntimeException("Failed to find inventory movements", e);
+            }
+        }
+
+        public List<InventoryMovement> findByBatchId(Long batchId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<InventoryMovement> query = session.createQuery(
+                        "FROM InventoryMovement m WHERE m.batch.id = :batchId ORDER BY m.createdAt DESC, m.id DESC",
+                        InventoryMovement.class);
+                query.setParameter("batchId", batchId);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find movements by batch id: {}", batchId, e);
+                throw new RuntimeException("Failed to find inventory movements", e);
+            }
+        }
+
+        public boolean existsByReference(String movementType, String referenceType, Long referenceId, Long referenceItemId, Long batchId) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<Long> query = session.createQuery(
+                        "SELECT COUNT(m.id) FROM InventoryMovement m " +
+                                "WHERE m.movementType = :movementType " +
+                                "AND m.referenceType = :referenceType " +
+                                "AND m.referenceId = :referenceId " +
+                                "AND m.referenceItemId = :referenceItemId " +
+                                "AND ((:batchId IS NULL AND m.batch IS NULL) OR m.batch.id = :batchId)",
+                        Long.class);
+                query.setParameter("movementType", movementType);
+                query.setParameter("referenceType", referenceType);
+                query.setParameter("referenceId", referenceId);
+                query.setParameter("referenceItemId", referenceItemId);
+                query.setParameter("batchId", batchId);
+                Long count = query.uniqueResult();
+                return count != null && count > 0;
+            } catch (Exception e) {
+                logger.error("Failed to check movement existence for reference {} / {} / {}", referenceId, referenceItemId, batchId, e);
+                throw new RuntimeException("Failed to check inventory movement duplication", e);
+            }
+        }
+    }
+
+    public static class SaleItemBatchRepository extends Repository<SaleItemBatch> {
+        public SaleItemBatchRepository() {
+            super(SaleItemBatch.class);
         }
     }
     
@@ -651,6 +786,7 @@ public class Repository<T> {
                     "LEFT JOIN FETCH r.customer " +
                     "LEFT JOIN FETCH r.sale " +
                     "LEFT JOIN FETCH r.returnItems ri " +
+                    "LEFT JOIN FETCH ri.originalSaleItem " +
                     "LEFT JOIN FETCH ri.product " +
                     "WHERE r.sale.id = :saleId ORDER BY r.returnDate DESC", SaleReturn.class);
                 query.setParameter("saleId", saleId);
@@ -668,6 +804,7 @@ public class Repository<T> {
                     "LEFT JOIN FETCH r.sale s " +
                     "LEFT JOIN FETCH r.customer " +
                     "LEFT JOIN FETCH r.returnItems ri " +
+                    "LEFT JOIN FETCH ri.originalSaleItem " +
                     "LEFT JOIN FETCH ri.product " +
                     "WHERE r.customer.id = :customerId ORDER BY r.returnDate DESC", SaleReturn.class);
                 query.setParameter("customerId", customerId);
@@ -685,6 +822,7 @@ public class Repository<T> {
                     "LEFT JOIN FETCH r.sale s " +
                     "LEFT JOIN FETCH r.customer " +
                     "LEFT JOIN FETCH r.returnItems ri " +
+                    "LEFT JOIN FETCH ri.originalSaleItem " +
                     "LEFT JOIN FETCH ri.product " +
                     "ORDER BY r.returnDate DESC", SaleReturn.class);
                 return query.list();
@@ -760,6 +898,12 @@ public class Repository<T> {
     public static class ReturnItemRepository extends Repository<ReturnItem> {
         public ReturnItemRepository() {
             super(ReturnItem.class);
+        }
+    }
+
+    public static class ReturnItemBatchRepository extends Repository<ReturnItemBatch> {
+        public ReturnItemBatchRepository() {
+            super(ReturnItemBatch.class);
         }
     }
 

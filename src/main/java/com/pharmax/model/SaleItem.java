@@ -1,6 +1,8 @@
 package com.pharmax.model;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "sale_items")
@@ -16,6 +18,10 @@ public class SaleItem {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
     
     @Column(nullable = false)
     private Double quantity;
@@ -44,6 +50,18 @@ public class SaleItem {
     @Column(name = "base_quantity")
     private Double baseQuantity;
 
+    @Column(name = "batch_number_snapshot")
+    private String batchNumberSnapshot;
+
+    @Column(name = "expiration_date_snapshot")
+    private String expirationDateSnapshot;
+
+    @Column(name = "unit_cost_snapshot")
+    private Double unitCostSnapshot;
+
+    @OneToMany(mappedBy = "saleItem", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<SaleItemBatch> batchAllocations = new ArrayList<>();
+
     public SaleItem() {
         this.discountPercentage = 0.0;
         this.discountAmount = 0.0;
@@ -61,6 +79,9 @@ public class SaleItem {
     
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
+
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
     
     public Double getQuantity() { return quantity; }
     public void setQuantity(Double quantity) { this.quantity = quantity; }
@@ -88,6 +109,23 @@ public class SaleItem {
 
     public Double getBaseQuantity() { return baseQuantity; }
     public void setBaseQuantity(Double baseQuantity) { this.baseQuantity = baseQuantity; }
+
+    public String getBatchNumberSnapshot() { return batchNumberSnapshot; }
+    public void setBatchNumberSnapshot(String batchNumberSnapshot) { this.batchNumberSnapshot = batchNumberSnapshot; }
+
+    public String getExpirationDateSnapshot() { return expirationDateSnapshot; }
+    public void setExpirationDateSnapshot(String expirationDateSnapshot) { this.expirationDateSnapshot = expirationDateSnapshot; }
+
+    public Double getUnitCostSnapshot() { return unitCostSnapshot; }
+    public void setUnitCostSnapshot(Double unitCostSnapshot) { this.unitCostSnapshot = unitCostSnapshot; }
+
+    public List<SaleItemBatch> getBatchAllocations() { return batchAllocations; }
+    public void setBatchAllocations(List<SaleItemBatch> batchAllocations) { this.batchAllocations = batchAllocations; }
+
+    public void addBatchAllocation(SaleItemBatch allocation) {
+        batchAllocations.add(allocation);
+        allocation.setSaleItem(this);
+    }
 
     public double getEffectiveConversionFactor() {
         return conversionFactor != null && conversionFactor > 0 ? conversionFactor : 1.0;

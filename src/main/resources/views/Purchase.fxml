@@ -112,6 +112,8 @@
                         <TableColumn fx:id="itemProductColumn" text="المادة" prefWidth="200"/>
                         <TableColumn fx:id="itemQuantityColumn" text="الكمية" prefWidth="80"/>
                         <TableColumn fx:id="itemUnitColumn" text="الوحدة" prefWidth="80"/>
+                        <TableColumn fx:id="itemBatchColumn" text="رقم التشغيلة" prefWidth="120"/>
+                        <TableColumn fx:id="itemExpiryColumn" text="الصلاحية" prefWidth="110"/>
                         <TableColumn fx:id="itemPriceColumn" text="سعر الشراء" prefWidth="120"/>
                         <TableColumn fx:id="itemSalePriceColumn" text="سعر البيع" prefWidth="120"/>
                         <TableColumn fx:id="itemTotalColumn" text="المجموع" prefWidth="120"/>

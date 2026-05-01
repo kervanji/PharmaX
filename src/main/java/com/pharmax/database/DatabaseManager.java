@@ -5,16 +5,29 @@ import org.hibernate.cfg.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DatabaseManager {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseManager.class);
     private static final String DB_URL = "jdbc:sqlite:pharmax.db";
+    private static final List<String> MANAGED_MIGRATIONS = List.of(
+            "db/migrations/20260501_batch_inventory_foundation.sql",
+            "db/migrations/20260501_opening_batches.sql",
+            "db/migrations/20260501_purchase_batch_fields.sql",
+            "db/migrations/20260501_sales_fefo_foundation.sql",
+            "db/migrations/20260501_sales_return_batches.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -43,9 +56,13 @@ public class DatabaseManager {
 
             // Create tables if they don't exist
             createTables(stmt);
+            ensureSchemaMigrationsTable(stmt);
 
             // Apply lightweight migrations for existing databases
             applyMigrations(stmt);
+
+            // Apply tracked SQL migrations for additive schema/data upgrades
+            applyManagedMigrations(conn);
 
             // Ensure database integrity and repair corrupted indexes without deleting data
             runIntegrityCheckAndRepair(conn);
@@ -196,6 +213,139 @@ public class DatabaseManager {
         }
     }
 
+    private static void ensureSchemaMigrationsTable(Statement stmt) throws SQLException {
+        stmt.execute("""
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    migration_name TEXT PRIMARY KEY,
+                    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+    }
+
+    private static void applyManagedMigrations(Connection conn) {
+        for (String migrationResource : MANAGED_MIGRATIONS) {
+            try {
+                if (isMigrationApplied(conn, migrationResource)) {
+                    continue;
+                }
+                applySqlMigration(conn, migrationResource);
+                markMigrationApplied(conn, migrationResource);
+                logger.info("Applied managed migration: {}", migrationResource);
+            } catch (Exception e) {
+                logger.error("Failed to apply managed migration: {}", migrationResource, e);
+                throw new RuntimeException("Failed to apply managed migration: " + migrationResource, e);
+            }
+        }
+    }
+
+    private static boolean isMigrationApplied(Connection conn, String migrationName) throws SQLException {
+        try (var ps = conn.prepareStatement(
+                "SELECT 1 FROM schema_migrations WHERE migration_name = ?")) {
+            ps.setString(1, migrationName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private static void markMigrationApplied(Connection conn, String migrationName) throws SQLException {
+        try (var ps = conn.prepareStatement(
+                "INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES (?)")) {
+            ps.setString(1, migrationName);
+            ps.executeUpdate();
+        }
+    }
+
+    private static void applySqlMigration(Connection conn, String migrationResource) throws IOException, SQLException {
+        String sql = readResource(migrationResource);
+        List<String> statements = splitSqlStatements(sql);
+
+        try (Statement stmt = conn.createStatement()) {
+            for (String statement : statements) {
+                String trimmed = statement.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                try {
+                    stmt.execute(trimmed);
+                } catch (SQLException e) {
+                    if (isIgnorableMigrationError(e)) {
+                        logger.debug("Ignoring idempotent migration error for {}: {}", migrationResource,
+                                e.getMessage());
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        }
+    }
+
+    private static String readResource(String migrationResource) throws IOException {
+        ClassLoader classLoader = DatabaseManager.class.getClassLoader();
+        try (InputStream inputStream = classLoader.getResourceAsStream(migrationResource)) {
+            if (inputStream == null) {
+                throw new IOException("Migration resource not found: " + migrationResource);
+            }
+
+            StringBuilder builder = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    builder.append(line).append('\n');
+                }
+            }
+            return builder.toString();
+        }
+    }
+
+    private static List<String> splitSqlStatements(String sql) {
+        StringBuilder current = new StringBuilder();
+
+        for (String line : sql.split("\n")) {
+            String trimmedLine = line.trim();
+            if (trimmedLine.startsWith("--")) {
+                continue;
+            }
+            current.append(line).append('\n');
+        }
+
+        List<String> parsed = new ArrayList<>();
+        StringBuilder statement = new StringBuilder();
+        boolean inSingleQuote = false;
+
+        for (int i = 0; i < current.length(); i++) {
+            char ch = current.charAt(i);
+            if (ch == '\'') {
+                inSingleQuote = !inSingleQuote;
+            }
+
+            if (ch == ';' && !inSingleQuote) {
+                parsed.add(statement.toString());
+                statement.setLength(0);
+            } else {
+                statement.append(ch);
+            }
+        }
+
+        if (statement.length() > 0) {
+            parsed.add(statement.toString());
+        }
+
+        return parsed;
+    }
+
+    private static boolean isIgnorableMigrationError(SQLException e) {
+        String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("duplicate column name")
+                || normalized.contains("already exists")
+                || normalized.contains("duplicate key");
+    }
+
     private static void createTables(Statement stmt) throws SQLException {
         // Customers table
         stmt.execute("""
@@ -275,8 +425,30 @@ public class DatabaseManager {
                         sold_unit TEXT,
                         conversion_factor REAL DEFAULT 1,
                         base_quantity REAL DEFAULT 0,
+                        batch_id INTEGER,
+                        batch_number_snapshot TEXT,
+                        expiration_date_snapshot TEXT,
+                        unit_cost_snapshot REAL,
                         FOREIGN KEY (sale_id) REFERENCES sales(id),
-                        FOREIGN KEY (product_id) REFERENCES products(id)
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(id)
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS sale_item_batches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        sale_item_id INTEGER NOT NULL,
+                        batch_id INTEGER NOT NULL,
+                        quantity_sold REAL NOT NULL,
+                        batch_number_snapshot TEXT,
+                        expiration_date_snapshot TEXT,
+                        unit_cost_snapshot REAL,
+                        quantity_before REAL,
+                        quantity_after REAL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (sale_item_id) REFERENCES sale_items(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(id)
                     )
                 """);
 
@@ -364,9 +536,33 @@ public class DatabaseManager {
                         total_price REAL NOT NULL,
                         return_reason TEXT,
                         condition_status TEXT DEFAULT 'GOOD',
+                        batch_id INTEGER,
+                        batch_number_snapshot TEXT,
+                        expiration_date_snapshot TEXT,
+                        sale_item_batch_id INTEGER,
                         FOREIGN KEY (return_id) REFERENCES sale_returns(id),
                         FOREIGN KEY (product_id) REFERENCES products(id),
-                        FOREIGN KEY (original_sale_item_id) REFERENCES sale_items(id)
+                        FOREIGN KEY (original_sale_item_id) REFERENCES sale_items(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(batch_id),
+                        FOREIGN KEY (sale_item_batch_id) REFERENCES sale_item_batches(id)
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS return_item_batches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        return_item_id INTEGER NOT NULL,
+                        sale_item_batch_id INTEGER,
+                        batch_id INTEGER NOT NULL,
+                        quantity_returned REAL NOT NULL DEFAULT 0,
+                        batch_number_snapshot TEXT,
+                        expiration_date_snapshot TEXT,
+                        quantity_before REAL,
+                        quantity_after REAL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (return_item_id) REFERENCES return_items(id),
+                        FOREIGN KEY (sale_item_batch_id) REFERENCES sale_item_batches(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(batch_id)
                     )
                 """);
 
@@ -451,11 +647,59 @@ public class DatabaseManager {
                         unit_price REAL,
                         total_price REAL,
                         unit_of_measure TEXT,
+                        batch_id INTEGER,
+                        batch_number TEXT,
+                        expiration_date TEXT,
                         notes TEXT,
                         add_to_inventory BOOLEAN DEFAULT 1,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (voucher_id) REFERENCES vouchers(id),
-                        FOREIGN KEY (product_id) REFERENCES products(id)
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(id)
+                    )
+                """);
+
+        // Product batches table
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS product_batches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        batch_number TEXT NOT NULL,
+                        expiry_date DATE,
+                        quantity REAL NOT NULL DEFAULT 0,
+                        original_quantity REAL NOT NULL DEFAULT 0,
+                        unit_cost REAL,
+                        currency TEXT DEFAULT 'دينار',
+                        supplier_customer_id INTEGER,
+                        is_opening_batch BOOLEAN DEFAULT 0,
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(product_id, batch_number),
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (supplier_customer_id) REFERENCES customers(id)
+                    )
+                """);
+
+        // Inventory movements table
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS inventory_movements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        batch_id INTEGER,
+                        movement_type TEXT NOT NULL,
+                        reference_type TEXT,
+                        reference_id INTEGER,
+                        reference_item_id INTEGER,
+                        quantity_delta REAL NOT NULL,
+                        quantity_before REAL,
+                        quantity_after REAL,
+                        unit_cost_snapshot REAL,
+                        note TEXT,
+                        actor TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(id)
                     )
                 """);
 
@@ -480,30 +724,62 @@ public class DatabaseManager {
                 """);
 
         // Create indexes for better performance
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(customer_code)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_product_units_product ON product_units(product_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_product_units_barcode ON product_units(barcode)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_sales_code ON sales(sale_code)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_receipts_number ON receipts(receipt_number)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_returns_code ON sale_returns(return_code)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_returns_sale ON sale_returns(sale_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_returns_customer ON sale_returns(customer_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_payments_code ON customer_payments(payment_code)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_payments_customer ON customer_payments(customer_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_number ON vouchers(voucher_number)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_type ON vouchers(voucher_type)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_customer ON vouchers(customer_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(voucher_date)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_voucher_items_voucher ON voucher_items(voucher_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_installments_voucher ON installments(parent_voucher_id)");
-        stmt.execute("CREATE INDEX IF NOT EXISTS idx_installments_due_date ON installments(due_date)");
+        String[] indexes = {
+            "CREATE INDEX IF NOT EXISTS idx_customers_code ON customers(customer_code)",
+            "CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code)",
+            "CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)",
+            "CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)",
+            "CREATE INDEX IF NOT EXISTS idx_product_units_product ON product_units(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_units_barcode ON product_units(barcode)",
+            "CREATE INDEX IF NOT EXISTS idx_sales_code ON sales(sale_code)",
+            "CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sale_items_batch ON sale_items(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sale_item_batches_sale_item ON sale_item_batches(sale_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sale_item_batches_batch ON sale_item_batches(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_return_items_batch ON return_items(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_return_items_sale_item_batch ON return_items(sale_item_batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_return_item_batches_return_item ON return_item_batches(return_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_return_item_batches_sale_item_batch ON return_item_batches(sale_item_batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_return_item_batches_batch ON return_item_batches(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_receipts_number ON receipts(receipt_number)",
+            "CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name)",
+            "CREATE INDEX IF NOT EXISTS idx_returns_code ON sale_returns(return_code)",
+            "CREATE INDEX IF NOT EXISTS idx_returns_sale ON sale_returns(sale_id)",
+            "CREATE INDEX IF NOT EXISTS idx_returns_customer ON sale_returns(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_payments_code ON customer_payments(payment_code)",
+            "CREATE INDEX IF NOT EXISTS idx_payments_customer ON customer_payments(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+            "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
+            "CREATE INDEX IF NOT EXISTS idx_vouchers_number ON vouchers(voucher_number)",
+            "CREATE INDEX IF NOT EXISTS idx_vouchers_type ON vouchers(voucher_type)",
+            "CREATE INDEX IF NOT EXISTS idx_vouchers_customer ON vouchers(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(voucher_date)",
+            "CREATE INDEX IF NOT EXISTS idx_voucher_items_voucher ON voucher_items(voucher_id)",
+            "CREATE INDEX IF NOT EXISTS idx_voucher_items_batch_id ON voucher_items(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_voucher_items_batch_number ON voucher_items(batch_number)",
+            "CREATE INDEX IF NOT EXISTS idx_product_batches_product ON product_batches(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_batches_batch_number ON product_batches(batch_number)",
+            "CREATE INDEX IF NOT EXISTS idx_product_batches_expiry ON product_batches(expiry_date)",
+            "CREATE INDEX IF NOT EXISTS idx_product_batches_supplier ON product_batches(supplier_customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_product ON inventory_movements(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_batch ON inventory_movements(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements(movement_type)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_reference ON inventory_movements(reference_type, reference_id)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_reference_item ON inventory_movements(reference_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_inventory_movements_created_at ON inventory_movements(created_at)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_movements_item_batch_ref ON inventory_movements(movement_type, reference_type, reference_id, reference_item_id, batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_installments_voucher ON installments(parent_voucher_id)",
+            "CREATE INDEX IF NOT EXISTS idx_installments_due_date ON installments(due_date)"
+        };
+
+        for (String indexSql : indexes) {
+            try {
+                stmt.execute(indexSql);
+            } catch (SQLException e) {
+                // Ignore missing column errors, migrations will add them and create the index later
+                logger.debug("Skipped index creation (may need migration first): {}", e.getMessage());
+            }
+        }
 
         logger.info("Database tables created successfully");
     }
@@ -528,15 +804,19 @@ public class DatabaseManager {
             configuration.addAnnotatedClass(com.pharmax.model.ProductUnit.class);
             configuration.addAnnotatedClass(com.pharmax.model.Sale.class);
             configuration.addAnnotatedClass(com.pharmax.model.SaleItem.class);
+            configuration.addAnnotatedClass(com.pharmax.model.SaleItemBatch.class);
             configuration.addAnnotatedClass(com.pharmax.model.Receipt.class);
             configuration.addAnnotatedClass(com.pharmax.model.Category.class);
             configuration.addAnnotatedClass(com.pharmax.model.SaleReturn.class);
             configuration.addAnnotatedClass(com.pharmax.model.ReturnItem.class);
+            configuration.addAnnotatedClass(com.pharmax.model.ReturnItemBatch.class);
             configuration.addAnnotatedClass(com.pharmax.model.CustomerPayment.class);
             configuration.addAnnotatedClass(com.pharmax.model.User.class);
             configuration.addAnnotatedClass(com.pharmax.model.Voucher.class);
             configuration.addAnnotatedClass(com.pharmax.model.VoucherItem.class);
             configuration.addAnnotatedClass(com.pharmax.model.Installment.class);
+            configuration.addAnnotatedClass(com.pharmax.model.ProductBatch.class);
+            configuration.addAnnotatedClass(com.pharmax.model.InventoryMovement.class);
 
             sessionFactory = configuration.buildSessionFactory();
             logger.info("Hibernate configured successfully");

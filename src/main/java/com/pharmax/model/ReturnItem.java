@@ -1,6 +1,8 @@
 package com.pharmax.model;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "return_items")
@@ -20,6 +22,14 @@ public class ReturnItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "original_sale_item_id")
     private SaleItem originalSaleItem;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sale_item_batch_id")
+    private SaleItemBatch saleItemBatch;
     
     @Column(nullable = false)
     private Double quantity;
@@ -35,6 +45,15 @@ public class ReturnItem {
     
     @Column(name = "condition_status")
     private String conditionStatus; // GOOD, DAMAGED, DEFECTIVE
+
+    @Column(name = "batch_number_snapshot")
+    private String batchNumberSnapshot;
+
+    @Column(name = "expiration_date_snapshot")
+    private String expirationDateSnapshot;
+
+    @OneToMany(mappedBy = "returnItem", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<ReturnItemBatch> batchRestorations = new ArrayList<>();
 
     public ReturnItem() {
         this.conditionStatus = "GOOD";
@@ -52,6 +71,12 @@ public class ReturnItem {
     
     public SaleItem getOriginalSaleItem() { return originalSaleItem; }
     public void setOriginalSaleItem(SaleItem originalSaleItem) { this.originalSaleItem = originalSaleItem; }
+
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
+
+    public SaleItemBatch getSaleItemBatch() { return saleItemBatch; }
+    public void setSaleItemBatch(SaleItemBatch saleItemBatch) { this.saleItemBatch = saleItemBatch; }
     
     public Double getQuantity() { return quantity; }
     public void setQuantity(Double quantity) { this.quantity = quantity; }
@@ -67,4 +92,18 @@ public class ReturnItem {
     
     public String getConditionStatus() { return conditionStatus; }
     public void setConditionStatus(String conditionStatus) { this.conditionStatus = conditionStatus; }
+
+    public String getBatchNumberSnapshot() { return batchNumberSnapshot; }
+    public void setBatchNumberSnapshot(String batchNumberSnapshot) { this.batchNumberSnapshot = batchNumberSnapshot; }
+
+    public String getExpirationDateSnapshot() { return expirationDateSnapshot; }
+    public void setExpirationDateSnapshot(String expirationDateSnapshot) { this.expirationDateSnapshot = expirationDateSnapshot; }
+
+    public List<ReturnItemBatch> getBatchRestorations() { return batchRestorations; }
+    public void setBatchRestorations(List<ReturnItemBatch> batchRestorations) { this.batchRestorations = batchRestorations; }
+
+    public void addBatchRestoration(ReturnItemBatch restoration) {
+        batchRestorations.add(restoration);
+        restoration.setReturnItem(this);
+    }
 }

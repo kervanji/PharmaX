@@ -6,6 +6,7 @@ import com.pharmax.service.InventoryService;
 import com.pharmax.service.VoucherService;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
+import javafx.event.ActionEvent;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -76,6 +78,10 @@ public class PurchaseController implements Initializable {
     private TableColumn<PurchaseItemRow, Double> itemQuantityColumn;
     @FXML
     private TableColumn<PurchaseItemRow, String> itemUnitColumn;
+    @FXML
+    private TableColumn<PurchaseItemRow, String> itemBatchColumn;
+    @FXML
+    private TableColumn<PurchaseItemRow, String> itemExpiryColumn;
     @FXML
     private TableColumn<PurchaseItemRow, Double> itemPriceColumn;
     @FXML
@@ -156,6 +162,8 @@ public class PurchaseController implements Initializable {
         itemProductColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getProductName()));
         itemQuantityColumn.setCellValueFactory(d -> new SimpleDoubleProperty(d.getValue().getQuantity()).asObject());
         itemUnitColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getUnitOfMeasure()));
+        itemBatchColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getBatchNumber()));
+        itemExpiryColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getExpirationDate()));
         itemPriceColumn.setCellValueFactory(d -> new SimpleDoubleProperty(d.getValue().getUnitPrice()).asObject());
         itemSalePriceColumn.setCellValueFactory(d -> new SimpleDoubleProperty(d.getValue().getSalePrice()).asObject());
         itemTotalColumn.setCellValueFactory(d -> new SimpleDoubleProperty(d.getValue().getTotalPrice()).asObject());
@@ -169,6 +177,20 @@ public class PurchaseController implements Initializable {
 
         itemUnitColumn.setCellFactory(TextFieldTableCell.forTableColumn());
         itemUnitColumn.setOnEditCommit(ev -> ev.getRowValue().setUnitOfMeasure(ev.getNewValue()));
+
+        itemBatchColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+        itemBatchColumn.setOnEditCommit(ev -> ev.getRowValue().setBatchNumber(sanitizeOptionalText(ev.getNewValue())));
+
+        itemExpiryColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+        itemExpiryColumn.setOnEditCommit(ev -> {
+            String normalized = normalizeExpirationDate(ev.getNewValue());
+            if (ev.getNewValue() != null && !ev.getNewValue().trim().isEmpty() && normalized == null) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "تاريخ الصلاحية يجب أن يكون بصيغة YYYY-MM-DD");
+                itemsTable.refresh();
+                return;
+            }
+            ev.getRowValue().setExpirationDate(normalized);
+        });
 
         itemQuantityColumn.setCellFactory(TextFieldTableCell.forTableColumn(new DoubleStringConverter()));
         itemQuantityColumn.setOnEditCommit(ev -> {
@@ -412,9 +434,11 @@ public class PurchaseController implements Initializable {
         double specialPrice = (product != null && product.getSpecialPrice() != null) ? product.getSpecialPrice()
                 : salePrice;
         String category = (product != null) ? product.getCategory() : "";
+        String batchNumber = vi.getBatchNumber();
+        String expirationDate = vi.getExpirationDate();
 
         PurchaseItemRow newRow = new PurchaseItemRow(product, productName, qty, unit, unitPrice, salePrice,
-                wholesalePrice, specialPrice, category);
+                wholesalePrice, specialPrice, category, DEFAULT_CURRENCY, batchNumber, expirationDate);
         itemRows.add(newRow);
         recalculateTotal();
     }
@@ -504,6 +528,14 @@ public class PurchaseController implements Initializable {
 
         TextField specialPriceField = new TextField("0");
         specialPriceField.setPrefWidth(120);
+
+        TextField batchNumberField = new TextField();
+        batchNumberField.setPrefWidth(140);
+        batchNumberField.setPromptText("(اختياري)");
+
+        TextField expirationDateField = new TextField();
+        expirationDateField.setPrefWidth(140);
+        expirationDateField.setPromptText("YYYY-MM-DD");
 
         Label marginSaleLabel = new Label("");
         marginSaleLabel.setStyle("-fx-text-fill: -fx-badge-success-text; -fx-font-weight: bold;");
@@ -656,20 +688,33 @@ public class PurchaseController implements Initializable {
         grid.add(unitField, 1, 3);
         grid.add(new Label("العملة"), 0, 4);
         grid.add(currencyCombo, 1, 4);
-        grid.add(new Label("سعر الوحدة"), 0, 5);
-        grid.add(priceField, 1, 5);
-        grid.add(new Label("سعر البيع (مفرد)"), 0, 6);
-        grid.add(salePriceField, 1, 6);
-        grid.add(marginSaleLabel, 2, 6);
-        grid.add(new Label("سعر الجملة"), 0, 7);
-        grid.add(wholesalePriceField, 1, 7);
-        grid.add(marginWholesaleLabel, 2, 7);
-        grid.add(new Label("سعر خاص"), 0, 8);
-        grid.add(specialPriceField, 1, 8);
-        grid.add(marginSpecialLabel, 2, 8);
+        grid.add(new Label("رقم التشغيلة"), 0, 5);
+        grid.add(batchNumberField, 1, 5);
+        grid.add(new Label("تاريخ الصلاحية"), 0, 6);
+        grid.add(expirationDateField, 1, 6);
+        grid.add(new Label("سعر الوحدة"), 0, 7);
+        grid.add(priceField, 1, 7);
+        grid.add(new Label("سعر البيع (مفرد)"), 0, 8);
+        grid.add(salePriceField, 1, 8);
+        grid.add(marginSaleLabel, 2, 8);
+        grid.add(new Label("سعر الجملة"), 0, 9);
+        grid.add(wholesalePriceField, 1, 9);
+        grid.add(marginWholesaleLabel, 2, 9);
+        grid.add(new Label("سعر خاص"), 0, 10);
+        grid.add(specialPriceField, 1, 10);
+        grid.add(marginSpecialLabel, 2, 10);
 
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().setPrefWidth(550);
+        Button addButton = (Button) dialog.getDialogPane().lookupButton(addButtonType);
+        addButton.addEventFilter(ActionEvent.ACTION, event -> {
+            String normalized = normalizeExpirationDate(expirationDateField.getText());
+            if (expirationDateField.getText() != null && !expirationDateField.getText().trim().isEmpty()
+                    && normalized == null) {
+                event.consume();
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "تاريخ الصلاحية يجب أن يكون بصيغة YYYY-MM-DD");
+            }
+        });
 
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == addButtonType) {
@@ -697,10 +742,12 @@ public class PurchaseController implements Initializable {
                 String category = categoryCombo.getValue() != null ? categoryCombo.getValue().trim()
                         : (categoryCombo.getEditor().getText() != null ? categoryCombo.getEditor().getText().trim()
                                 : "");
+                String batchNumber = sanitizeOptionalText(batchNumberField.getText());
+                String expirationDate = normalizeExpirationDate(expirationDateField.getText());
                 String cur = currencyCombo.getValue() != null ? currencyCombo.getValue() : "دينار";
                 PurchaseItemRow row = new PurchaseItemRow(
                         selectedProduct, productName, qty, unit, price, salePrice, wholesalePrice, specialPrice,
-                        category, cur);
+                        category, cur, batchNumber, expirationDate);
                 return row;
             }
             return null;
@@ -782,6 +829,16 @@ public class PurchaseController implements Initializable {
 
         TextField specialPriceField = new TextField(String.valueOf(existingRow.getSpecialPrice()));
         specialPriceField.setPrefWidth(120);
+
+        TextField batchNumberField = new TextField(
+                existingRow.getBatchNumber() != null ? existingRow.getBatchNumber() : "");
+        batchNumberField.setPrefWidth(140);
+        batchNumberField.setPromptText("(اختياري)");
+
+        TextField expirationDateField = new TextField(
+                existingRow.getExpirationDate() != null ? existingRow.getExpirationDate() : "");
+        expirationDateField.setPrefWidth(140);
+        expirationDateField.setPromptText("YYYY-MM-DD");
 
         Label marginSaleLabel = new Label("");
         marginSaleLabel.setStyle("-fx-text-fill: -fx-badge-success-text; -fx-font-weight: bold;");
@@ -936,20 +993,33 @@ public class PurchaseController implements Initializable {
         grid.add(unitField, 1, 3);
         grid.add(new Label("العملة"), 0, 4);
         grid.add(currencyCombo, 1, 4);
-        grid.add(new Label("سعر الوحدة"), 0, 5);
-        grid.add(priceField, 1, 5);
-        grid.add(new Label("سعر البيع (مفرد)"), 0, 6);
-        grid.add(salePriceField, 1, 6);
-        grid.add(marginSaleLabel, 2, 6);
-        grid.add(new Label("سعر الجملة"), 0, 7);
-        grid.add(wholesalePriceField, 1, 7);
-        grid.add(marginWholesaleLabel, 2, 7);
-        grid.add(new Label("سعر خاص"), 0, 8);
-        grid.add(specialPriceField, 1, 8);
-        grid.add(marginSpecialLabel, 2, 8);
+        grid.add(new Label("رقم التشغيلة"), 0, 5);
+        grid.add(batchNumberField, 1, 5);
+        grid.add(new Label("تاريخ الصلاحية"), 0, 6);
+        grid.add(expirationDateField, 1, 6);
+        grid.add(new Label("سعر الوحدة"), 0, 7);
+        grid.add(priceField, 1, 7);
+        grid.add(new Label("سعر البيع (مفرد)"), 0, 8);
+        grid.add(salePriceField, 1, 8);
+        grid.add(marginSaleLabel, 2, 8);
+        grid.add(new Label("سعر الجملة"), 0, 9);
+        grid.add(wholesalePriceField, 1, 9);
+        grid.add(marginWholesaleLabel, 2, 9);
+        grid.add(new Label("سعر خاص"), 0, 10);
+        grid.add(specialPriceField, 1, 10);
+        grid.add(marginSpecialLabel, 2, 10);
 
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().setPrefWidth(550);
+        Button addButton = (Button) dialog.getDialogPane().lookupButton(addButtonType);
+        addButton.addEventFilter(ActionEvent.ACTION, event -> {
+            String normalized = normalizeExpirationDate(expirationDateField.getText());
+            if (expirationDateField.getText() != null && !expirationDateField.getText().trim().isEmpty()
+                    && normalized == null) {
+                event.consume();
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "تاريخ الصلاحية يجب أن يكون بصيغة YYYY-MM-DD");
+            }
+        });
 
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == addButtonType) {
@@ -987,6 +1057,8 @@ public class PurchaseController implements Initializable {
                 existingRow.setSpecialPrice(specialPrice);
                 existingRow.category = category;
                 existingRow.setCurrency(currencyCombo.getValue() != null ? currencyCombo.getValue() : "دينار");
+                existingRow.setBatchNumber(sanitizeOptionalText(batchNumberField.getText()));
+                existingRow.setExpirationDate(normalizeExpirationDate(expirationDateField.getText()));
                 existingRow.recalcTotal();
 
                 return existingRow;
@@ -1133,6 +1205,8 @@ public class PurchaseController implements Initializable {
                 item.setUnitPrice(row.getUnitPrice());
                 item.setTotalPrice(row.getTotalPrice());
                 item.setUnitOfMeasure(row.getUnitOfMeasure());
+                item.setBatchNumber(row.getBatchNumber());
+                item.setExpirationDate(row.getExpirationDate());
                 item.setAddToInventory(true);
                 voucher.addItem(item);
             }
@@ -1273,6 +1347,26 @@ public class PurchaseController implements Initializable {
         }
     }
 
+    private String sanitizeOptionalText(String text) {
+        if (text == null) {
+            return null;
+        }
+        String trimmed = text.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeExpirationDate(String text) {
+        String trimmed = sanitizeOptionalText(text);
+        if (trimmed == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(trimmed).toString();
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
     private void showAlert(Alert.AlertType type, String title, String message) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
@@ -1294,10 +1388,13 @@ public class PurchaseController implements Initializable {
         private double totalPrice;
         private String category;
         private String currency = "دينار";
+        private String batchNumber;
+        private String expirationDate;
 
         public PurchaseItemRow(Product product, String productName, double quantity,
                 String unitOfMeasure, double unitPrice, double salePrice,
-                double wholesalePrice, double specialPrice, String category, String currency) {
+                double wholesalePrice, double specialPrice, String category, String currency,
+                String batchNumber, String expirationDate) {
             this.product = product;
             this.productName = productName;
             this.quantity = quantity;
@@ -1309,13 +1406,15 @@ public class PurchaseController implements Initializable {
             this.totalPrice = quantity * unitPrice;
             this.category = category;
             this.currency = currency != null ? currency : "دينار";
+            this.batchNumber = batchNumber;
+            this.expirationDate = expirationDate;
         }
 
         public PurchaseItemRow(Product product, String productName, double quantity,
                 String unitOfMeasure, double unitPrice, double salePrice,
                 double wholesalePrice, double specialPrice, String category) {
             this(product, productName, quantity, unitOfMeasure, unitPrice, salePrice,
-                    wholesalePrice, specialPrice, category, "دينار");
+                    wholesalePrice, specialPrice, category, "دينار", null, null);
         }
 
         public void setProductName(String name) {
@@ -1400,6 +1499,22 @@ public class PurchaseController implements Initializable {
 
         public void setCurrency(String c) {
             this.currency = c;
+        }
+
+        public String getBatchNumber() {
+            return batchNumber;
+        }
+
+        public void setBatchNumber(String batchNumber) {
+            this.batchNumber = batchNumber;
+        }
+
+        public String getExpirationDate() {
+            return expirationDate;
+        }
+
+        public void setExpirationDate(String expirationDate) {
+            this.expirationDate = expirationDate;
         }
     }
 }

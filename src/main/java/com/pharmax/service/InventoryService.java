@@ -14,10 +14,12 @@ public class InventoryService {
     private static final Logger logger = LoggerFactory.getLogger(InventoryService.class);
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
+    private final ProductBatchService productBatchService;
     
     public InventoryService() {
         this.productRepository = new ProductRepository();
         this.categoryService = new CategoryService();
+        this.productBatchService = new ProductBatchService();
     }
     
     public Product createProduct(Product product) {
@@ -232,5 +234,13 @@ public class InventoryService {
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
                 .mapToDouble(p -> p.getQuantityInStock() == null ? 0 : p.getQuantityInStock())
                 .sum();
+    }
+
+    public double getBatchBackedQuantity(Long productId) {
+        return productBatchService.getTotalBatchQuantity(productId);
+    }
+
+    public Product syncProductQuantityFromBatches(Long productId) {
+        return productBatchService.syncProductSummaryQuantity(productId);
     }
 }

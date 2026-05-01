@@ -99,8 +99,8 @@ public class AccountsController {
     private final AuthService authService = new AuthService();
 
     private MainApp mainApp;
-    private boolean tabMode = false;
-    private String tabId;
+    @SuppressWarnings("unused") private boolean tabMode = false;
+    @SuppressWarnings("unused") private String tabId;
     private ObservableList<Customer> customers = FXCollections.observableArrayList();
 
     public void setMainApp(MainApp mainApp) {
@@ -166,8 +166,7 @@ public class AccountsController {
 
         if (showDetails) {
             // Details mode: hide date, reorder, rename columns
-            statementTable.getColumns().setAll(colDate, colType, colRef, colDesc, colPayStatus, colDebit, colCredit,
-                    colBalance, colActions);
+            statementTable.getColumns().setAll(List.of(colDate, colType, colRef, colDesc, colPayStatus, colDebit, colCredit, colBalance, colActions));
             colDate.setVisible(false);
             colRef.setText("رقم الفاتورة");
             colDesc.setText("اسم المادة");
@@ -176,8 +175,7 @@ public class AccountsController {
             colCredit.setText("المجموع");
         } else {
             // Normal mode: show all, restore text
-            statementTable.getColumns().setAll(colDate, colType, colRef, colDesc, colDebit, colCredit, colBalance,
-                    colPayStatus, colActions);
+            statementTable.getColumns().setAll(List.of(colDate, colType, colRef, colDesc, colDebit, colCredit, colBalance, colPayStatus, colActions));
             colRef.setText("رقم المرجع");
             colDesc.setText("البيان");
             colPayStatus.setText("حالة الدفع");
@@ -583,7 +581,7 @@ public class AccountsController {
                     setStyle("");
                     return;
                 }
-                String currencySymbol = "دولار".equals(rowItem.getCurrency()) ? " $" : " د.ع";
+                String currencySymbol = rowItem != null && "دولار".equals(rowItem.getCurrency()) ? " $" : " د.ع";
                 setText(currencyFormat.format(item) + currencySymbol);
                 if (item > 0) {
                     setStyle("-fx-text-fill: -fx-danger-text; -fx-font-weight: bold;");

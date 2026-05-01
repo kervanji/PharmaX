@@ -1,6 +1,7 @@
 package com.pharmax.model;
 
 import javax.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -35,6 +36,16 @@ public class VoucherItem {
     
     @Column(name = "unit_of_measure")
     private String unitOfMeasure;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "batch_id")
+    private ProductBatch batch;
+
+    @Column(name = "batch_number")
+    private String batchNumber;
+
+    @Column(name = "expiration_date")
+    private String expirationDate;
     
     @Column(name = "notes")
     private String notes;
@@ -80,6 +91,22 @@ public class VoucherItem {
     
     public String getUnitOfMeasure() { return unitOfMeasure; }
     public void setUnitOfMeasure(String unitOfMeasure) { this.unitOfMeasure = unitOfMeasure; }
+
+    public ProductBatch getBatch() { return batch; }
+    public void setBatch(ProductBatch batch) { this.batch = batch; }
+
+    public String getBatchNumber() { return batchNumber; }
+    public void setBatchNumber(String batchNumber) { this.batchNumber = batchNumber; }
+
+    public String getExpirationDate() { return expirationDate; }
+    public void setExpirationDate(String expirationDate) { this.expirationDate = expirationDate; }
+
+    public LocalDate getParsedExpirationDate() {
+        if (expirationDate == null || expirationDate.trim().isEmpty()) {
+            return null;
+        }
+        return LocalDate.parse(expirationDate.trim());
+    }
     
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

@@ -16,7 +16,7 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.scene.layout.VBox;
-import javafx.scene.control.ListView;
+
 import javafx.scene.control.Dialog;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ButtonBar;
@@ -32,8 +32,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
+
 import java.util.prefs.Preferences;
 
 public class SettingsController {
@@ -386,7 +385,7 @@ public class SettingsController {
                 };
 
                 dlTask.setOnSucceeded(ev2 -> {
-                    File dbFile = dlTask.getValue();
+                    @SuppressWarnings("unused") File dbFile = dlTask.getValue();
                     statusIcon.setText("✓");
                     statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-success-text; -fx-min-width: 24;");
                     downloadBtn.setText("تم التنزيل ✓");

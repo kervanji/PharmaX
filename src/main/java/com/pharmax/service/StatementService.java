@@ -9,16 +9,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class StatementService {
-    private static final Logger logger = LoggerFactory.getLogger(StatementService.class);
+    @SuppressWarnings("unused") private static final Logger logger = LoggerFactory.getLogger(StatementService.class);
 
     // Dependencies
     private final SalesService salesService;
     private final VoucherService voucherService;
     private final ReturnService returnService;
-    private final CustomerService customerService;
+    @SuppressWarnings("unused") private final CustomerService customerService;
 
     public StatementService() {
         this.salesService = new SalesService();
