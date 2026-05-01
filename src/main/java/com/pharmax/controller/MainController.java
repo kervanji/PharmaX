@@ -22,6 +22,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -33,12 +34,10 @@ import com.pharmax.update.AppVersion;
 import com.pharmax.update.UpdateCheckResult;
 import com.pharmax.update.UpdateInstallerLauncher;
 import com.pharmax.update.UpdateService;
-import com.pharmax.model.Customer;
 import com.pharmax.model.Product;
 import com.pharmax.model.Sale;
 import com.pharmax.model.UserRole;
 import com.pharmax.model.VoucherType;
-import javafx.scene.control.ButtonType;
 import com.pharmax.service.CustomerService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.SalesService;
@@ -301,40 +300,29 @@ public class MainController {
 
     private final List<TileDef> defaultTileDefinitions = List.of(
             new TileDef("pos", "🛒", "point_of_sale.png", "نقطة بيع",
-                    "linear-gradient(to bottom right, #4facfe, #00f2fe)", "handleNewSale"),
+                    "linear-gradient(to bottom right, #2563eb, #1d4ed8)", "handleNewSale"),
             new TileDef("view-sales", "📄", "sales_reports.png", "عرض المبيعات",
-                    "linear-gradient(to bottom right, #43e97b, #38f9d7)", "handleViewSales"),
+                    "linear-gradient(to bottom right, #0f766e, #0d9488)", "handleViewSales"),
             new TileDef("view-inventory", "📦", "inventory_view.png", "عرض المخزون",
-                    "linear-gradient(to bottom right, #fa709a, #fee140)", "handleViewInventory"),
+                    "linear-gradient(to bottom right, #d97706, #f59e0b)", "handleViewInventory"),
             new TileDef("new-product", "➕", "add_product.png", "إضافة منتج",
-                    "linear-gradient(to bottom right, #f83600, #f9d423)", "handleNewProduct"),
-            new TileDef("receipt-voucher", "📥", "accounts.png", "سند قبض",
-                    "linear-gradient(to bottom right, #30cfd0, #330867)", "handleReceiptVoucher"),
-            new TileDef("payment-voucher", "📤", "payment_voucher.png", "سند دفع",
-                    "linear-gradient(to bottom right, #ff0844, #ffb199)", "handlePaymentVoucher"),
+                    "linear-gradient(to bottom right, #ea580c, #f97316)", "handleNewProduct"),
             new TileDef("purchase", "🛍️", "purchases.png", "المشتريات",
-                    "linear-gradient(to bottom right, #c471f5, #fa71cd)", "handlePurchase"),
-            new TileDef("accounts", "📊", "accounts.png", "حسابات",
-                    "linear-gradient(to bottom right, #48c6ef, #6f86d6)", "handleAccounts"),
+                    "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
             new TileDef("product-return", "↩️", "returns.png", "إرجاع مواد",
-                    "linear-gradient(to bottom right, #f78ca0, #f9748f)", "handleProductReturn"),
-            new TileDef("sales-report", "📊", "sales_reports.png", "تقارير المبيعات",
-                    "linear-gradient(to bottom right, #6a11cb, #2575fc)", "handleSalesReport",
-                    false, true, false),
+                    "linear-gradient(to bottom right, #db2777, #ec4899)", "handleProductReturn"),
             new TileDef("low-stock", "⚠️", "low_stock_alert.png", "منخفض المخزون",
-                    "linear-gradient(to bottom right, #f5576c, #f093fb)", "handleLowStock"),
-            new TileDef("add-stock", "➕", "add_warehouse.png", "إضافة مخزون",
-                    "linear-gradient(to bottom right, #00c6ff, #0072ff)", "handleAddStock"),
+                    "linear-gradient(to bottom right, #b91c1c, #dc2626)", "handleLowStock"),
             new TileDef("barcode-print", "▥", "barcode_printing.png", "طباعة باركود",
-                    "linear-gradient(to bottom right, #16a085, #f4d03f)", "handleBarcodePrint"),
+                    "linear-gradient(to bottom right, #475569, #64748b)", "handleBarcodePrint"),
             new TileDef("user-management", "👤", "user_management.png", "إدارة المستخدمين",
-                    "linear-gradient(to bottom right, #fccb90, #d57eeb)", "handleUserManagement",
+                    "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handleUserManagement",
                     true, false, false),
             new TileDef("settings", "⚙️", "settings.png", "الإعدادات",
-                    "linear-gradient(to bottom right, #89f7fe, #66a6ff)", "handleSettings",
+                    "linear-gradient(to bottom right, #334155, #475569)", "handleSettings",
                     false, false, true),
             new TileDef("about", "ℹ️", "about_system.png", "عن البرنامج",
-                    "linear-gradient(to bottom right, #1e3c72, #2a5298)", "handleAbout"));
+                    "linear-gradient(to bottom right, #1e293b, #334155)", "handleAbout"));
 
     private Map<String, TileDef> tileDefMap;
 
@@ -350,11 +338,9 @@ public class MainController {
         loadCurrentUserInfo();
         applyRolePermissions();
         buildDashboardTiles();
-        loadInstallmentReminderDays();
         refreshDashboard();
         initUpdateUi();
         checkForUpdatesInBackground();
-        showInstallmentStartupAlert();
         updateDriveStatusIndicator();
     }
 
@@ -521,13 +507,16 @@ public class MainController {
             Image iconImage = loadPngIcon(iconFile, 72, 72);
             if (iconImage != null) {
                 ImageView imageView = new ImageView(iconImage);
-                imageView.setFitWidth(72);
-                imageView.setFitHeight(72);
+                imageView.setFitWidth(60);
+                imageView.setFitHeight(60);
                 imageView.setPreserveRatio(true);
                 imageView.setSmooth(true);
                 imageView.setCache(true);
+                imageView.getStyleClass().add("tile-image-icon");
 
-                iconNode = imageView;
+                StackPane iconShell = new StackPane(imageView);
+                iconShell.getStyleClass().add("tile-icon-shell");
+                iconNode = iconShell;
             } else {
                 // Fallback to text emoji if PNG fails
                 Label iconLabel = new Label(icon);
@@ -857,12 +846,6 @@ public class MainController {
 
     private void refreshDashboard() {
         try {
-            // Total customers
-            int customersCount = customerService.getAllCustomers().size();
-            if (totalCustomersLabel != null) {
-                totalCustomersLabel.setText(String.valueOf(customersCount));
-            }
-
             // Total products
             int productsCount = inventoryService.getAllProducts().size();
             if (totalProductsLabel != null) {
@@ -904,35 +887,11 @@ public class MainController {
                 }
             }
 
-            // Pending payments
-            List<Sale> pendingPayments = salesService.getPendingPayments();
-            double pendingAmount = pendingPayments.stream().mapToDouble(s -> {
-                double finalAmt = s.getFinalAmount() != null ? s.getFinalAmount() : 0;
-                double paidAmt = s.getPaidAmount() != null ? s.getPaidAmount() : 0;
-                return finalAmt - paidAmt;
-            }).sum();
-
-            if (pendingPaymentsLabel != null) {
-                if (pendingPayments.isEmpty()) {
-                    pendingPaymentsLabel.setText("لا توجد معلقات");
-                    pendingPaymentsLabel.setStyle(
-                            "-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-background-color: -fx-success-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
-                } else {
-                    pendingPaymentsLabel
-                            .setText(pendingPayments.size() + " فاتورة (" + currencyFormat.format(pendingAmount) + ")");
-                    pendingPaymentsLabel.setStyle(
-                            "-fx-font-size: 12px; -fx-text-fill: -fx-warning-text; -fx-background-color: -fx-badge-warning-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
-                }
-            }
-
             // Inventory value
             double inventoryValue = inventoryService.getTotalInventoryValue();
             if (inventoryValueLabel != null) {
                 inventoryValueLabel.setText(currencyFormat.format(inventoryValue) + " د.ع");
             }
-
-            // Installment alerts
-            refreshInstallmentAlerts();
 
         } catch (Exception e) {
             logger.error("Failed to refresh dashboard", e);
@@ -1153,7 +1112,6 @@ public class MainController {
             }
 
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            List<String> customerNames = new ArrayList<>();
             StringBuilder msg = new StringBuilder();
             msg.append("الفواتير المعلقة (").append(pendingPayments.size()).append("):\n\n");
 
@@ -1173,57 +1131,18 @@ public class MainController {
                 }
                 msg.append("\n");
 
-                if (sale.getCustomer() != null && !customerNames.contains(customerName)) {
-                    customerNames.add(customerName);
-                }
             }
 
-            msg.append("\nهل تريد فتح حساب عميل معين؟");
-
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("المدفوعات المعلقة");
             alert.setHeaderText("فواتير تنتظر الدفع");
             alert.setContentText(msg.toString());
             alert.getDialogPane().setMinWidth(550);
-
-            // Add buttons for each customer + cancel
-            alert.getButtonTypes().clear();
-            for (String name : customerNames) {
-                alert.getButtonTypes().add(new ButtonType(name));
-            }
-            alert.getButtonTypes().add(ButtonType.CANCEL);
-
-            alert.showAndWait().ifPresent(response -> {
-                if (response != ButtonType.CANCEL) {
-                    String selectedName = response.getText();
-                    Customer selectedCustomer = pendingPayments.stream()
-                            .map(Sale::getCustomer)
-                            .filter(c -> c != null && selectedName.equals(c.getName()))
-                            .findFirst().orElse(null);
-                    if (selectedCustomer != null) {
-                        openAccountsForCustomer(selectedCustomer);
-                    }
-                }
-            });
+            alert.showAndWait();
         } catch (Exception e) {
             logger.error("Failed to show pending payments", e);
             showError("خطأ", "فشل في عرض المدفوعات المعلقة");
         }
-    }
-
-    private void openAccountsForCustomer(Customer customer) {
-        TabManager.getInstance().closeTab("accounts");
-        TabManager.getInstance().openTab(
-                "accounts",
-                "حسابات",
-                "statement.svg",
-                "/views/Accounts.fxml",
-                (AccountsController controller) -> {
-                    controller.setMainApp(mainApp);
-                    controller.setTabMode(true);
-                    controller.setTabId("accounts");
-                    controller.selectCustomerAndGenerate(customer);
-                });
     }
 
     @FXML

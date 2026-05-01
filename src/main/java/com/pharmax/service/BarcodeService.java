@@ -13,6 +13,14 @@ import java.text.DecimalFormat;
 
 public class BarcodeService {
     private static final DecimalFormat PRICE_FORMAT = new DecimalFormat("#,##0.##");
+    public static final double XPRINTER_365B_DEFAULT_LABEL_WIDTH_MM = 58.0;
+    public static final double XPRINTER_365B_DEFAULT_LABEL_HEIGHT_MM = 30.0;
+    public static final double XPRINTER_365B_MIN_LABEL_WIDTH_MM = 20.0;
+    public static final double XPRINTER_365B_MAX_PRINT_WIDTH_MM = 76.0;
+    public static final double XPRINTER_365B_MIN_LABEL_HEIGHT_MM = 15.0;
+    public static final double XPRINTER_365B_MAX_LABEL_HEIGHT_MM = 80.0;
+    private static final double XPRINTER_365B_DPI = 203.0;
+    private static final double MM_PER_INCH = 25.4;
 
     public BufferedImage generateBarcodeImage(String barcodeText, int width, int height) {
         String normalized = normalizeBarcodeText(barcodeText);
@@ -120,8 +128,8 @@ public class BarcodeService {
         private boolean barcodeOnly;
         private boolean showProductName = true;
         private boolean showPrice = true;
-        private double labelWidthMm = 50.0;
-        private double labelHeightMm = 30.0;
+        private double labelWidthMm = XPRINTER_365B_DEFAULT_LABEL_WIDTH_MM;
+        private double labelHeightMm = XPRINTER_365B_DEFAULT_LABEL_HEIGHT_MM;
 
         public boolean isBarcodeOnly() {
             return barcodeOnly;
@@ -152,7 +160,11 @@ public class BarcodeService {
         }
 
         public void setLabelWidthMm(double labelWidthMm) {
-            this.labelWidthMm = labelWidthMm;
+            this.labelWidthMm = clamp(
+                    labelWidthMm,
+                    XPRINTER_365B_MIN_LABEL_WIDTH_MM,
+                    XPRINTER_365B_MAX_PRINT_WIDTH_MM
+            );
         }
 
         public double getLabelHeightMm() {
@@ -160,15 +172,26 @@ public class BarcodeService {
         }
 
         public void setLabelHeightMm(double labelHeightMm) {
-            this.labelHeightMm = labelHeightMm;
+            this.labelHeightMm = clamp(
+                    labelHeightMm,
+                    XPRINTER_365B_MIN_LABEL_HEIGHT_MM,
+                    XPRINTER_365B_MAX_LABEL_HEIGHT_MM
+            );
         }
 
         public int getPreviewWidthPixels() {
-            return (int) Math.round(labelWidthMm * 8);
+            return (int) Math.round(labelWidthMm * XPRINTER_365B_DPI / MM_PER_INCH);
         }
 
         public int getPreviewHeightPixels() {
-            return (int) Math.round(labelHeightMm * 8);
+            return (int) Math.round(labelHeightMm * XPRINTER_365B_DPI / MM_PER_INCH);
+        }
+
+        private double clamp(double value, double min, double max) {
+            if (Double.isNaN(value) || Double.isInfinite(value)) {
+                return min;
+            }
+            return Math.max(min, Math.min(max, value));
         }
     }
 }

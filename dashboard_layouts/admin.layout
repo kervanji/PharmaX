@@ -8,8 +8,9 @@ payment-voucher
 product-return
 sales-report
 low-stock
-!add-stock
+add-stock
 view-sales
-!purchase
+purchase
 about
 settings
+barcode-print

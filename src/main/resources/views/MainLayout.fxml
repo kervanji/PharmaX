@@ -72,10 +72,6 @@
                                                 <Label fx:id="todaySalesAmountLabel" text="0 د.ع" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
                                                 <Label fx:id="todaySalesCountLabel" text="عدد المبيعات: --" style="-fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.7);"/>
                                             </VBox>
-                                            <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #7c4dff, #512da8); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
-                                                <Label text="العملاء" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
-                                                <Label fx:id="totalCustomersLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
-                                            </VBox>
                                             <VBox alignment="CENTER" spacing="6" styleClass="stat-card" style="-fx-background-color: linear-gradient(to bottom right, #11998e, #38ef7d); -fx-background-radius: 16; -fx-padding: 18 24; -fx-pref-width: 200; -fx-effect: -fx-shadow-md;">
                                                 <Label text="المنتجات" style="-fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.8);"/>
                                                 <Label fx:id="totalProductsLabel" text="--" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: white;"/>
@@ -97,23 +93,6 @@
                                                     <Label text="تنبيهات المخزون" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #d32f2f;"/>
                                                     <Label fx:id="lowStockDescLabel" text="راقب المنتجات منخفضة المخزون" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
                                                     <Label fx:id="lowStockCountLabel" text="لا توجد تنبيهات" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-success-text; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
-                                                </VBox>
-                                            </HBox>
-                                            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-background-color: linear-gradient(to bottom right, #f6d365, #fda085); -fx-background-radius: 12; -fx-padding: 12 20; -fx-pref-width: 350; -fx-effect: -fx-shadow-sm; -fx-cursor: hand;" onMouseClicked="#handlePendingPaymentsAlertClick">
-                                                <VBox alignment="CENTER_RIGHT" spacing="4" HBox.hgrow="ALWAYS">
-                                                    <Label text="المدفوعات المعلقة" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #e65100;"/>
-                                                    <Label fx:id="pendingPaymentsDescLabel" text="فواتير تنتظر الدفع" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
-                                                    <Label fx:id="pendingPaymentsLabel" text="0 فاتورة" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-warning-dark; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
-                                                </VBox>
-                                            </HBox>
-                                            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-background-color: linear-gradient(to bottom right, #e0c3fc, #8ec5fc); -fx-background-radius: 12; -fx-padding: 12 20; -fx-pref-width: 350; -fx-effect: -fx-shadow-sm; -fx-cursor: hand;" onMouseClicked="#handleInstallmentAlertClick">
-                                                <VBox alignment="CENTER_RIGHT" spacing="4" HBox.hgrow="ALWAYS">
-                                                    <HBox alignment="CENTER_RIGHT" spacing="8">
-                                                        <Label fx:id="installmentReminderDaysLabel" text="تنبيه قبل: 3 أيام" style="-fx-font-size: 10px; -fx-text-fill: #4a148c; -fx-background-color: rgba(255,255,255,0.5); -fx-padding: 2 8; -fx-background-radius: 8; -fx-cursor: hand;" onMouseClicked="#handleChangeReminderDays"/>
-                                                        <Label text="تنبيهات الأقساط" style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #4a148c;"/>
-                                                    </HBox>
-                                                    <Label fx:id="installmentAlertDescLabel" text="أقساط قادمة ومستحقة" style="-fx-font-size: 11px; -fx-text-fill: rgba(0,0,0,0.6);"/>
-                                                    <Label fx:id="installmentAlertLabel" text="لا توجد أقساط قريبة" style="-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -fx-success-text; -fx-background-color: rgba(255,255,255,0.7); -fx-padding: 4 10; -fx-background-radius: 8;"/>
                                                 </VBox>
                                             </HBox>
                                         </HBox>

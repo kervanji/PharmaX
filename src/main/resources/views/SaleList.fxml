@@ -22,34 +22,70 @@
     </HBox>
 
     <!-- Filters -->
-    <HBox spacing="15" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
-        <Label text="البحث:" style="-fx-font-weight: bold;"/>
-        <TextField fx:id="searchField" promptText="رقم الفاتورة أو اسم العميل..." prefWidth="200" onKeyReleased="#handleSearch"/>
-        
-        <Separator orientation="VERTICAL"/>
-        
-        <Label text="من:" style="-fx-font-weight: bold;"/>
-        <DatePicker fx:id="fromDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
-        
-        <Label text="إلى:" style="-fx-font-weight: bold;"/>
-        <DatePicker fx:id="toDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
-        
-        <Separator orientation="VERTICAL"/>
-        
-        <Label text="الحالة:" style="-fx-font-weight: bold;"/>
-        <ComboBox fx:id="statusComboBox" prefWidth="120" onAction="#handleStatusFilter">
-            <items>
-                <FXCollections fx:factory="observableArrayList">
-                    <String fx:value="الكل"/>
-                    <String fx:value="مدفوع"/>
-                    <String fx:value="معلق"/>
-                    <String fx:value="متأخر"/>
-                </FXCollections>
-            </items>
-        </ComboBox>
-        
-        <Button text="🔄 تحديث" onAction="#handleRefresh" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white;"/>
-    </HBox>
+    <VBox spacing="12" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <HBox spacing="15" alignment="CENTER_LEFT">
+            <Label text="البحث:" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="searchField" promptText="رقم الفاتورة أو الملاحظات..." prefWidth="240" onKeyReleased="#handleSearch"/>
+
+            <Separator orientation="VERTICAL"/>
+
+            <Label text="الفترة:" style="-fx-font-weight: bold;"/>
+            <ComboBox fx:id="periodComboBox" prefWidth="120" onAction="#handlePeriodFilter">
+                <items>
+                    <FXCollections fx:factory="observableArrayList">
+                        <String fx:value="هذا الشهر"/>
+                        <String fx:value="اليوم"/>
+                        <String fx:value="هذا الأسبوع"/>
+                        <String fx:value="هذه السنة"/>
+                        <String fx:value="كل الفترات"/>
+                        <String fx:value="مخصص"/>
+                    </FXCollections>
+                </items>
+            </ComboBox>
+
+            <Label text="من:" style="-fx-font-weight: bold;"/>
+            <DatePicker fx:id="fromDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+
+            <Label text="إلى:" style="-fx-font-weight: bold;"/>
+            <DatePicker fx:id="toDatePicker" prefWidth="130" onAction="#handleDateFilter"/>
+        </HBox>
+
+        <HBox spacing="15" alignment="CENTER_LEFT">
+            <Label text="الحالة:" style="-fx-font-weight: bold;"/>
+            <ComboBox fx:id="statusComboBox" prefWidth="120" onAction="#handleStatusFilter">
+                <items>
+                    <FXCollections fx:factory="observableArrayList">
+                        <String fx:value="الكل"/>
+                        <String fx:value="مدفوع"/>
+                        <String fx:value="معلق"/>
+                        <String fx:value="متأخر"/>
+                    </FXCollections>
+                </items>
+            </ComboBox>
+
+            <Label text="الدفع:" style="-fx-font-weight: bold;"/>
+            <ComboBox fx:id="paymentMethodComboBox" prefWidth="120" onAction="#handlePaymentMethodFilter">
+                <items>
+                    <FXCollections fx:factory="observableArrayList">
+                        <String fx:value="الكل"/>
+                        <String fx:value="نقدي"/>
+                        <String fx:value="دين"/>
+                        <String fx:value="بطاقة"/>
+                    </FXCollections>
+                </items>
+            </ComboBox>
+
+            <Separator orientation="VERTICAL"/>
+
+            <Label text="من مبلغ:" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="minAmountField" promptText="0" prefWidth="100" onKeyReleased="#handleAmountFilter"/>
+
+            <Label text="إلى مبلغ:" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="maxAmountField" promptText="∞" prefWidth="100" onKeyReleased="#handleAmountFilter"/>
+
+            <Button text="🔄 تحديث" onAction="#handleRefresh" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white;"/>
+        </HBox>
+    </VBox>
 
     <!-- Sales Table -->
     <TableView fx:id="salesTable" VBox.vgrow="ALWAYS">
@@ -58,8 +94,12 @@
             <TableColumn fx:id="customerColumn" text="العميل" prefWidth="150"/>
             <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="120"/>
             <TableColumn fx:id="totalColumn" text="الإجمالي" prefWidth="100"/>
+            <TableColumn fx:id="paidColumn" text="المدفوع" prefWidth="100"/>
+            <TableColumn fx:id="remainingColumn" text="المتبقي" prefWidth="100"/>
+            <TableColumn fx:id="itemsCountColumn" text="الأصناف" prefWidth="80"/>
             <TableColumn fx:id="paymentMethodColumn" text="طريقة الدفع" prefWidth="100"/>
             <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="80"/>
+            <TableColumn fx:id="createdByColumn" text="بواسطة" prefWidth="110"/>
             <TableColumn fx:id="actionsColumn" text="الإجراءات" prefWidth="180"/>
         </columns>
         <placeholder>
@@ -87,6 +127,16 @@
         <VBox alignment="CENTER" spacing="5">
             <Label text="المعلق" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
             <Label fx:id="pendingAmountLabel" text="0.00 دينار" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="متوسط الفاتورة" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="avgSaleLabel" text="0.00 دينار" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #9b59b6;"/>
+        </VBox>
+        <Separator orientation="VERTICAL"/>
+        <VBox alignment="CENTER" spacing="5">
+            <Label text="عدد الأصناف" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="itemsCountLabel" text="0" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
         </VBox>
     </HBox>
 

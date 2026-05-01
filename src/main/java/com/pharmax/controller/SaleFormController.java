@@ -13,6 +13,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Modality;
@@ -22,8 +23,9 @@ import com.pharmax.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.Desktop;
 import java.io.File;
+import java.awt.print.PrinterException;
+import java.awt.print.PrinterJob;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -34,8 +36,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.printing.PDFPrintable;
+import org.apache.pdfbox.printing.Scaling;
+
 public class SaleFormController {
     private static final Logger logger = LoggerFactory.getLogger(SaleFormController.class);
+    private static final String IQD_CURRENCY = "دينار";
+    private static final String DEFAULT_SALE_CUSTOMER_CODE = "CASH";
+    private static final String DEFAULT_SALE_CUSTOMER_NAME = "زبون نقدي";
+    private static final String DEFAULT_PRICE_TYPE = "مفرد";
 
     @FXML
     private VBox root;
@@ -94,6 +104,12 @@ public class SaleFormController {
     @FXML
     private TextField additionalDiscountField;
     @FXML
+    private HBox paymentControlsBox;
+    @FXML
+    private Separator paymentControlsSeparator;
+    @FXML
+    private VBox additionalDiscountBox;
+    @FXML
     private Label additionalDiscountCurrencyLabel;
     @FXML
     private Label subtotalLabel;
@@ -103,6 +119,8 @@ public class SaleFormController {
     private Label finalTotalLabel;
     @FXML
     private TextField paidAmountField;
+    @FXML
+    private VBox paidAmountBox;
     @FXML
     private Label paidAmountCurrencyLabel;
     @FXML
@@ -155,6 +173,8 @@ public class SaleFormController {
         setupPriceTypeComboBox();
         setupItemsTable();
         setupDefaults();
+        selectDefaultSaleCustomer();
+        applyRoleRestrictions();
 
         Platform.runLater(() -> {
             if (root != null && root.getScene() != null && root.getScene().getWindow() instanceof Stage s) {
@@ -168,17 +188,22 @@ public class SaleFormController {
             return;
         }
 
-        currencyComboBox.setItems(FXCollections.observableArrayList("دينار", "دولار"));
-        currencyComboBox.setValue("دينار");
+        currencyComboBox.setItems(FXCollections.observableArrayList(IQD_CURRENCY));
+        currencyComboBox.setValue(IQD_CURRENCY);
+        currencyComboBox.setDisable(true);
         if (exchangeRateField != null
                 && (exchangeRateField.getText() == null || exchangeRateField.getText().trim().isEmpty())) {
             exchangeRateField.setText("1500");
         }
-        updateExchangeRateVisibility("دينار");
-        updateCurrencyLabels("دينار");
+        updateExchangeRateVisibility(IQD_CURRENCY);
+        updateCurrencyLabels(IQD_CURRENCY);
         currencyComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
-            updateExchangeRateVisibility(newVal);
-            updateCurrencyLabels(newVal);
+            if (!IQD_CURRENCY.equals(newVal)) {
+                Platform.runLater(() -> currencyComboBox.setValue(IQD_CURRENCY));
+                return;
+            }
+            updateExchangeRateVisibility(IQD_CURRENCY);
+            updateCurrencyLabels(IQD_CURRENCY);
             updateSelectedProductPriceLabel();
             updateTotals();
         });
@@ -193,8 +218,13 @@ public class SaleFormController {
     private void setupPriceTypeComboBox() {
         if (priceTypeComboBox != null) {
             priceTypeComboBox.setItems(FXCollections.observableArrayList("مفرد", "جملة", "خاص"));
-            priceTypeComboBox.setValue("مفرد");
+            priceTypeComboBox.setValue(DEFAULT_PRICE_TYPE);
+            priceTypeComboBox.setDisable(true);
             priceTypeComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+                if (!DEFAULT_PRICE_TYPE.equals(newVal)) {
+                    Platform.runLater(() -> priceTypeComboBox.setValue(DEFAULT_PRICE_TYPE));
+                    return;
+                }
                 updateSelectedProductPriceLabel();
             });
         }
@@ -228,7 +258,7 @@ public class SaleFormController {
     }
 
     private void updateExchangeRateVisibility(String currency) {
-        boolean isUsd = "دولار".equals(currency);
+        boolean isUsd = false;
         if (exchangeRateBox != null) {
             exchangeRateBox.setVisible(isUsd);
             exchangeRateBox.setManaged(isUsd);
@@ -256,7 +286,7 @@ public class SaleFormController {
     }
 
     private void updateCurrencyLabels(String currency) {
-        String label = currency != null ? currency : "دينار";
+        String label = IQD_CURRENCY;
         if (additionalDiscountCurrencyLabel != null) {
             additionalDiscountCurrencyLabel.setText(label);
         }
@@ -273,15 +303,12 @@ public class SaleFormController {
         cashRadio.setToggleGroup(paymentGroup);
         creditRadio.setToggleGroup(paymentGroup);
 
-        // Force single selection (and prevent clearing selection)
         if (paymentGroup.getSelectedToggle() == null) {
-            creditRadio.setSelected(true); // default to دين (دين)
+            cashRadio.setSelected(true);
         }
 
         if (paidAmountField != null) {
-            // For cash: disable field and auto-fill with total
-            // For debt: enable field for partial payment
-            paidAmountField.setDisable(cashRadio.isSelected());
+            paidAmountField.setDisable(true);
         }
 
         paymentGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
@@ -289,21 +316,59 @@ public class SaleFormController {
                 oldToggle.setSelected(true);
             }
 
-            if (paidAmountField != null) {
-                boolean isCash = cashRadio.isSelected();
-                paidAmountField.setDisable(isCash);
-
-                if (isCash) {
-                    // Auto-fill with full amount for cash
-                    double finalTotal = calculateFinalTotal();
-                    paidAmountField.setText(String.valueOf(finalTotal));
-                } else {
-                    // Enable partial payment for debt
-                    paidAmountField.setText("0");
-                }
-                handlePaidAmountChange();
+            if (SessionManager.getInstance().isSeller() && creditRadio.isSelected()) {
+                cashRadio.setSelected(true);
+                return;
             }
+
+            syncPaidAmountWithPayment(calculateFinalTotal());
+            handlePaidAmountChange();
         });
+    }
+
+    private void applyRoleRestrictions() {
+        boolean seller = SessionManager.getInstance().isSeller();
+
+        if (currencyComboBox != null) {
+            currencyComboBox.setValue(IQD_CURRENCY);
+            currencyComboBox.setDisable(true);
+        }
+
+        if (creditRadio != null) {
+            creditRadio.setVisible(!seller);
+            creditRadio.setManaged(!seller);
+            creditRadio.setDisable(seller);
+        }
+        if (cashRadio != null && seller) {
+            cashRadio.setSelected(true);
+            cashRadio.setDisable(true);
+        }
+
+        if (additionalDiscountBox != null) {
+            additionalDiscountBox.setVisible(!seller);
+            additionalDiscountBox.setManaged(!seller);
+        }
+        if (paymentControlsBox != null) {
+            paymentControlsBox.setVisible(!seller);
+            paymentControlsBox.setManaged(!seller);
+        }
+        if (paymentControlsSeparator != null) {
+            paymentControlsSeparator.setVisible(!seller);
+            paymentControlsSeparator.setManaged(!seller);
+        }
+        if (seller && additionalDiscountField != null) {
+            additionalDiscountField.setText("0");
+        }
+
+        if (paidAmountBox != null) {
+            paidAmountBox.setVisible(false);
+            paidAmountBox.setManaged(false);
+        }
+        if (paidAmountField != null) {
+            paidAmountField.setDisable(true);
+            paidAmountField.setVisible(false);
+            paidAmountField.setManaged(false);
+        }
     }
 
     private void setupCategoryFilter(List<Product> products) {
@@ -434,6 +499,27 @@ public class SaleFormController {
         });
 
         updateProjectLocations(customerComboBox.getValue());
+    }
+
+    private void selectDefaultSaleCustomer() {
+        Customer defaultCustomer = getOrCreateDefaultSaleCustomer();
+        if (defaultCustomer == null || customerComboBox == null) {
+            return;
+        }
+
+        customerComboBox.setValue(defaultCustomer);
+        updateProjectLocations(defaultCustomer);
+    }
+
+    private Customer getOrCreateDefaultSaleCustomer() {
+        return customerRepository.findByCustomerCode(DEFAULT_SALE_CUSTOMER_CODE)
+                .orElseGet(() -> {
+                    Customer customer = new Customer();
+                    customer.setCustomerCode(DEFAULT_SALE_CUSTOMER_CODE);
+                    customer.setName(DEFAULT_SALE_CUSTOMER_NAME);
+                    customer.setProjectLocation("");
+                    return customerRepository.save(customer);
+                });
     }
 
     private void updateProjectLocations(Customer customer) {
@@ -666,17 +752,7 @@ public class SaleFormController {
     }
 
     private String resolveProductCurrency(Product product, ProductUnit saleUnit) {
-        String requestedCurrency = currencyComboBox != null ? currencyComboBox.getValue() : "دينار";
-        if (hasPositiveValue(getSelectedPrice(product, saleUnit, requestedCurrency))) {
-            return requestedCurrency;
-        }
-
-        String otherCurrency = "دولار".equals(requestedCurrency) ? "دينار" : "دولار";
-        if (hasPositiveValue(getSelectedPrice(product, saleUnit, otherCurrency))) {
-            return otherCurrency;
-        }
-
-        return requestedCurrency;
+        return IQD_CURRENCY;
     }
 
     private boolean hasPositiveValue(Double value) {
@@ -688,7 +764,7 @@ public class SaleFormController {
     }
 
     private String currencySymbol(String currency) {
-        return "دولار".equals(currency) ? "$" : "د.ع";
+        return "د.ع";
     }
 
     private SaleItemRow getCellRow(TableCell<SaleItemRow, ?> cell) {
@@ -1181,9 +1257,13 @@ public class SaleFormController {
     }
 
     private void setupDefaults() {
-        creditRadio.setSelected(true); // default to دين (دين)
+        cashRadio.setSelected(true);
         quantityField.setText("1");
         additionalDiscountField.setText("0");
+        if (paidAmountField != null) {
+            paidAmountField.setText("0");
+            paidAmountField.setDisable(true);
+        }
     }
 
     public void setDialogStage(Stage dialogStage) {
@@ -1281,7 +1361,7 @@ public class SaleFormController {
         String itemCurrency = resolveProductCurrency(product, saleUnit);
         Double itemPrice = getSelectedPrice(product, saleUnit, itemCurrency);
         if (itemPrice == null || itemPrice <= 0) {
-            showError("خطأ", "لا يوجد سعر لهذا المنتج بالدينار أو بالدولار");
+            showError("خطأ", "لا يوجد سعر لهذا المنتج بالدينار");
             return;
         }
         String priceType = priceTypeComboBox != null ? priceTypeComboBox.getValue() : "مفرد";
@@ -1312,7 +1392,7 @@ public class SaleFormController {
                     conversionFactor);
             newItem.setSavedUnitPriceUsd(getSelectedPrice(product, saleUnit, "دولار"));
             newItem.setBaseQuantity(baseQuantity);
-            newItem.setCurrencyAndRate(itemCurrency, getExchangeRateOrDefault());
+            newItem.setCurrencyAndRate(IQD_CURRENCY, getExchangeRateOrDefault());
             newItem.recalculate();
             saleItems.add(newItem);
         }
@@ -1397,12 +1477,12 @@ public class SaleFormController {
 
         String paymentCurrency = getPaymentCurrencyForTotals(totals);
         CurrencyTotals summary = totals.get(paymentCurrency);
-        return summary != null ? summary.finalTotal(parseAmount(additionalDiscountField)) : 0;
+        return summary != null ? summary.finalTotal(getAllowedAdditionalDiscount()) : 0;
     }
 
     private void updateTotals() {
         Map<String, CurrencyTotals> totals = buildCurrencyTotals();
-        double additionalDiscount = parseAmount(additionalDiscountField);
+        double additionalDiscount = getAllowedAdditionalDiscount();
         String paymentCurrency = getPaymentCurrencyForTotals(totals);
         updateCurrencyLabels(paymentCurrency);
 
@@ -1418,12 +1498,24 @@ public class SaleFormController {
             finalTotal = paymentSummary.finalTotal(additionalDiscount);
         }
 
-        // Auto-update paid amount for cash payment
-        if (cashRadio.isSelected() && paidAmountField != null) {
-            paidAmountField.setText(String.valueOf(finalTotal));
-        }
+        syncPaidAmountWithPayment(finalTotal);
 
         updateBalance(finalTotal, paymentCurrency, totals.size() > 1);
+    }
+
+    private double getAllowedAdditionalDiscount() {
+        if (SessionManager.getInstance().isSeller()) {
+            return 0;
+        }
+        return parseAmount(additionalDiscountField);
+    }
+
+    private void syncPaidAmountWithPayment(double finalTotal) {
+        if (paidAmountField == null) {
+            return;
+        }
+        double paidAmount = cashRadio != null && cashRadio.isSelected() ? finalTotal : 0.0;
+        paidAmountField.setText(String.valueOf(paidAmount));
     }
 
     @FXML
@@ -1447,11 +1539,7 @@ public class SaleFormController {
     }
 
     private String getPaymentCurrencyForTotals(Map<String, CurrencyTotals> totals) {
-        String selectedCurrency = currencyComboBox != null ? currencyComboBox.getValue() : "دينار";
-        if (totals.containsKey(selectedCurrency)) {
-            return selectedCurrency;
-        }
-        return totals.keySet().stream().findFirst().orElse(selectedCurrency);
+        return IQD_CURRENCY;
     }
 
     private double parseAmount(TextField field) {
@@ -1468,7 +1556,7 @@ public class SaleFormController {
 
     private String formatCurrencyTotals(Map<String, CurrencyTotals> totals, CurrencyValueProvider provider) {
         if (totals.isEmpty()) {
-            return formatCurrencyAmount(0, currencyComboBox != null ? currencyComboBox.getValue() : "دينار");
+            return formatCurrencyAmount(0, IQD_CURRENCY);
         }
 
         StringBuilder sb = new StringBuilder();
@@ -1520,31 +1608,37 @@ public class SaleFormController {
 
                     File pdfFile = new File(receipt.getFilePath());
                     if (pdfFile.exists()) {
-                        if (mainApp != null) {
-                            mainApp.showPdfPreview(pdfFile,
-                                    "معاينة الوصل " + receipt.getReceiptNumber() + " - " + sale.getCurrency());
-                        } else if (Desktop.isDesktopSupported()) {
-                            Desktop.getDesktop().open(pdfFile);
-                        }
+                        printReceiptPdf(pdfFile);
                     }
                 }
                 resetSaleForm();
             } catch (Exception ex) {
                 logger.error("Failed to generate receipt", ex);
-                showError("خطأ", "تم حفظ الفاتورة لكن فشل إنشاء الإيصال");
+                showError("خطأ", "تم حفظ البيع لكن فشل إرسال الفاتورة إلى الطابعة: " + ex.getMessage());
             }
         }
     }
 
-    private List<Sale> createSales() {
-        if (customerComboBox.getValue() == null) {
-            showError("خطأ", "الرجاء اختيار العميل");
-            return List.of();
+    private void printReceiptPdf(File pdfFile) {
+        if (pdfFile == null || !pdfFile.exists()) {
+            throw new IllegalArgumentException("ملف الفاتورة غير موجود");
         }
 
-        if (projectLocationComboBox == null || projectLocationComboBox.isDisabled()
-                || projectLocationComboBox.getValue() == null || projectLocationComboBox.getValue().trim().isEmpty()) {
-            showError("خطأ", "الرجاء اختيار موقع المشروع");
+        try (PDDocument document = PDDocument.load(pdfFile)) {
+            PrinterJob job = PrinterJob.getPrinterJob();
+            job.setPrintable(new PDFPrintable(document, Scaling.SHRINK_TO_FIT));
+            job.print();
+        } catch (PrinterException e) {
+            throw new RuntimeException("فشل الاتصال بالطابعة الافتراضية", e);
+        } catch (Exception e) {
+            throw new RuntimeException("فشل تجهيز ملف الفاتورة للطباعة", e);
+        }
+    }
+
+    private List<Sale> createSales() {
+        selectDefaultSaleCustomer();
+        if (customerComboBox.getValue() == null) {
+            showError("خطأ", "تعذر تجهيز عميل البيع الافتراضي");
             return List.of();
         }
 
@@ -1558,15 +1652,16 @@ public class SaleFormController {
         }
 
         String paymentMethod = "CASH";
-        if (creditRadio.isSelected())
+        if (SessionManager.getInstance().isSeller()) {
+            cashRadio.setSelected(true);
+        } else if (creditRadio.isSelected()) {
             paymentMethod = "DEBT";
+        }
 
         try {
             Map<String, List<SaleItemRow>> rowsByCurrency = groupRowsByCurrency();
             String paymentCurrency = getPaymentCurrencyForTotals(buildCurrencyTotals());
-            boolean hasMultipleCurrencies = rowsByCurrency.size() > 1;
-            double enteredPaidAmount = parseAmount(paidAmountField);
-            double additionalDiscount = parseAmount(additionalDiscountField);
+            double additionalDiscount = getAllowedAdditionalDiscount();
             String createdBy = SessionManager.getInstance().getCurrentDisplayName();
             String creator = createdBy != null ? createdBy : "System";
             List<Sale> createdSales = new ArrayList<>();
@@ -1575,10 +1670,10 @@ public class SaleFormController {
                 String saleCurrency = entry.getKey();
                 SalesService.SaleRequest request = new SalesService.SaleRequest();
                 request.setCustomerId(customerComboBox.getValue().getId());
-                request.setProjectLocation(projectLocationComboBox.getValue().trim());
+                request.setProjectLocation("");
                 request.setPaymentMethod(paymentMethod);
-                request.setCurrency(saleCurrency);
-                request.setNotes(notesArea.getText());
+                request.setCurrency(IQD_CURRENCY);
+                request.setNotes(notesArea != null ? notesArea.getText() : "");
                 request.setCreatedBy(creator);
 
                 double saleAdditionalDiscount = saleCurrency.equals(paymentCurrency) ? additionalDiscount : 0;
@@ -1604,8 +1699,6 @@ public class SaleFormController {
                 double finalTotal = groupTotal - saleAdditionalDiscount;
                 if (cashRadio.isSelected()) {
                     request.setPaidAmount(finalTotal);
-                } else if (!hasMultipleCurrencies || saleCurrency.equals(paymentCurrency)) {
-                    request.setPaidAmount(enteredPaidAmount);
                 } else {
                     request.setPaidAmount(0.0);
                 }
@@ -1653,18 +1746,22 @@ public class SaleFormController {
         saleItems.clear();
         itemsTable.refresh();
         additionalDiscountField.setText("0");
-        additionalDiscountCurrencyLabel.setText("");
+        additionalDiscountCurrencyLabel.setText(IQD_CURRENCY);
         subtotalLabel.setText("0");
         discountLabel.setText("0");
-        finalTotalLabel.setText("0");
-        paidAmountField.clear();
-        paidAmountCurrencyLabel.setText("");
+        finalTotalLabel.setText(formatCurrencyAmount(0, IQD_CURRENCY));
+        paidAmountField.setText("0");
+        paidAmountCurrencyLabel.setText(IQD_CURRENCY);
         balanceLabel.setText("0");
         balanceStatusLabel.setText("");
-        notesArea.clear();
-        if (paymentGroup != null) {
-            paymentGroup.selectToggle(creditRadio); // reset to دين
+        if (notesArea != null) {
+            notesArea.clear();
         }
+        if (paymentGroup != null) {
+            paymentGroup.selectToggle(cashRadio);
+        }
+        selectDefaultSaleCustomer();
+        applyRoleRestrictions();
     }
 
     private void showError(String title, String message) {

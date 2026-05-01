@@ -105,8 +105,8 @@ public class BarcodePrintController {
 
     private void setupOptions() {
         copiesSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 999, 1));
-        widthField.setText("50");
-        heightField.setText("30");
+        widthField.setText(formatMm(BarcodeService.XPRINTER_365B_DEFAULT_LABEL_WIDTH_MM));
+        heightField.setText(formatMm(BarcodeService.XPRINTER_365B_DEFAULT_LABEL_HEIGHT_MM));
         productNameCheckBox.setSelected(true);
         priceCheckBox.setSelected(true);
 
@@ -212,8 +212,14 @@ public class BarcodePrintController {
         options.setBarcodeOnly(barcodeOnlyCheckBox.isSelected());
         options.setShowProductName(productNameCheckBox.isSelected());
         options.setShowPrice(priceCheckBox.isSelected());
-        options.setLabelWidthMm(parsePositive(widthField.getText(), 50.0));
-        options.setLabelHeightMm(parsePositive(heightField.getText(), 30.0));
+        options.setLabelWidthMm(parsePositive(
+                widthField.getText(),
+                BarcodeService.XPRINTER_365B_DEFAULT_LABEL_WIDTH_MM
+        ));
+        options.setLabelHeightMm(parsePositive(
+                heightField.getText(),
+                BarcodeService.XPRINTER_365B_DEFAULT_LABEL_HEIGHT_MM
+        ));
         return options;
     }
 
@@ -274,6 +280,10 @@ public class BarcodePrintController {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    private String formatMm(double value) {
+        return value == Math.rint(value) ? String.valueOf((int) value) : String.valueOf(value);
     }
 
     private void showError(String title, String message) {
