@@ -166,8 +166,7 @@ public class AccountsController {
 
         if (showDetails) {
             // Details mode: hide date, reorder, rename columns
-            @SuppressWarnings("unchecked") var detailCols = new javafx.scene.control.TableColumn[]{colDate, colType, colRef, colDesc, colPayStatus, colDebit, colCredit, colBalance, colActions};
-            statementTable.getColumns().setAll(detailCols);
+            statementTable.getColumns().setAll(List.of(colDate, colType, colRef, colDesc, colPayStatus, colDebit, colCredit, colBalance, colActions));
             colDate.setVisible(false);
             colRef.setText("رقم الفاتورة");
             colDesc.setText("اسم المادة");
@@ -176,8 +175,7 @@ public class AccountsController {
             colCredit.setText("المجموع");
         } else {
             // Normal mode: show all, restore text
-            @SuppressWarnings("unchecked") var normalCols = new javafx.scene.control.TableColumn[]{colDate, colType, colRef, colDesc, colDebit, colCredit, colBalance, colPayStatus, colActions};
-            statementTable.getColumns().setAll(normalCols);
+            statementTable.getColumns().setAll(List.of(colDate, colType, colRef, colDesc, colDebit, colCredit, colBalance, colPayStatus, colActions));
             colRef.setText("رقم المرجع");
             colDesc.setText("البيان");
             colPayStatus.setText("حالة الدفع");
