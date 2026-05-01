@@ -1,0 +1,43 @@
+
+
+Version:	3.50
+CmdLine:	C:\Users\smart\Projects\PharmaX\PharmaX.exe --l4j-debug
+JNI:		No
+WOW64:		Yes
+Working dir:	C:\Users\smart\Projects\PharmaX\.
+Requires JDK:	No
+Requires 64-Bit: No
+Java min ver:	
+Java max ver:	
+Substitute:	JAVA_HOME = 
+Substitute:	PATH = C:\Program Files\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Git\cmd;C:\Program Files\GitHub CLI\;C:\Python313;C:\Program Files\Apache\apache-maven-3.9.12\bin;C:\Program Files\nodejs\;C:\Program Files\Cloudflare\Cloudflare WARP\;C:\Users\smart\AppData\Local\Programs\Python\Launcher\;C:\Users\smart\AppData\Local\Microsoft\WindowsApps;C:\Users\smart\AppData\Local\Programs\Windsurf\bin;C:\Users\smart\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\src\flutter\bin;C:\Users\smart\AppData\Roaming\npm;C:\Program Files\Java\jdk-17\bin
+JRE paths:	;C:\Program Files\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Git\cmd;C:\Program Files\GitHub CLI\;C:\Python313;C:\Program Files\Apache\apache-maven-3.9.12\bin;C:\Program Files\nodejs\;C:\Program Files\Cloudflare\Cloudflare WARP\;C:\Users\smart\AppData\Local\Programs\Python\Launcher\;C:\Users\smart\AppData\Local\Microsoft\WindowsApps;C:\Users\smart\AppData\Local\Programs\Windsurf\bin;C:\Users\smart\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\src\flutter\bin;C:\Users\smart\AppData\Roaming\npm;C:\Program Files\Java\jdk-17\bin
+Check launcher:	C:\Program Files\Common Files\Oracle\Java\javapath\bin\javaw.exe (not found)
+Check launcher:	C:\WINDOWS\system32\bin\javaw.exe (not found)
+Check launcher:	C:\WINDOWS\bin\javaw.exe (not found)
+Check launcher:	C:\WINDOWS\System32\Wbem\bin\javaw.exe (not found)
+Check launcher:	C:\WINDOWS\System32\WindowsPowerShell\v1.0\bin\javaw.exe (not found)
+Check launcher:	C:\WINDOWS\System32\OpenSSH\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\Git\cmd\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\GitHub CLI\bin\javaw.exe (not found)
+Check launcher:	C:\Python313\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\Apache\apache-maven-3.9.12\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\nodejs\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\Cloudflare\Cloudflare WARP\bin\javaw.exe (not found)
+Check launcher:	C:\Users\smart\AppData\Local\Programs\Python\Launcher\bin\javaw.exe (not found)
+Check launcher:	C:\Users\smart\AppData\Local\Microsoft\WindowsApps\bin\javaw.exe (not found)
+Check launcher:	C:\Users\smart\AppData\Local\Programs\Windsurf\bin\javaw.exe (not found)
+Check launcher:	C:\Users\smart\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\javaw.exe (not found)
+Check launcher:	C:\src\flutter\bin\javaw.exe (not found)
+Check launcher:	C:\Users\smart\AppData\Roaming\npm\bin\javaw.exe (not found)
+Check launcher:	C:\Program Files\Java\jdk-17\bin\javaw.exe (OK)
+Version string: 1.017.000_012 / 64-Bit (OK)
+Main class:	com.PharmaX.MainApp
+Add classpath:	PharmaX.jar
+Add classpath:	lib\*
+Launcher:	C:\Program Files\Java\jdk-17\bin\javaw.exe
+Launcher args:	-classpath "C:\Users\smart\Projects\PharmaX\PharmaX.exe;PharmaX.jar" com.PharmaX.MainApp
+Args length:	124/32768 chars
+Exit code:	0

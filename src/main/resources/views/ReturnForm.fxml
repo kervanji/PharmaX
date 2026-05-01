@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.collections.FXCollections?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import java.lang.String?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.ReturnController"
+      stylesheets="@../styles/main.css"
+      spacing="15" alignment="TOP_CENTER"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="🔄 إرجاع مواد مباعة" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+    </HBox>
+
+    <!-- Filters Selection -->
+    <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="العميل:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="customerComboBox" prefWidth="150" onAction="#handleCustomerChange"/>
+        
+        <Label text="العملة:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="currencyComboBox" prefWidth="100" onAction="#handleFilterChange"/>
+        
+        <Label text="المشروع:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="projectComboBox" prefWidth="150" onAction="#handleFilterChange"/>
+        
+        <Label text="رقم الفاتورة:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="saleComboBox" prefWidth="120" onAction="#handleFilterChange"/>
+    </HBox>
+
+    <!-- Sale Items Table - Items that can be returned -->
+    <VBox spacing="10" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="المواد المتاحة للإرجاع:" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <TableView fx:id="saleItemsTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="selectColumn" text="✓" prefWidth="40"/>
+                <TableColumn fx:id="productColumn" text="المنتج" prefWidth="200"/>
+                <TableColumn fx:id="soldQtyColumn" text="الكمية المباعة" prefWidth="100"/>
+                <TableColumn fx:id="returnedQtyColumn" text="المرتجع سابقاً" prefWidth="100"/>
+                <TableColumn fx:id="availableQtyColumn" text="المتاح للإرجاع" prefWidth="100"/>
+                <TableColumn fx:id="returnQtyColumn" text="كمية الإرجاع" prefWidth="100"/>
+                <TableColumn fx:id="currencyColumn" text="العملة" prefWidth="80"/>
+                <TableColumn fx:id="unitPriceColumn" text="سعر الوحدة" prefWidth="100"/>
+                <TableColumn fx:id="totalColumn" text="الإجمالي" prefWidth="100"/>
+            </columns>
+            <placeholder>
+                <Label text="اختر فاتورة لعرض المواد"/>
+            </placeholder>
+        </TableView>
+    </VBox>
+
+    <!-- Return Details -->
+    <HBox spacing="20" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <VBox spacing="10" HBox.hgrow="ALWAYS">
+            <Label text="ملاحظات:" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="notesArea" prefHeight="60" promptText="أضف ملاحظات إضافية..."/>
+        </VBox>
+
+        <VBox spacing="10" alignment="CENTER_RIGHT" style="-fx-min-width: 250;">
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <Label text="إجمالي المرتجع:" style="-fx-font-weight: bold; -fx-font-size: 16px;"/>
+                <Label fx:id="totalReturnLabel" text="0.00 د.ع" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+            </HBox>
+        </VBox>
+    </HBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="10" alignment="CENTER">
+        <Button text="✅ تأكيد الإرجاع" onAction="#handleConfirmReturn" prefHeight="40" prefWidth="150"
+                style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <Button text="📄 طباعة إيصال الإرجاع" onAction="#handlePrintReturnReceipt" prefHeight="40"
+                style="-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="📋 سجل المرتجعات" onAction="#handleViewReturns" prefHeight="40"
+                style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="❌ إغلاق" onAction="#handleClose" prefHeight="40"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

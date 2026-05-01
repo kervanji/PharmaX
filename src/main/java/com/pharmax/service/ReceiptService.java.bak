@@ -1,0 +1,280 @@
+﻿package com.pharmax.service;
+
+import com.pharmax.database.Repository.ReceiptRepository;
+import com.pharmax.database.Repository.SaleRepository;
+import com.pharmax.model.Receipt;
+import com.pharmax.model.Sale;
+import com.pharmax.model.SaleItem;
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Chunk;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public class ReceiptService {
+    private static final Logger logger = LoggerFactory.getLogger(ReceiptService.class);
+    private final ReceiptRepository receiptRepository;
+    private final SaleRepository saleRepository;
+    
+    // Company information - can be made configurable
+    private static final String COMPANY_NAME = "PharmaX";
+    private static final String COMPANY_ADDRESS = "العراق";
+    private static final String COMPANY_PHONE = "الهاتف: +964-XXX-XXX-XXXX";
+    private static final String COMPANY_EMAIL = "البريد: info@PharmaX.com";
+    
+    public ReceiptService() {
+        this.receiptRepository = new ReceiptRepository();
+        this.saleRepository = new SaleRepository();
+    }
+    
+    public Receipt generateReceipt(Long saleId, String template, String printedBy) {
+        logger.info("Generating receipt for sale: {}", saleId);
+        
+        Optional<Sale> saleOpt = saleRepository.findById(saleId);
+        if (saleOpt.isEmpty()) {
+            throw new IllegalArgumentException("البيع غير موجود");
+        }
+        
+        Sale sale = saleOpt.get();
+        
+        // Create receipt record
+        Receipt receipt = new Receipt();
+        receipt.setReceiptNumber(generateReceiptNumber());
+        receipt.setSale(sale);
+        receipt.setTemplate(template != null ? template : "DEFAULT");
+        receipt.setPrintedBy(printedBy);
+        
+        // Generate PDF
+        try {
+            byte[] pdfData = generateReceiptPDF(sale, receipt.getTemplate());
+            
+            // Ensure receipts directory exists
+            java.io.File receiptsDir = new java.io.File("receipts");
+            if (!receiptsDir.exists()) {
+                receiptsDir.mkdirs();
+            }
+            
+            // Save PDF file
+            String fileName = "receipt_" + receipt.getReceiptNumber() + ".pdf";
+            String filePath = "receipts/" + fileName;
+            
+            try (FileOutputStream fos = new FileOutputStream(filePath)) {
+                fos.write(pdfData);
+            }
+            
+            receipt.setFilePath(filePath);
+            receipt.setIsPrinted(true);
+            receipt.setPrintedAt(LocalDateTime.now());
+            
+            Receipt savedReceipt = receiptRepository.save(receipt);
+            logger.info("Receipt generated successfully: {}", savedReceipt.getReceiptNumber());
+            
+            return savedReceipt;
+            
+        } catch (Exception e) {
+            logger.error("Failed to generate receipt PDF", e);
+            throw new RuntimeException("فشل في إنشاء الإيصال", e);
+        }
+    }
+    
+    private byte[] generateReceiptPDF(Sale sale, String template) throws DocumentException, IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        
+        Document document = new Document(PageSize.A5);
+        PdfWriter.getInstance(document, baos);
+        document.open();
+        
+        // Set Arabic font (you'll need to add an Arabic font to your resources)
+        Font arabicFont = new Font(Font.FontFamily.HELVETICA, 12, Font.NORMAL);
+        Font arabicBoldFont = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD);
+        Font titleFont = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
+        
+        // Company Header
+        Paragraph title = new Paragraph(COMPANY_NAME, titleFont);
+        title.setAlignment(Element.ALIGN_CENTER);
+        document.add(title);
+        
+        Paragraph companyInfo = new Paragraph(COMPANY_ADDRESS + "\n" + COMPANY_PHONE + "\n" + COMPANY_EMAIL, arabicFont);
+        companyInfo.setAlignment(Element.ALIGN_CENTER);
+        document.add(companyInfo);
+        
+        // Separator
+        document.add(new Paragraph("==========================================", arabicFont));
+        
+        // Receipt Title
+        Paragraph receiptTitle = new Paragraph("إيصال بيع", arabicBoldFont);
+        receiptTitle.setAlignment(Element.ALIGN_CENTER);
+        document.add(receiptTitle);
+        
+        // Receipt Number and Date
+        Paragraph receiptInfo = new Paragraph(
+            "رقم الإيصال: " + sale.getSaleCode() + "\n" +
+            "التاريخ: " + sale.getSaleDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+            arabicFont
+        );
+        receiptInfo.setAlignment(Element.ALIGN_RIGHT);
+        document.add(receiptInfo);
+        
+        document.add(new Paragraph("==========================================", arabicFont));
+        
+        // Customer Information
+        Paragraph customerTitle = new Paragraph("معلومات العميل:", arabicBoldFont);
+        customerTitle.setAlignment(Element.ALIGN_RIGHT);
+        document.add(customerTitle);
+        
+        Paragraph customerInfo = new Paragraph(
+            "الاسم: " + sale.getCustomer().getName() + "\n" +
+            (sale.getCustomer().getPhoneNumber() != null ? "الهاتف: " + sale.getCustomer().getPhoneNumber() + "\n" : "") +
+            (sale.getCustomer().getAddress() != null ? "العنوان: " + sale.getCustomer().getAddress() : ""),
+            arabicFont
+        );
+        customerInfo.setAlignment(Element.ALIGN_RIGHT);
+        document.add(customerInfo);
+        
+        document.add(new Paragraph("------------------------------------------", arabicFont));
+        
+        // Sale Items Table
+        PdfPTable table = new PdfPTable(4);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{2, 1, 1, 1});
+        
+        // Table Headers
+        addTableHeader(table, "المنتج", arabicBoldFont);
+        addTableHeader(table, "الكمية", arabicBoldFont);
+        addTableHeader(table, "السعر", arabicBoldFont);
+        addTableHeader(table, "الإجمالي", arabicBoldFont);
+        
+        // Table Data
+        for (SaleItem item : sale.getSaleItems()) {
+            table.addCell(createCell(item.getProduct().getName(), arabicFont));
+            table.addCell(createCell(String.valueOf(item.getQuantity()), arabicFont));
+            table.addCell(createCell(String.format("%.2f", item.getUnitPrice()), arabicFont));
+            table.addCell(createCell(String.format("%.2f", item.getTotalPrice()), arabicFont));
+        }
+        
+        document.add(table);
+        
+        document.add(new Paragraph("------------------------------------------", arabicFont));
+        
+        // Totals
+        Paragraph totals = new Paragraph();
+        totals.setAlignment(Element.ALIGN_RIGHT);
+        totals.add(new Chunk("المجموع: ", arabicFont));
+        totals.add(new Chunk(String.format("%.2f دينار", sale.getTotalAmount()), arabicBoldFont));
+        totals.add(Chunk.NEWLINE);
+        
+        if (sale.getDiscountAmount() > 0) {
+            totals.add(new Chunk("الخصم: ", arabicFont));
+            totals.add(new Chunk(String.format("%.2f دينار", sale.getDiscountAmount()), arabicBoldFont));
+            totals.add(Chunk.NEWLINE);
+        }
+        
+        totals.add(new Chunk("الإجمالي النهائي: ", arabicBoldFont));
+        totals.add(new Chunk(String.format("%.2f دينار", sale.getFinalAmount()), new Font(Font.FontFamily.HELVETICA, 16, Font.BOLD)));
+        
+        document.add(totals);
+        
+        document.add(new Paragraph("==========================================", arabicFont));
+        
+        // Payment Information
+        Paragraph paymentInfo = new Paragraph(
+            "طريقة الدفع: " + getPaymentMethodArabic(sale.getPaymentMethod()) + "\n" +
+            "الحالة: " + getPaymentStatusArabic(sale.getPaymentStatus()),
+            arabicFont
+        );
+        paymentInfo.setAlignment(Element.ALIGN_RIGHT);
+        document.add(paymentInfo);
+        
+        // Notes
+        if (sale.getNotes() != null && !sale.getNotes().trim().isEmpty()) {
+            document.add(new Paragraph("------------------------------------------", arabicFont));
+            Paragraph notesTitle = new Paragraph("ملاحظات:", arabicBoldFont);
+            notesTitle.setAlignment(Element.ALIGN_RIGHT);
+            document.add(notesTitle);
+            
+            Paragraph notes = new Paragraph(sale.getNotes(), arabicFont);
+            notes.setAlignment(Element.ALIGN_RIGHT);
+            document.add(notes);
+        }
+        
+        // Footer
+        document.add(new Paragraph("==========================================", arabicFont));
+        Paragraph footer = new Paragraph("شكراً لتعاملكم معنا", arabicFont);
+        footer.setAlignment(Element.ALIGN_CENTER);
+        document.add(footer);
+        
+        document.close();
+        
+        return baos.toByteArray();
+    }
+    
+    private void addTableHeader(PdfPTable table, String header, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(header, font));
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+        table.addCell(cell);
+    }
+    
+    private PdfPCell createCell(String text, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        return cell;
+    }
+    
+    private String generateReceiptNumber() {
+        return "RCP-" + LocalDateTime.now().toString().substring(0, 10).replace("-", "") + 
+               "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+    }
+    
+    private String getPaymentMethodArabic(String method) {
+        switch (method) {
+            case "CASH": return "نقدي";
+            case "DEBT": return "دين";
+            case "CARD": return "بطاقة";
+            default: return method;
+        }
+    }
+    
+    private String getPaymentStatusArabic(String status) {
+        switch (status) {
+            case "PAID": return "مدفوع";
+            case "PENDING": return "معلق";
+            case "OVERDUE": return "متأخر";
+            default: return status;
+        }
+    }
+    
+    public Optional<Receipt> getReceiptById(Long id) {
+        return receiptRepository.findById(id);
+    }
+    
+    public Optional<Receipt> getReceiptByNumber(String receiptNumber) {
+        return receiptRepository.findByReceiptNumber(receiptNumber);
+    }
+    
+    public List<Receipt> getAllReceipts() {
+        return receiptRepository.findAll();
+    }
+    
+    public void deleteReceipt(Long id) {
+        receiptRepository.deleteById(id);
+    }
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "key": "search_customer",
+    "label_ar": "بحث عميل",
+    "file": "search_customer.svg"
+  },
+  {
+    "key": "customers_list",
+    "label_ar": "عرض العملاء",
+    "file": "customers_list.svg"
+  },
+  {
+    "key": "add_customer",
+    "label_ar": "إضافة عميل",
+    "file": "add_customer.svg"
+  },
+  {
+    "key": "add_product",
+    "label_ar": "إضافة منتج",
+    "file": "add_product.svg"
+  },
+  {
+    "key": "view_inventory",
+    "label_ar": "عرض المخزون",
+    "file": "view_inventory.svg"
+  },
+  {
+    "key": "view_sales",
+    "label_ar": "عرض المبيعات",
+    "file": "view_sales.svg"
+  },
+  {
+    "key": "pos",
+    "label_ar": "نقطة بيع",
+    "file": "pos.svg"
+  },
+  {
+    "key": "sales_invoice",
+    "label_ar": "فاتورة بيع",
+    "file": "sales_invoice.svg"
+  },
+  {
+    "key": "sales_reports",
+    "label_ar": "تقارير المبيعات",
+    "file": "sales_reports.svg"
+  },
+  {
+    "key": "return_items",
+    "label_ar": "إرجاع مواد",
+    "file": "return_items.svg"
+  },
+  {
+    "key": "view_receipts",
+    "label_ar": "عرض الإيصالات",
+    "file": "view_receipts.svg"
+  },
+  {
+    "key": "create_receipt",
+    "label_ar": "إنشاء إيصال",
+    "file": "create_receipt.svg"
+  },
+  {
+    "key": "payment_vouchers_list",
+    "label_ar": "سندات الدفع",
+    "file": "payment_vouchers_list.svg"
+  },
+  {
+    "key": "receipt_vouchers_list",
+    "label_ar": "سندات القبض",
+    "file": "receipt_vouchers_list.svg"
+  },
+  {
+    "key": "payment_voucher",
+    "label_ar": "سند دفع",
+    "file": "payment_voucher.svg"
+  },
+  {
+    "key": "receipt_voucher",
+    "label_ar": "سند قبض",
+    "file": "receipt_voucher.svg"
+  },
+  {
+    "key": "about",
+    "label_ar": "عن البرنامج",
+    "file": "about.svg"
+  },
+  {
+    "key": "settings",
+    "label_ar": "الإعدادات",
+    "file": "settings.svg"
+  },
+  {
+    "key": "user_management",
+    "label_ar": "إدارة المستخدمين",
+    "file": "user_management.svg"
+  },
+  {
+    "key": "due_installments",
+    "label_ar": "الأقساط المستحقة",
+    "file": "due_installments.svg"
+  },
+  {
+    "key": "categories_management",
+    "label_ar": "إدارة الفئات",
+    "file": "categories_management.svg"
+  },
+  {
+    "key": "add_stock",
+    "label_ar": "إضافة مخزون",
+    "file": "add_stock.svg"
+  },
+  {
+    "key": "low_stock",
+    "label_ar": "منخفضات المخزون",
+    "file": "low_stock.svg"
+  },
+  {
+    "key": "pending_payments",
+    "label_ar": "المدفوعات المعلقة",
+    "file": "pending_payments.svg"
+  }
+]

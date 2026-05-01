@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane stylesheets="@../styles/main.css" styleClass="login-pane"
+            style="-fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';"
+            xmlns:fx="http://javafx.com/fxml" fx:controller="com.pharmax.controller.ActivationController"
+            prefWidth="520" prefHeight="520">
+
+    <center>
+        <VBox alignment="CENTER">
+            <VBox alignment="CENTER" spacing="16"
+                  style="-fx-background-color: -fx-btn-secondary-bg; -fx-background-radius: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 20, 0, 0, 10);"
+                  maxWidth="420" maxHeight="420">
+                <padding>
+                    <Insets top="34" right="34" bottom="34" left="34"/>
+                </padding>
+
+                <Label text="PharmaX" style="-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-color;">
+                    <font><Font name="System Bold" size="34"/></font>
+                </Label>
+
+                <Label text="تفعيل البرنامج" style="-fx-font-size: 16px; -fx-text-fill: -fx-text-hint;"/>
+
+                <VBox spacing="8" alignment="CENTER_RIGHT">
+                    <Label text="معرّف الجهاز" style="-fx-text-fill: -fx-text-main; -fx-font-size: 13px;"/>
+                    <Label fx:id="deviceIdLabel" text="" style="-fx-text-fill: -fx-accent-hover; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+                </VBox>
+
+                <VBox spacing="8" alignment="CENTER_RIGHT">
+                    <Label text="كود التفعيل" style="-fx-text-fill: -fx-text-main; -fx-font-size: 14px;"/>
+                    <TextField fx:id="activationCodeField" promptText="HX1-000001-1A2B3C4D"
+                               prefWidth="320" prefHeight="45"
+                               style="-fx-background-radius: 10; -fx-border-radius: 10; -fx-border-color: -fx-border-main; -fx-border-width: 1; -fx-font-size: 14px; -fx-padding: 10;"
+                               alignment="CENTER"/>
+                </VBox>
+
+                <Label fx:id="errorLabel" text="" visible="false" managed="false"
+                       style="-fx-text-fill: -fx-danger-text; -fx-font-size: 13px; -fx-background-color: #fef2f2; -fx-padding: 8 15; -fx-background-radius: 8;"/>
+
+                <Label fx:id="statusLabel" text="" style="-fx-text-fill: -fx-success-dark; -fx-font-size: 13px;"/>
+
+                <Button fx:id="activateButton" text="تفعيل" onAction="#handleActivate"
+                        prefWidth="320" prefHeight="50"
+                        style="-fx-background-color: -fx-accent-color; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 10; -fx-cursor: hand;"/>
+
+                <Button text="خروج" onAction="#handleExit"
+                        style="-fx-background-color: transparent; -fx-text-fill: -fx-text-muted; -fx-font-size: 12px; -fx-cursor: hand;"/>
+            </VBox>
+        </VBox>
+    </center>
+
+    <bottom>
+        <VBox alignment="CENTER">
+            <padding>
+                <Insets bottom="20"/>
+            </padding>
+            <Label text="© 2025 KervanjiHolding" style="-fx-text-fill: rgba(255,255,255,0.5); -fx-font-size: 11px;"/>
+        </VBox>
+    </bottom>
+</BorderPane>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.BarcodePrintController"
+      spacing="16"
+      nodeOrientation="RIGHT_TO_LEFT"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 24;">
+
+    <Label text="طباعة باركود الأصناف"
+           style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+    <HBox spacing="18" VBox.vgrow="ALWAYS">
+        <VBox spacing="12" HBox.hgrow="ALWAYS">
+            <GridPane hgap="12" vgap="12">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="28"/>
+                    <ColumnConstraints percentWidth="72"/>
+                </columnConstraints>
+
+                <Label text="المنتج:" GridPane.rowIndex="0" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="productComboBox" GridPane.rowIndex="0" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="اختر المنتج" nodeOrientation="RIGHT_TO_LEFT"/>
+
+                <Label text="الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="unitComboBox" GridPane.rowIndex="1" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="قطعة / شريط / كرتون" nodeOrientation="RIGHT_TO_LEFT"/>
+
+                <Label text="الطابعة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="printerComboBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="الطابعة الافتراضية" nodeOrientation="RIGHT_TO_LEFT"/>
+
+                <Label text="عدد الملصقات:" GridPane.rowIndex="3" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <Spinner fx:id="copiesSpinner" GridPane.rowIndex="3" GridPane.columnIndex="1"
+                         editable="true" prefWidth="120"/>
+
+                <Label text="حجم الملصق:" GridPane.rowIndex="4" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <HBox GridPane.rowIndex="4" GridPane.columnIndex="1" spacing="8" alignment="CENTER_RIGHT">
+                    <TextField fx:id="widthField" prefWidth="80" alignment="CENTER_RIGHT"/>
+                    <Label text="مم ×"/>
+                    <TextField fx:id="heightField" prefWidth="80" alignment="CENTER_RIGHT"/>
+                    <Label text="مم"/>
+                </HBox>
+            </GridPane>
+
+            <Separator/>
+
+            <VBox spacing="8">
+                <Label text="محتوى الملصق:" style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+                <CheckBox fx:id="barcodeOnlyCheckBox" text="طباعة الباركود فقط"/>
+                <CheckBox fx:id="productNameCheckBox" text="إظهار اسم المنتج أسفل الباركود"/>
+                <CheckBox fx:id="priceCheckBox" text="إظهار السعر"/>
+            </VBox>
+
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <Button text="توليد باركود" onAction="#handleGenerateBarcode"
+                        style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+                <Button text="تحديث المعاينة" onAction="#handleRefreshPreview"
+                        style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input;"/>
+                <Button text="طباعة الملصقات" onAction="#handlePrint"
+                        style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-weight: bold;"/>
+            </HBox>
+        </VBox>
+
+        <VBox spacing="10" alignment="TOP_CENTER" minWidth="360" prefWidth="420">
+            <Label text="المعاينة" style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+            <StackPane style="-fx-background-color: white; -fx-border-color: -fx-border-input; -fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 12;">
+                <ImageView fx:id="previewImageView" fitWidth="360" fitHeight="220" preserveRatio="true"/>
+            </StackPane>
+        </VBox>
+    </HBox>
+</VBox>

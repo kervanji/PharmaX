@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>gui</headerType>
+  <jar>C:\Users\smart\Projects\PharmaX\distribution\PharmaX.jar</jar>
+  <outfile>C:\Users\smart\Projects\PharmaX\distribution\PharmaX.exe</outfile>
+  <errTitle></errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl></downloadUrl>
+  <supportUrl></supportUrl>
+  <stayAlive>false</stayAlive>
+  <restartOnCrash>false</restartOnCrash>
+  <manifest></manifest>
+  <icon>C:\Users\smart\Projects\PharmaX\src\main\resources\templates\PharmaX.ico</icon>
+  <classPath>
+    <mainClass>com.pharmax.MainApp</mainClass>
+    <cp>PharmaX.jar</cp>
+    <cp>lib\*</cp>
+  </classPath>
+  <jre>
+    <path>%EXEDIR%\runtime</path>
+    <requiresJdk>false</requiresJdk>
+    <requires64Bit>true</requires64Bit>
+    <minVersion>17</minVersion>
+    <maxVersion></maxVersion>
+    <opt>--add-modules=javafx.controls,javafx.fxml,javafx.graphics,javafx.swing</opt>
+  </jre>
+</launch4jConfig>

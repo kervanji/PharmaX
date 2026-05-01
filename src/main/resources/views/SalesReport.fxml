@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.collections.FXCollections?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.chart.*?>
+<?import java.lang.String?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.SalesReportController"
+      stylesheets="@../styles/main.css"
+      spacing="15" alignment="TOP_CENTER"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="📊 تقارير المبيعات" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+    </HBox>
+
+    <!-- Date Range Filter -->
+    <HBox spacing="15" alignment="CENTER" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="الفترة:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="periodComboBox" prefWidth="150" onAction="#handlePeriodChange">
+            <items>
+                <FXCollections fx:factory="observableArrayList">
+                    <String fx:value="اليوم"/>
+                    <String fx:value="الأسبوع"/>
+                    <String fx:value="الشهر"/>
+                    <String fx:value="السنة"/>
+                    <String fx:value="مخصص"/>
+                </FXCollections>
+            </items>
+        </ComboBox>
+        
+        <Separator orientation="VERTICAL"/>
+        
+        <Label text="من:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="fromDatePicker" prefWidth="130" onAction="#handleDateChange"/>
+        
+        <Label text="إلى:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="toDatePicker" prefWidth="130" onAction="#handleDateChange"/>
+        
+        <Button text="📈 إنشاء التقرير" onAction="#handleGenerateReport" 
+                style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+    </HBox>
+
+    <!-- Summary Cards -->
+    <HBox spacing="15" alignment="CENTER">
+        <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS" style="-fx-background-color: -fx-success; -fx-background-radius: 10; -fx-padding: 20;">
+            <Label text="إجمالي المبيعات" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+            <Label fx:id="totalSalesLabel" text="0.00" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <Label text="دينار" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS" style="-fx-background-color: -fx-accent-light; -fx-background-radius: 10; -fx-padding: 20;">
+            <Label text="عدد الفواتير" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+            <Label fx:id="invoiceCountLabel" text="0" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <Label text="فاتورة" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS" style="-fx-background-color: #9b59b6; -fx-background-radius: 10; -fx-padding: 20;">
+            <Label text="متوسط الفاتورة" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+            <Label fx:id="avgSaleLabel" text="0.00" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <Label text="دينار" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS" style="-fx-background-color: -fx-danger; -fx-background-radius: 10; -fx-padding: 20;">
+            <Label text="الخصومات" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+            <Label fx:id="totalDiscountLabel" text="0.00" style="-fx-text-fill: white; -fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <Label text="دينار" style="-fx-text-fill: white; -fx-font-size: 12px;"/>
+        </VBox>
+    </HBox>
+
+    <!-- Charts and Tables -->
+    <HBox spacing="15" VBox.vgrow="ALWAYS">
+        <!-- Payment Methods Breakdown -->
+        <VBox spacing="10" prefWidth="300" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 15;">
+            <Label text="توزيع طرق الدفع" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+            <VBox fx:id="paymentBreakdownBox" spacing="10" VBox.vgrow="ALWAYS">
+                <!-- Will be populated dynamically -->
+            </VBox>
+        </VBox>
+
+        <!-- Top Products -->
+        <VBox spacing="10" HBox.hgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 15;">
+            <Label text="المنتجات الأكثر مبيعاً" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+            <TableView fx:id="topProductsTable" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="productNameColumn" text="المنتج" prefWidth="200"/>
+                    <TableColumn fx:id="quantitySoldColumn" text="الكمية" prefWidth="80"/>
+                    <TableColumn fx:id="productTotalColumn" text="الإجمالي" prefWidth="100"/>
+                </columns>
+                <placeholder>
+                    <Label text="لا توجد بيانات"/>
+                </placeholder>
+            </TableView>
+        </VBox>
+
+        <!-- Top Customers -->
+        <VBox spacing="10" prefWidth="300" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 15;">
+            <Label text="أفضل العملاء" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+            <TableView fx:id="topCustomersTable" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="customerNameColumn" text="العميل" prefWidth="150"/>
+                    <TableColumn fx:id="customerTotalColumn" text="الإجمالي" prefWidth="100"/>
+                </columns>
+                <placeholder>
+                    <Label text="لا توجد بيانات"/>
+                </placeholder>
+            </TableView>
+        </VBox>
+    </HBox>
+
+    <!-- Action Buttons -->
+    <HBox spacing="10" alignment="CENTER">
+        <Button text="📄 تصدير PDF" onAction="#handleExportPDF" prefHeight="35"
+                style="-fx-background-color: -fx-danger; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="📥 تصدير Excel" onAction="#handleExportExcel" prefHeight="35"
+                style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="❌ إغلاق" onAction="#handleClose" prefHeight="35"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

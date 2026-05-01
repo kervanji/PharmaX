@@ -1,0 +1,137 @@
+/* =============================================
+   PharmaX Theme Variables - Light Blue
+   =============================================
+   Overrides variables for a soft light blue look
+*/
+
+.root {
+    /* ── Background Colors ── */
+    -fx-bg-main:      #f0f8ff; /* AliceBlue */
+    -fx-bg-panel:     #ffffff;
+    -fx-bg-surface:   #e6f2ff;
+    -fx-bg-header:    #dbeafe;
+    -fx-bg-gradient:  linear-gradient(to bottom right, #f0f8ff, #e6f2ff);
+
+    /* ── Text Colors ── */
+    -fx-text-main:    #000000;
+    -fx-text-muted:   #333333;
+    -fx-text-hint:    #555555;
+    -fx-text-bright:  #000000;
+    -fx-text-header:  #000000;
+
+    /* ── Accent / Primary ── */
+    -fx-accent-color:   #0ea5e9; /* Sky Blue */
+    -fx-accent-hover:   #0284c7;
+    -fx-accent-light:   #38bdf8;
+    -fx-accent-bg:      rgba(14, 165, 233, 0.15);
+    -fx-accent-text:    #0ea5e9;
+
+    /* ── Semantic Colors ── */
+    -fx-success:        #16a34a;
+    -fx-success-dark:   #15803d;
+    -fx-success-bg:     #dcfce7;
+    -fx-success-text:   #16a34a;
+
+    -fx-danger:         #dc2626;
+    -fx-danger-dark:    #b91c1c;
+    -fx-danger-bg:      #fee2e2;
+    -fx-danger-text:    #dc2626;
+
+    -fx-warning:        #d97706;
+    -fx-warning-dark:   #b45309;
+    -fx-warning-text:   #d97706;
+
+    /* ── Border & Hover ── */
+    -fx-border-main:    #e2e8f0;
+    -fx-border-input:   #cbd5e1;
+    -fx-border-focus:   #3b82f6;
+    -fx-hover-bg:       #e2e8f0;
+
+    /* ── Selection ── */
+    -fx-selection-bg:          #dbeafe;
+    -fx-selection-bg-focused:  #bfdbfe;
+    -fx-selection-text:        #000000;
+
+    /* ── Scrollbar ── */
+    -fx-scrollbar-thumb:       #cbd5e1;
+    -fx-scrollbar-thumb-hover: #94a3b8;
+
+    /* ── Dashboard Tiles ── */
+    -fx-tile-bg:        linear-gradient(to bottom right, #ffffff, #f1f5f9);
+    -fx-tile-hover:     linear-gradient(to bottom right, #eff6ff, #dbeafe);
+    -fx-tile-pressed:   linear-gradient(to bottom right, #e2e8f0, #cbd5e1);
+    -fx-tile-text:      #000000;
+    -fx-tile-icon:      #1e40af;
+
+    /* ── Table Row Alternate ── */
+    -fx-row-odd:        #f1f5f9;
+
+    /* ── Badges ── */
+    -fx-badge-success-bg:   #dcfce7;
+    -fx-badge-success-text: #166534;
+    -fx-badge-warning-bg:   #fef3c7;
+    -fx-badge-warning-text: #92400e;
+    -fx-badge-danger-bg:    #fee2e2;
+    -fx-badge-danger-text:  #991b1b;
+    -fx-badge-info-bg:      #dbeafe;
+    -fx-badge-info-text:    #1e40af;
+
+    /* ── Shadows ── */
+    -fx-shadow-sm: dropshadow(gaussian, rgba(0,0,0,0.05), 4, 0, 0, 2);
+    -fx-shadow-md: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 4);
+    -fx-shadow-lg: dropshadow(gaussian, rgba(0,0,0,0.12), 20, 0, 0, 8);
+
+    /* ── Card ── */
+    -fx-card-bg:    #ffffff;
+
+    /* ── Button colors ── */
+    -fx-btn-primary-top:    #3b82f6;
+    -fx-btn-primary-bottom: #2563eb;
+    -fx-btn-primary-hover-top:    #2563eb;
+    -fx-btn-primary-hover-bottom: #1e40af;
+
+    -fx-btn-success-top:    #22c55e;
+    -fx-btn-success-bottom: #16a34a;
+    -fx-btn-success-hover-top:    #16a34a;
+    -fx-btn-success-hover-bottom: #15803d;
+
+    -fx-btn-warning-top:    #f59e0b;
+    -fx-btn-warning-bottom: #d97706;
+    -fx-btn-warning-hover-top:    #d97706;
+    -fx-btn-warning-hover-bottom: #b45309;
+
+    -fx-btn-danger-top:     #ef4444;
+    -fx-btn-danger-bottom:  #dc2626;
+    -fx-btn-danger-hover-top:     #dc2626;
+    -fx-btn-danger-hover-bottom:  #b91c1c;
+
+    /* ── Secondary Button ── */
+    -fx-btn-secondary-bg:     #ffffff;
+    -fx-btn-secondary-text:   #000000;
+    -fx-btn-secondary-border: #e2e8f0;
+    -fx-btn-secondary-hover:  #f8fafc;
+
+    /* ── Login Screen ── */
+    -fx-login-bg:       linear-gradient(to bottom right, #eff6ff, #f8fafc);
+    -fx-login-card-bg:  #ffffff;
+    -fx-login-title:    #2563eb;
+
+    /* ── Dialog / Alert ── */
+    -fx-dialog-bg:      #ffffff;
+    -fx-dialog-header:  #f8fafc;
+
+    /* ── Stat Card ── */
+    -fx-stat-card-bg:   linear-gradient(to bottom right, #ffffff, #f1f5f9);
+
+    /* ── Alert Cards ── */
+    -fx-alert-card-bg:  linear-gradient(to right, #f8fafc, #eff6ff);
+
+    /* ── Header/Footer Bar ── */
+    -fx-bar-bg:         #ffffff;
+    -fx-bar-border:     #e2e8f0;
+
+    /* ── Voucher / Form Sections ── */
+    -fx-form-section-bg:  #f8fafc;
+    -fx-form-label:       #000000;
+    -fx-form-sublabel:    #333333;
+}

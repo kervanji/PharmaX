@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox spacing="20" stylesheets="@../styles/main.css"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 20;"
+      xmlns:fx="http://javafx.com/fxml" fx:controller="com.pharmax.controller.UserManagementController">
+    
+    <!-- Header -->
+    <HBox alignment="CENTER_RIGHT" spacing="15">
+        <Label text="👥 إدارة المستخدمين" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;" HBox.hgrow="ALWAYS"/>
+        
+        <Button text="🔄 تحديث" onAction="#handleRefresh"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8; -fx-cursor: hand;"/>
+        <Button text="➕ إضافة مستخدم" onAction="#handleAddUser"
+                style="-fx-background-color: -fx-accent-color; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8; -fx-cursor: hand;"/>
+    </HBox>
+    
+    <!-- Stats Cards -->
+    <HBox alignment="CENTER" spacing="20">
+        <VBox alignment="CENTER" spacing="5" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0, 0, 4);">
+            <Label text="إجمالي المستخدمين" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalUsersLabel" text="0" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-light;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="5" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0, 0, 4);">
+            <Label text="المدراء" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="adminCountLabel" text="0" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="5" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0, 0, 4);">
+            <Label text="البائعون" style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="sellerCountLabel" text="0" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: -fx-warning;"/>
+        </VBox>
+    </HBox>
+    
+    <!-- Users Table -->
+    <VBox VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 10, 0, 0, 4);">
+        <padding>
+            <Insets top="10" right="10" bottom="10" left="10"/>
+        </padding>
+        
+        <TableView fx:id="usersTable" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
+            <columns>
+                <TableColumn fx:id="usernameColumn" text="اسم المستخدم" prefWidth="120"/>
+                <TableColumn fx:id="displayNameColumn" text="الاسم المعروض" prefWidth="150"/>
+                <TableColumn fx:id="roleColumn" text="الدور" prefWidth="100"/>
+                <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="100"/>
+                <TableColumn fx:id="lastLoginColumn" text="آخر دخول" prefWidth="150"/>
+                <TableColumn fx:id="actionsColumn" text="الإجراءات" prefWidth="180"/>
+            </columns>
+            <placeholder>
+                <Label text="لا يوجد مستخدمين" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 14px;"/>
+            </placeholder>
+        </TableView>
+    </VBox>
+    
+</VBox>

@@ -1,0 +1,34 @@
+# OS files
+.DS_Store
+
+# outputs
+distribution/
+installer/
+installer-output/
+Compiler/
+target/
+distribution-mac/
+receipts/
+voucher_receipts/
+javafx-jmods-17.0.10/
+
+
+# binaries
+*.exe
+*.jar
+
+# local db
+*.db
+
+*.db-wal
+*.db-shm
+
+voucher_receipts/*.pdf
+
+app_config.properties
+
+# JavaFX jmods (prefer downloading in build step)
+javafx-jmods-17.0.10/
+
+# secrets
+src/main/resources/credentials.json
