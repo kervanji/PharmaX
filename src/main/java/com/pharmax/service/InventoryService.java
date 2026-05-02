@@ -3,15 +3,21 @@ package com.pharmax.service;
 import com.pharmax.database.Repository.ProductRepository;
 import com.pharmax.model.Category;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public class InventoryService {
     private static final Logger logger = LoggerFactory.getLogger(InventoryService.class);
+    private final AccessControlService accessControlService = new AccessControlService();
+    private final AuditLogService auditLogService = new AuditLogService();
+    private static final double QTY_EPSILON = 1e-6;
     private final ProductRepository productRepository;
     private final CategoryService categoryService;
     private final ProductBatchService productBatchService;
@@ -82,18 +88,117 @@ public class InventoryService {
     public List<Product> getLowStockProducts() {
         return productRepository.findLowStock();
     }
+
+    public List<DataQualityAlert> getDataQualityAlerts() {
+        List<DataQualityAlert> alerts = new ArrayList<>();
+        for (Product product : productRepository.findAll()) {
+            if (product == null || product.getId() == null || !Boolean.TRUE.equals(product.getIsActive())) {
+                continue;
+            }
+
+            double quantityInStock = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
+            double batchTotal = productBatchService.getTotalBatchQuantity(product.getId());
+            List<ProductBatch> allBatches = productBatchService.getAllBatches(product.getId());
+
+            if (isBlank(product.getBarcode())) {
+                alerts.add(new DataQualityAlert(
+                        "MISSING_BARCODE",
+                        "بدون باركود",
+                        product,
+                        "المنتج محفوظ بدون باركود.",
+                        quantityInStock,
+                        batchTotal,
+                        allBatches.size(),
+                        null
+                ));
+            }
+
+            if (!hasPositiveValue(product.getUnitPrice()) && !hasPositiveValue(product.getUnitPriceUsd())) {
+                alerts.add(new DataQualityAlert(
+                        "MISSING_SALE_PRICE",
+                        "بدون سعر بيع",
+                        product,
+                        "لا يوجد سعر بيع مفرد بالدينار أو الدولار.",
+                        quantityInStock,
+                        batchTotal,
+                        allBatches.size(),
+                        null
+                ));
+            }
+
+            if (!hasPositiveValue(product.getCostPrice()) && !hasPositiveValue(product.getCostPriceUsd())) {
+                alerts.add(new DataQualityAlert(
+                        "MISSING_COST_PRICE",
+                        "بدون سعر تكلفة",
+                        product,
+                        "لا يوجد سعر تكلفة بالدينار أو الدولار.",
+                        quantityInStock,
+                        batchTotal,
+                        allBatches.size(),
+                        null
+                ));
+            }
+
+            if (quantityInStock > 0 && allBatches.isEmpty()) {
+                alerts.add(new DataQualityAlert(
+                        "NO_BATCH_RECORDS",
+                        "بدون دفعات",
+                        product,
+                        "المنتج لديه مخزون ملخص لكن لا توجد له أي سجلات دفعات.",
+                        quantityInStock,
+                        batchTotal,
+                        0,
+                        null
+                ));
+            }
+
+            if (quantityInStock < 0) {
+                alerts.add(new DataQualityAlert(
+                        "NEGATIVE_QUANTITY",
+                        "كمية سالبة",
+                        product,
+                        "الكمية الحالية سالبة ويجب مراجعتها.",
+                        quantityInStock,
+                        batchTotal,
+                        allBatches.size(),
+                        null
+                ));
+            }
+
+            double mismatch = quantityInStock - batchTotal;
+            if (Math.abs(mismatch) > QTY_EPSILON) {
+                alerts.add(new DataQualityAlert(
+                        "QUANTITY_MISMATCH",
+                        "عدم تطابق الكمية",
+                        product,
+                        "الكمية الظاهرة لا تساوي مجموع كميات الدفعات.",
+                        quantityInStock,
+                        batchTotal,
+                        allBatches.size(),
+                        mismatch
+                ));
+            }
+        }
+        return alerts;
+    }
     
     public void deleteProduct(Long id) {
+        accessControlService.requireProductEdit("PRODUCT_DELETE", "product", id);
+        auditLogService.record("PRODUCT_DELETED", "product", id, "تم حذف المنتج من خلال خدمة المخزون");
         logger.info("Deleting product: {}", id);
         productRepository.deleteById(id);
     }
     
     public void deleteProduct(Product product) {
+        accessControlService.requireProductEdit("PRODUCT_DELETE", "product", product != null ? product.getId() : null);
+        auditLogService.record("PRODUCT_DELETED", "product", product != null ? product.getId() : null,
+                product != null ? "تم حذف المنتج: " + product.getName() : "تم حذف منتج");
         logger.info("Deleting product: {}", product.getId());
         productRepository.delete(product);
     }
     
     public Product addStock(Long productId, Double quantity) {
+        accessControlService.requireProductEdit("MANUAL_STOCK_ADD", "product", productId);
         if (quantity <= 0) {
             throw new IllegalArgumentException("الكمية يجب أن تكون أكبر من صفر");
         }
@@ -102,6 +207,8 @@ public class InventoryService {
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
             product.setQuantityInStock(product.getQuantityInStock() + quantity);
+            auditLogService.record("MANUAL_STOCK_ADJUSTMENT", "product", product.getId(),
+                    "إضافة مخزون يدوي بمقدار " + quantity + " للمنتج " + product.getName());
             logger.info("Added {} units to product: {}", quantity, product.getName());
             return productRepository.save(product);
         }
@@ -109,6 +216,7 @@ public class InventoryService {
     }
     
     public Product removeStock(Long productId, Double quantity) {
+        accessControlService.requireProductEdit("MANUAL_STOCK_REMOVE", "product", productId);
         if (quantity <= 0) {
             throw new IllegalArgumentException("الكمية يجب أن تكون أكبر من صفر");
         }
@@ -122,6 +230,8 @@ public class InventoryService {
                 throw new IllegalArgumentException("الكمية المطلوبة غير متوفرة في المخزون");
             }
             product.setQuantityInStock(currentStock - quantity);
+            auditLogService.record("MANUAL_STOCK_ADJUSTMENT", "product", product.getId(),
+                    "خصم مخزون يدوي بمقدار " + quantity + " من المنتج " + product.getName());
             logger.info("Removed {} units from product: {}", quantity, product.getName());
             return productRepository.save(product);
         }
@@ -198,6 +308,10 @@ public class InventoryService {
     private boolean hasPositiveValue(Double value) {
         return value != null && value > 0;
     }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
     
     public List<String> getAllCategories() {
         return categoryService.getActiveCategories().stream()
@@ -242,5 +356,72 @@ public class InventoryService {
 
     public Product syncProductQuantityFromBatches(Long productId) {
         return productBatchService.syncProductSummaryQuantity(productId);
+    }
+
+    public static class DataQualityAlert {
+        private final String typeCode;
+        private final String typeLabel;
+        private final Product product;
+        private final String message;
+        private final double quantityInStock;
+        private final double batchTotalQuantity;
+        private final int batchRecordCount;
+        private final Double mismatchQuantity;
+        private final LocalDateTime createdAt;
+
+        public DataQualityAlert(String typeCode,
+                                String typeLabel,
+                                Product product,
+                                String message,
+                                double quantityInStock,
+                                double batchTotalQuantity,
+                                int batchRecordCount,
+                                Double mismatchQuantity) {
+            this.typeCode = typeCode;
+            this.typeLabel = typeLabel;
+            this.product = product;
+            this.message = message;
+            this.quantityInStock = quantityInStock;
+            this.batchTotalQuantity = batchTotalQuantity;
+            this.batchRecordCount = batchRecordCount;
+            this.mismatchQuantity = mismatchQuantity;
+            this.createdAt = LocalDateTime.now();
+        }
+
+        public String getTypeCode() {
+            return typeCode;
+        }
+
+        public String getTypeLabel() {
+            return typeLabel;
+        }
+
+        public Product getProduct() {
+            return product;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public double getQuantityInStock() {
+            return quantityInStock;
+        }
+
+        public double getBatchTotalQuantity() {
+            return batchTotalQuantity;
+        }
+
+        public int getBatchRecordCount() {
+            return batchRecordCount;
+        }
+
+        public Double getMismatchQuantity() {
+            return mismatchQuantity;
+        }
+
+        public LocalDateTime getCreatedAt() {
+            return createdAt;
+        }
     }
 }

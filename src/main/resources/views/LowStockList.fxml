@@ -19,6 +19,8 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Button text="تحديث" onAction="#handleRefresh"
                 style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20; -fx-background-radius: 10;"/>
+        <Button fx:id="dataQualityAlertsButton" text="تنبيهات الجودة" onAction="#handleDataQualityAlerts"
+                style="-fx-background-color: -fx-badge-warning-bg; -fx-text-fill: -fx-warning-dark; -fx-border-color: -fx-warning-dark; -fx-border-radius: 10; -fx-font-size: 14px; -fx-padding: 10 16; -fx-background-radius: 10;"/>
         <Button text="تصدير التقرير" onAction="#handleExport"
                 style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 10; -fx-font-size: 14px; -fx-padding: 10 16; -fx-background-radius: 10; -fx-border-color: -fx-border-input; -fx-border-radius: 10;"/>
     </HBox>
@@ -59,6 +61,8 @@
     </TableView>
     
     <HBox alignment="CENTER_RIGHT" spacing="12">
+        <Label fx:id="dataQualityCountLabel" text="لا توجد تنبيهات جودة بيانات" style="-fx-font-size: 13px; -fx-text-fill: -fx-success-text;"/>
+        <Region HBox.hgrow="ALWAYS"/>
         <Label fx:id="lastUpdateLabel" text="آخر تحديث: --" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
     </HBox>
 </VBox>

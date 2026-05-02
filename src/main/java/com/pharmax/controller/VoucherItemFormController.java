@@ -42,7 +42,10 @@ public class VoucherItemFormController {
     }
 
     private void loadUnitsOfMeasure() {
-        List<String> units = Arrays.asList("قطعة", "كيلو", "متر", "لتر", "علبة", "كرتون", "طن", "جرام");
+        List<String> units = Arrays.asList(
+                "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
+                "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
+                "حقنة", "مل", "جرام", "قطعة");
         unitOfMeasureCombo.setItems(FXCollections.observableArrayList(units));
     }
 

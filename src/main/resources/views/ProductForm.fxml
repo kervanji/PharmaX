@@ -56,10 +56,22 @@
                 <ComboBox fx:id="unitOfMeasureComboBox" GridPane.rowIndex="4" GridPane.columnIndex="1"
                           maxWidth="Infinity" promptText="اختر وحدة القياس"
                           style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
-                          
-                <Label text="الحالة:" GridPane.rowIndex="5" GridPane.columnIndex="0"
+
+                <Label text="تاريخ الانتهاء:" GridPane.rowIndex="5" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <CheckBox fx:id="isActiveCheckBox" GridPane.rowIndex="5" GridPane.columnIndex="1"
+                <DatePicker fx:id="expiryDatePicker" GridPane.rowIndex="5" GridPane.columnIndex="1"
+                            promptText="اختياري"
+                            style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+
+                <Label text="عدد الشرائط في العلبة:" GridPane.rowIndex="6" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="stripsPerBoxField" GridPane.rowIndex="6" GridPane.columnIndex="1"
+                           promptText="مثلاً 2 أو 3"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                          
+                <Label text="الحالة:" GridPane.rowIndex="7" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <CheckBox fx:id="isActiveCheckBox" GridPane.rowIndex="7" GridPane.columnIndex="1"
                           text="نشط" selected="true"
                           style="-fx-font-size: 14px;"/>
             </GridPane>

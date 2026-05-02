@@ -43,15 +43,20 @@ public class ReturnService {
     @SuppressWarnings("unused") private final InventoryService inventoryService;
     private final ProductBatchService productBatchService;
     private final InventoryMovementService inventoryMovementService;
+    private final AccessControlService accessControlService;
+    private final AuditLogService auditLogService;
 
     public ReturnService() {
         this.returnRepository = new SaleReturnRepository();
         this.inventoryService = new InventoryService();
         this.productBatchService = new ProductBatchService();
         this.inventoryMovementService = new InventoryMovementService();
+        this.accessControlService = new AccessControlService();
+        this.auditLogService = new AuditLogService();
     }
 
     public SaleReturn createReturn(Sale sale, List<ReturnItem> items, String reason, String processedBy) {
+        accessControlService.requireInvoiceDeletionPrivilege("SALE_RETURN_CREATE", "sale", sale != null ? sale.getId() : null);
         Transaction transaction = null;
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             Sale managedSale = session.get(Sale.class, sale != null ? sale.getId() : null);
@@ -175,6 +180,8 @@ public class ReturnService {
             // (moves the balance toward zero). For fully paid sales it creates a customer credit
             // until the cash refund is settled elsewhere.
             applyCustomerBalanceCorrection(managedSale.getCustomer(), totalReturnAmount, managedSale.getCurrency());
+            auditLogService.record(session, "SALE_RETURN_CREATED", "sale_return", saleReturn.getId(),
+                    "تم إنشاء مرتجع بيع للفواتير رقم " + managedSale.getSaleCode() + " بمبلغ " + totalReturnAmount);
 
             transaction.commit();
             logger.info("Created return: {} with amount: {}", saleReturn.getReturnCode(), totalReturnAmount);

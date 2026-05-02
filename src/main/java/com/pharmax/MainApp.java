@@ -324,12 +324,11 @@ public class MainApp extends Application {
         }
         System.out.println("[RESTORE] Found pending restore file: " + pendingRestore.getAbsolutePath());
         try {
+            com.pharmax.service.BackupRestoreService backupRestoreService = new com.pharmax.service.BackupRestoreService();
+            backupRestoreService.validateBackupFile(pendingRestore);
             java.io.File currentDb = new java.io.File("pharmax.db");
-            // Backup current DB before replacing
-            if (currentDb.exists()) {
-                java.io.File backup = new java.io.File("PharmaX_before_restore.db");
-                java.nio.file.Files.copy(currentDb.toPath(), backup.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            java.io.File backup = backupRestoreService.createPreRestoreSafetyBackup();
+            if (backup != null) {
                 System.out.println("[RESTORE] Backed up current DB to: " + backup.getAbsolutePath());
             }
             // Delete WAL and SHM files first (they hold locks)

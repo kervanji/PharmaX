@@ -27,7 +27,10 @@ public class DatabaseManager {
             "db/migrations/20260501_opening_batches.sql",
             "db/migrations/20260501_purchase_batch_fields.sql",
             "db/migrations/20260501_sales_fefo_foundation.sql",
-            "db/migrations/20260501_sales_return_batches.sql");
+            "db/migrations/20260501_sales_return_batches.sql",
+            "db/migrations/20260502_purchase_returns.sql",
+            "db/migrations/20260502_cashbox_foundation.sql",
+            "db/migrations/20260502_permissions_audit.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -703,6 +706,103 @@ public class DatabaseManager {
                     )
                 """);
 
+        // Purchase returns table
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS purchase_returns (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        customer_id INTEGER,
+                        source_voucher_id INTEGER,
+                        return_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        currency TEXT DEFAULT 'دينار',
+                        total_amount REAL NOT NULL DEFAULT 0,
+                        notes TEXT,
+                        created_by TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (customer_id) REFERENCES customers(id),
+                        FOREIGN KEY (source_voucher_id) REFERENCES vouchers(id)
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS purchase_return_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        purchase_return_id INTEGER NOT NULL,
+                        source_voucher_item_id INTEGER,
+                        product_id INTEGER,
+                        batch_id INTEGER,
+                        batch_number_snapshot TEXT,
+                        expiration_date_snapshot TEXT,
+                        quantity REAL NOT NULL DEFAULT 0,
+                        unit_cost REAL,
+                        line_total REAL,
+                        reason TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns(id),
+                        FOREIGN KEY (source_voucher_item_id) REFERENCES voucher_items(id),
+                        FOREIGN KEY (product_id) REFERENCES products(id),
+                        FOREIGN KEY (batch_id) REFERENCES product_batches(id)
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS cashbox_ledger (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        entry_type TEXT NOT NULL,
+                        direction TEXT NOT NULL,
+                        amount REAL NOT NULL DEFAULT 0,
+                        currency TEXT DEFAULT 'دينار',
+                        source_type TEXT,
+                        source_id INTEGER,
+                        source_item_id INTEGER DEFAULT 0,
+                        customer_id INTEGER,
+                        supplier_id INTEGER,
+                        account_id INTEGER,
+                        payment_method TEXT,
+                        description TEXT,
+                        created_by TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        voided BOOLEAN DEFAULT 0,
+                        void_reason TEXT,
+                        FOREIGN KEY (customer_id) REFERENCES customers(id),
+                        FOREIGN KEY (supplier_id) REFERENCES customers(id),
+                        FOREIGN KEY (account_id) REFERENCES customers(id)
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS daily_closings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        closing_date DATE NOT NULL UNIQUE,
+                        opening_cash REAL DEFAULT 0,
+                        total_cash_in REAL DEFAULT 0,
+                        total_cash_out REAL DEFAULT 0,
+                        expected_cash REAL DEFAULT 0,
+                        actual_cash REAL DEFAULT 0,
+                        difference_amount REAL DEFAULT 0,
+                        closed_by TEXT,
+                        closed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        notes TEXT,
+                        status TEXT DEFAULT 'CLOSED'
+                    )
+                """);
+
+        stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        action_type TEXT NOT NULL,
+                        entity_type TEXT NOT NULL,
+                        entity_id INTEGER,
+                        user_id INTEGER,
+                        username_snapshot TEXT,
+                        role_snapshot TEXT,
+                        details TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(id)
+                    )
+                """);
+
         // Installments table (الأقساط)
         stmt.execute("""
                     CREATE TABLE IF NOT EXISTS installments (
@@ -768,6 +868,23 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_inventory_movements_reference_item ON inventory_movements(reference_item_id)",
             "CREATE INDEX IF NOT EXISTS idx_inventory_movements_created_at ON inventory_movements(created_at)",
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_movements_item_batch_ref ON inventory_movements(movement_type, reference_type, reference_id, reference_item_id, batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_returns_customer ON purchase_returns(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_returns_voucher ON purchase_returns(source_voucher_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_returns_date ON purchase_returns(return_date)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_return_items_return ON purchase_return_items(purchase_return_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_return_items_source_item ON purchase_return_items(source_voucher_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_purchase_return_items_batch ON purchase_return_items(batch_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cashbox_ledger_date ON cashbox_ledger(transaction_date)",
+            "CREATE INDEX IF NOT EXISTS idx_cashbox_ledger_entry_type ON cashbox_ledger(entry_type)",
+            "CREATE INDEX IF NOT EXISTS idx_cashbox_ledger_source ON cashbox_ledger(source_type, source_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cashbox_ledger_customer ON cashbox_ledger(customer_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cashbox_ledger_supplier ON cashbox_ledger(supplier_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_cashbox_ledger_source_entry ON cashbox_ledger(entry_type, source_type, source_id, source_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_daily_closings_date ON daily_closings(closing_date)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_action_type ON audit_log(action_type)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_installments_voucher ON installments(parent_voucher_id)",
             "CREATE INDEX IF NOT EXISTS idx_installments_due_date ON installments(due_date)"
         };
@@ -817,6 +934,11 @@ public class DatabaseManager {
             configuration.addAnnotatedClass(com.pharmax.model.Installment.class);
             configuration.addAnnotatedClass(com.pharmax.model.ProductBatch.class);
             configuration.addAnnotatedClass(com.pharmax.model.InventoryMovement.class);
+            configuration.addAnnotatedClass(com.pharmax.model.PurchaseReturn.class);
+            configuration.addAnnotatedClass(com.pharmax.model.PurchaseReturnItem.class);
+            configuration.addAnnotatedClass(com.pharmax.model.CashboxLedger.class);
+            configuration.addAnnotatedClass(com.pharmax.model.DailyClosing.class);
+            configuration.addAnnotatedClass(com.pharmax.model.AuditLog.class);
 
             sessionFactory = configuration.buildSessionFactory();
             logger.info("Hibernate configured successfully");
@@ -837,6 +959,7 @@ public class DatabaseManager {
     public static void shutdown() {
         if (sessionFactory != null) {
             sessionFactory.close();
+            sessionFactory = null;
             logger.info("Database connection closed");
         }
     }

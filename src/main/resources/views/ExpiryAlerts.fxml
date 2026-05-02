@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.ExpiryAlertsController"
+      stylesheets="@../styles/main.css"
+      spacing="16"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 24;">
+
+    <HBox alignment="CENTER_LEFT" spacing="16">
+        <VBox spacing="4">
+            <Label text="تنبيهات الانتهاء"
+                   style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+            <Label text="الدفعات المنتهية أو القريبة من الانتهاء خلال 90 يوماً"
+                   style="-fx-font-size: 14px; -fx-text-fill: -fx-form-sublabel;"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="التصفية:" style="-fx-font-size: 14px;"/>
+        <ComboBox fx:id="filterComboBox" prefWidth="160"
+                  style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+        <Button text="تحديث" onAction="#handleRefresh"
+                style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20; -fx-background-radius: 10;"/>
+    </HBox>
+
+    <HBox spacing="16">
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-danger-bg; -fx-padding: 16; -fx-background-radius: 12; -fx-border-color: -fx-danger; -fx-border-radius: 12;">
+            <Label text="دفعات منتهية" style="-fx-font-size: 13px; -fx-text-fill: -fx-danger-text;"/>
+            <Label fx:id="expiredCountLabel" text="0" style="-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-badge-warning-bg; -fx-padding: 16; -fx-background-radius: 12; -fx-border-color: -fx-warning-dark; -fx-border-radius: 12;">
+            <Label text="تنتهي خلال 30 يوم" style="-fx-font-size: 13px; -fx-text-fill: -fx-warning-dark;"/>
+            <Label fx:id="expiringSoonCountLabel" text="0" style="-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-dark;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-success-bg; -fx-padding: 16; -fx-background-radius: 12; -fx-border-color: -fx-success-dark; -fx-border-radius: 12;">
+            <Label text="عدد السجلات المعروضة" style="-fx-font-size: 13px; -fx-text-fill: -fx-success-dark;"/>
+            <Label fx:id="alertWindowLabel" text="0" style="-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: -fx-success-dark;"/>
+        </VBox>
+    </HBox>
+
+    <TableView fx:id="expiryTable" VBox.vgrow="ALWAYS"
+               style="-fx-background-radius: 12; -fx-border-radius: 12;">
+        <columns>
+            <TableColumn fx:id="productNameColumn" text="اسم المنتج" prefWidth="220"/>
+            <TableColumn fx:id="productCodeColumn" text="الكود" prefWidth="100"/>
+            <TableColumn fx:id="barcodeColumn" text="الباركود" prefWidth="120"/>
+            <TableColumn fx:id="batchNumberColumn" text="رقم التشغيلة" prefWidth="120"/>
+            <TableColumn fx:id="expirationDateColumn" text="تاريخ الانتهاء" prefWidth="120"/>
+            <TableColumn fx:id="daysRemainingColumn" text="الأيام المتبقية" prefWidth="120"/>
+            <TableColumn fx:id="quantityColumn" text="الكمية" prefWidth="100"/>
+            <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="180"/>
+        </columns>
+        <placeholder>
+            <Label text="لا توجد دفعات مطابقة لهذا الفلتر" style="-fx-font-size: 16px; -fx-text-fill: -fx-success-text;"/>
+        </placeholder>
+    </TableView>
+
+    <HBox alignment="CENTER_RIGHT" spacing="12">
+        <Label fx:id="lastUpdateLabel" text="آخر تحديث: --" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
+    </HBox>
+</VBox>

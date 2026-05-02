@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,10 +21,14 @@ public class ProductBatchService {
     private static final Logger logger = LoggerFactory.getLogger(ProductBatchService.class);
     private final ProductBatchRepository productBatchRepository;
     private final ProductRepository productRepository;
+    private final AccessControlService accessControlService;
+    private final AuditLogService auditLogService;
 
     public ProductBatchService() {
         this.productBatchRepository = new ProductBatchRepository();
         this.productRepository = new ProductRepository();
+        this.accessControlService = new AccessControlService();
+        this.auditLogService = new AuditLogService();
     }
 
     public List<ProductBatch> getAvailableBatches(Long productId) {
@@ -37,6 +43,36 @@ public class ProductBatchService {
             throw new IllegalArgumentException("المنتج غير موجود");
         }
         return productBatchRepository.findByProductId(productId);
+    }
+
+    public List<ProductBatch> getExpiredBatches(LocalDate today) {
+        LocalDate effectiveToday = today != null ? today : LocalDate.now();
+        return filterExpiryCandidates(productBatchRepository.findAll()).stream()
+                .filter(batch -> batch.getExpiryDate().isBefore(effectiveToday))
+                .sorted(expiryComparator())
+                .toList();
+    }
+
+    public List<ProductBatch> getExpiringBatchesWithinDays(int days, LocalDate today) {
+        if (days <= 0) {
+            return List.of();
+        }
+        LocalDate effectiveToday = today != null ? today : LocalDate.now();
+        LocalDate limitDate = effectiveToday.plusDays(days);
+        return filterExpiryCandidates(productBatchRepository.findAll()).stream()
+                .filter(batch -> !batch.getExpiryDate().isBefore(effectiveToday))
+                .filter(batch -> !batch.getExpiryDate().isAfter(limitDate))
+                .sorted(expiryComparator())
+                .toList();
+    }
+
+    public List<ProductBatch> getExpiryAlertBatches(LocalDate today) {
+        LocalDate effectiveToday = today != null ? today : LocalDate.now();
+        LocalDate maxWindow = effectiveToday.plusDays(90);
+        return filterExpiryCandidates(productBatchRepository.findAll()).stream()
+                .filter(batch -> batch.getExpiryDate().isBefore(effectiveToday) || !batch.getExpiryDate().isAfter(maxWindow))
+                .sorted(expiryComparator())
+                .toList();
     }
 
     public double getTotalBatchQuantity(Long productId) {
@@ -61,6 +97,7 @@ public class ProductBatchService {
                                             String currency,
                                             Customer supplierCustomer,
                                             Boolean isOpeningBatch) {
+        accessControlService.requireProductEdit("BATCH_CORRECTION", "product_batch", null);
         if (product == null || product.getId() == null) {
             throw new IllegalArgumentException("المنتج يجب أن يكون محفوظاً قبل إدارة الدفعات");
         }
@@ -106,7 +143,25 @@ public class ProductBatchService {
 
         ProductBatch saved = productBatchRepository.save(batch);
         syncProductSummaryQuantity(product.getId());
+        auditLogService.record("BATCH_CORRECTION", "product_batch", saved.getId(),
+                "تعديل يدوي على دفعة " + saved.getBatchNumber() + " للمنتج " + product.getName());
         logger.info("Batch {} synced for product {}", saved.getBatchNumber(), product.getName());
+        return saved;
+    }
+
+    public ProductBatch updateBatchExpiry(ProductBatch batch, LocalDate expiryDate) {
+        accessControlService.requireProductEdit("BATCH_EXPIRY_UPDATE", "product_batch", batch != null ? batch.getId() : null);
+        if (batch == null || batch.getId() == null) {
+            throw new IllegalArgumentException("الدفعة غير موجودة");
+        }
+        batch.setExpiryDate(expiryDate);
+        batch.setUpdatedAt(LocalDateTime.now());
+        ProductBatch saved = productBatchRepository.save(batch);
+        if (saved.getProduct() != null && saved.getProduct().getId() != null) {
+            syncProductSummaryQuantity(saved.getProduct().getId());
+        }
+        auditLogService.record("BATCH_EXPIRY_UPDATED", "product_batch", saved.getId(),
+                "تم تحديث صلاحية الدفعة " + saved.getBatchNumber() + " إلى " + (expiryDate != null ? expiryDate : "-"));
         return saved;
     }
 
@@ -216,6 +271,33 @@ public class ProductBatchService {
                 .filter(batch -> batch.getQuantity() != null && batch.getQuantity() > 0)
                 .filter(batch -> batch.getExpiryDate() == null || !batch.getExpiryDate().isBefore(effectiveToday))
                 .toList();
+    }
+
+    private List<ProductBatch> filterExpiryCandidates(List<ProductBatch> batches) {
+        List<ProductBatch> filtered = new ArrayList<>();
+        for (ProductBatch batch : batches) {
+            if (batch == null) {
+                continue;
+            }
+            if (!"ACTIVE".equalsIgnoreCase(batch.getStatus())) {
+                continue;
+            }
+            if (batch.getQuantity() == null || batch.getQuantity() <= 0) {
+                continue;
+            }
+            if (batch.getExpiryDate() == null) {
+                continue;
+            }
+            filtered.add(batch);
+        }
+        return filtered;
+    }
+
+    private Comparator<ProductBatch> expiryComparator() {
+        return Comparator
+                .comparing(ProductBatch::getExpiryDate)
+                .thenComparing(batch -> batch.getCreatedAt() != null ? batch.getCreatedAt() : LocalDateTime.MIN)
+                .thenComparing(batch -> batch.getId() != null ? batch.getId() : Long.MAX_VALUE);
     }
 
     public Optional<ProductBatch> findByProductIdAndBatchNumber(Session session, Long productId, String batchNumber) {

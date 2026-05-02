@@ -32,12 +32,18 @@ public class VoucherService {
     @SuppressWarnings("unused") private final InventoryService inventoryService;
     private final ProductBatchService productBatchService;
     private final InventoryMovementService inventoryMovementService;
+    private final CashboxService cashboxService;
+    private final AccessControlService accessControlService;
+    private final AuditLogService auditLogService;
     
     public VoucherService() {
         this.customerService = new CustomerService();
         this.inventoryService = new InventoryService();
         this.productBatchService = new ProductBatchService();
         this.inventoryMovementService = new InventoryMovementService();
+        this.cashboxService = new CashboxService();
+        this.accessControlService = new AccessControlService();
+        this.auditLogService = new AuditLogService();
     }
 
     public File generateVoucherReceiptPdf(Long voucherId, String printedBy) {
@@ -457,6 +463,8 @@ public class VoucherService {
                     }
                 }
             }
+
+            postCashboxEntryIfApplicable(session, voucher);
             
             transaction.commit();
             logger.info("Voucher saved successfully: {}", voucher.getVoucherNumber());
@@ -528,6 +536,8 @@ public class VoucherService {
                     }
                 }
             }
+
+            postCashboxEntryIfApplicable(session, voucher);
             
             transaction.commit();
             logger.info("Voucher with installments saved: {}", voucher.getVoucherNumber());
@@ -672,6 +682,7 @@ public class VoucherService {
     
     // إلغاء سند
     public Voucher cancelVoucher(Long voucherId, String cancelledBy, String reason) {
+        accessControlService.requireInvoiceDeletionPrivilege("VOUCHER_CANCEL", "voucher", voucherId);
         logger.info("Cancelling voucher: {}", voucherId);
         
         Transaction transaction = null;
@@ -694,6 +705,8 @@ public class VoucherService {
             }
             
             session.update(voucher);
+            auditLogService.record(session, "VOUCHER_CANCELLED", "voucher", voucher.getId(),
+                    "تم إلغاء السند " + voucher.getVoucherNumber() + (reason != null && !reason.isBlank() ? " :: " + reason : ""));
             transaction.commit();
             
             return voucher;
@@ -996,6 +1009,57 @@ public class VoucherService {
 
         for (Long productId : touchedProductIds.stream().distinct().toList()) {
             productBatchService.syncProductSummaryQuantity(session, productId);
+        }
+    }
+
+    private void postCashboxEntryIfApplicable(Session session, Voucher voucher) {
+        if (voucher == null || voucher.getId() == null) {
+            return;
+        }
+        String currency = voucher.getCurrency() != null ? voucher.getCurrency() : "دينار";
+        LocalDateTime transactionDate = voucher.getVoucherDate() != null ? voucher.getVoucherDate() : LocalDateTime.now();
+        String createdBy = voucher.getCreatedBy();
+        long sourceItemId = 0L;
+
+        if (voucher.getVoucherType() == VoucherType.RECEIPT) {
+            cashboxService.recordEntry(
+                    session,
+                    transactionDate,
+                    "customer_payment",
+                    "IN",
+                    voucher.getNetAmount(),
+                    currency,
+                    "voucher_receipt",
+                    voucher.getId(),
+                    sourceItemId,
+                    voucher.getCustomer(),
+                    null,
+                    voucher.getCustomer(),
+                    "CASH",
+                    "سند قبض نقدي رقم " + voucher.getVoucherNumber(),
+                    createdBy
+            );
+            return;
+        }
+
+        if (voucher.getVoucherType() == VoucherType.PAYMENT && !Boolean.TRUE.equals(voucher.getIsInstallment())) {
+            cashboxService.recordEntry(
+                    session,
+                    transactionDate,
+                    "supplier_payment",
+                    "OUT",
+                    voucher.getNetAmount(),
+                    currency,
+                    "voucher_payment",
+                    voucher.getId(),
+                    sourceItemId,
+                    null,
+                    voucher.getCustomer(),
+                    voucher.getCustomer(),
+                    "CASH",
+                    "سند دفع نقدي رقم " + voucher.getVoucherNumber(),
+                    createdBy
+            );
         }
     }
 

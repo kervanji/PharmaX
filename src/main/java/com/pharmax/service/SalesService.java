@@ -30,6 +30,9 @@ public class SalesService {
     private final CustomerService customerService;
     private final ProductBatchService productBatchService;
     private final InventoryMovementService inventoryMovementService;
+    private final CashboxService cashboxService;
+    private final AccessControlService accessControlService;
+    private final AuditLogService auditLogService;
     
     public SalesService() {
         this.saleRepository = new SaleRepository();
@@ -40,6 +43,9 @@ public class SalesService {
         this.customerService = new CustomerService();
         this.productBatchService = new ProductBatchService();
         this.inventoryMovementService = new InventoryMovementService();
+        this.cashboxService = new CashboxService();
+        this.accessControlService = new AccessControlService();
+        this.auditLogService = new AuditLogService();
     }
     
     public Sale createSale(SaleRequest saleRequest) {
@@ -132,6 +138,25 @@ public class SalesService {
             updateCustomerBalanceInSession(customer, paidAmount - sale.getFinalAmount(), sale.getCurrency());
             sale.setSaleItems(savedItems);
 
+            if ("CASH".equalsIgnoreCase(sale.getPaymentMethod()) && paidAmount > 0) {
+                cashboxService.recordEntry(
+                        session,
+                        sale.getSaleDate(),
+                        "cash_sale",
+                        "IN",
+                        paidAmount,
+                        sale.getCurrency(),
+                        "sale",
+                        sale.getId(),
+                        0L,
+                        customer,
+                        null,
+                        null,
+                        "CASH",
+                        "مقبوض نقدي من فاتورة بيع " + sale.getSaleCode(),
+                        sale.getCreatedBy());
+            }
+
             transaction.commit();
             logger.info("Sale created successfully: {}", sale.getSaleCode());
             return sale;
@@ -177,6 +202,7 @@ public class SalesService {
     }
     
     public void deleteSale(Long id) {
+        accessControlService.requireInvoiceDeletionPrivilege("SALE_DELETE", "sale", id);
         Optional<Sale> saleOpt = saleRepository.findById(id);
         if (saleOpt.isPresent()) {
             Sale sale = saleOpt.get();
@@ -207,6 +233,8 @@ public class SalesService {
             );
             
             saleRepository.delete(sale);
+            auditLogService.record("SALE_DELETED", "sale", id,
+                    "تم حذف فاتورة البيع " + sale.getSaleCode());
             logger.info("Sale deleted: {}", id);
         }
     }

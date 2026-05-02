@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.PharmacyReportsController"
+      stylesheets="@../styles/main.css"
+      spacing="16"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 20;">
+
+    <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label text="📊 التقارير" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="إغلاق" onAction="#handleClose"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8;"/>
+    </HBox>
+
+    <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
+        <tabs>
+            <Tab text="المخزون حسب الدفعة">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="بحث:"/>
+                            <TextField fx:id="stockSearchField" promptText="اسم المنتج أو الكود أو الباركود أو الدفعة" prefWidth="300"/>
+                            <Label text="الصلاحية:"/>
+                            <ComboBox fx:id="stockExpiryFilterComboBox" prefWidth="150"/>
+                            <Button text="تحديث" onAction="#handleRefreshStock"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="stockCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="stockByBatchTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="stockProductColumn" text="المنتج" prefWidth="170"/>
+                                <TableColumn fx:id="stockCodeColumn" text="الكود" prefWidth="90"/>
+                                <TableColumn fx:id="stockBarcodeColumn" text="الباركود" prefWidth="110"/>
+                                <TableColumn fx:id="stockBatchColumn" text="الدفعة" prefWidth="110"/>
+                                <TableColumn fx:id="stockExpiryColumn" text="الصلاحية" prefWidth="100"/>
+                                <TableColumn fx:id="stockQtyColumn" text="الكمية" prefWidth="90"/>
+                                <TableColumn fx:id="stockCostColumn" text="التكلفة" prefWidth="90"/>
+                                <TableColumn fx:id="stockSalePriceColumn" text="سعر البيع" prefWidth="90"/>
+                                <TableColumn fx:id="stockStatusColumn" text="الحالة" prefWidth="90"/>
+                                <TableColumn fx:id="stockSourceColumn" text="المصدر" prefWidth="140"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد دفعات مطابقة"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="الانتهاء">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="الفلتر:"/>
+                            <ComboBox fx:id="expiryFilterComboBox" prefWidth="150"/>
+                            <Button text="تحديث" onAction="#handleRefreshExpiry"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="expiryCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="expiryTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="expiryProductColumn" text="المنتج" prefWidth="220"/>
+                                <TableColumn fx:id="expiryCodeColumn" text="الكود" prefWidth="100"/>
+                                <TableColumn fx:id="expiryBatchColumn" text="الدفعة" prefWidth="110"/>
+                                <TableColumn fx:id="expiryDateColumn" text="تاريخ الانتهاء" prefWidth="120"/>
+                                <TableColumn fx:id="expiryDaysColumn" text="الأيام المتبقية" prefWidth="120"/>
+                                <TableColumn fx:id="expiryQtyColumn" text="الكمية" prefWidth="100"/>
+                                <TableColumn fx:id="expiryStatusColumn" text="الحالة" prefWidth="140"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد دفعات ضمن هذا الفلتر"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="حركات المخزون">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="من:"/>
+                            <DatePicker fx:id="movementFromDatePicker"/>
+                            <Label text="إلى:"/>
+                            <DatePicker fx:id="movementToDatePicker"/>
+                            <Label text="بحث:"/>
+                            <TextField fx:id="movementSearchField" promptText="منتج أو دفعة أو مرجع" prefWidth="220"/>
+                            <Label text="نوع الحركة:"/>
+                            <ComboBox fx:id="movementTypeComboBox" prefWidth="170"/>
+                            <Button text="تحديث" onAction="#handleRefreshMovements"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="movementCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="movementsTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="movementDateColumn" text="التاريخ" prefWidth="140"/>
+                                <TableColumn fx:id="movementProductColumn" text="المنتج" prefWidth="170"/>
+                                <TableColumn fx:id="movementBatchColumn" text="الدفعة" prefWidth="110"/>
+                                <TableColumn fx:id="movementTypeColumn" text="النوع" prefWidth="120"/>
+                                <TableColumn fx:id="movementBeforeColumn" text="قبل" prefWidth="80"/>
+                                <TableColumn fx:id="movementChangedColumn" text="التغير" prefWidth="80"/>
+                                <TableColumn fx:id="movementAfterColumn" text="بعد" prefWidth="80"/>
+                                <TableColumn fx:id="movementRefTypeColumn" text="المرجع" prefWidth="120"/>
+                                <TableColumn fx:id="movementRefIdColumn" text="رقم المرجع" prefWidth="90"/>
+                                <TableColumn fx:id="movementNoteColumn" text="ملاحظات" prefWidth="220"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد حركات ضمن الفلتر المحدد"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="المشتريات">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="من:"/>
+                            <DatePicker fx:id="purchaseFromDatePicker"/>
+                            <Label text="إلى:"/>
+                            <DatePicker fx:id="purchaseToDatePicker"/>
+                            <Label text="المورد:"/>
+                            <ComboBox fx:id="purchaseSupplierComboBox" promptText="الكل" prefWidth="220"/>
+                            <Label text="بحث:"/>
+                            <TextField fx:id="purchaseSearchField" promptText="منتج أو فاتورة أو دفعة" prefWidth="220"/>
+                            <Button text="تحديث" onAction="#handleRefreshPurchases"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="purchaseCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="purchasesTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="purchaseVoucherColumn" text="الفاتورة" prefWidth="140"/>
+                                <TableColumn fx:id="purchaseDateColumn" text="التاريخ" prefWidth="140"/>
+                                <TableColumn fx:id="purchaseSupplierColumn" text="المورد/الحساب" prefWidth="160"/>
+                                <TableColumn fx:id="purchaseProductColumn" text="المنتج" prefWidth="170"/>
+                                <TableColumn fx:id="purchaseQtyColumn" text="الكمية" prefWidth="90"/>
+                                <TableColumn fx:id="purchaseAmountColumn" text="المبلغ" prefWidth="100"/>
+                                <TableColumn fx:id="purchaseBatchColumn" text="الدفعة" prefWidth="110"/>
+                                <TableColumn fx:id="purchaseExpiryColumn" text="الصلاحية" prefWidth="110"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد مشتريات ضمن الفلتر المحدد"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="الربح">
+                <content>
+                    <VBox spacing="12" alignment="CENTER" style="-fx-padding: 24;">
+                        <Label text="تقرير الربح" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+                        <Label fx:id="profitStatusLabel" wrapText="true" maxWidth="700" style="-fx-font-size: 14px; -fx-text-alignment: center;"/>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="الصندوق">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="من:"/>
+                            <DatePicker fx:id="cashboxFromDatePicker"/>
+                            <Label text="إلى:"/>
+                            <DatePicker fx:id="cashboxToDatePicker"/>
+                            <Button text="تحديث" onAction="#handleRefreshCashbox"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد الأيام:"/>
+                            <Label fx:id="cashboxCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="cashboxTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="cashboxDateColumn" text="التاريخ" prefWidth="110"/>
+                                <TableColumn fx:id="cashboxOpeningColumn" text="الرصيد الافتتاحي" prefWidth="120"/>
+                                <TableColumn fx:id="cashboxInColumn" text="الداخل" prefWidth="100"/>
+                                <TableColumn fx:id="cashboxOutColumn" text="الخارج" prefWidth="100"/>
+                                <TableColumn fx:id="cashboxExpectedColumn" text="الرصيد المتوقع" prefWidth="120"/>
+                                <TableColumn fx:id="cashboxActualColumn" text="الرصيد الفعلي" prefWidth="120"/>
+                                <TableColumn fx:id="cashboxDifferenceColumn" text="الفرق" prefWidth="100"/>
+                                <TableColumn fx:id="cashboxStatusColumn" text="الحالة" prefWidth="100"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد بيانات صندوق ضمن الفترة المحددة"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+        </tabs>
+    </TabPane>
+</VBox>

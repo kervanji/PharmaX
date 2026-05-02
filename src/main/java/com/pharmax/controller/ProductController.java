@@ -2,9 +2,11 @@ package com.pharmax.controller;
 
 import com.pharmax.model.Category;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductBatch;
 import com.pharmax.model.ProductUnit;
 import com.pharmax.service.CategoryService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.ProductUnitService;
 import com.pharmax.util.SessionManager;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -18,6 +20,8 @@ import javafx.stage.Stage;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -68,6 +72,10 @@ public class ProductController {
     @FXML
     private ComboBox<String> unitOfMeasureComboBox;
     @FXML
+    private DatePicker expiryDatePicker;
+    @FXML
+    private TextField stripsPerBoxField;
+    @FXML
     private ComboBox<String> baseUnitComboBox;
     @FXML
     private TableView<ProductUnitRow> packagingTable;
@@ -108,6 +116,7 @@ public class ProductController {
     private Double originalUnitPrice = null; // Store original selling price for sellers who can't edit it
     private final InventoryService inventoryService = new InventoryService();
     private final CategoryService categoryService = new CategoryService();
+    private final ProductBatchService productBatchService = new ProductBatchService();
     private final ProductUnitService productUnitService = new ProductUnitService();
     private final ObservableList<ProductUnitRow> packagingRows = FXCollections.observableArrayList();
     private final DecimalFormat numberFormat;
@@ -178,14 +187,17 @@ public class ProductController {
     }
 
     private void loadUnitsOfMeasure() {
-        List<String> units = Arrays.asList("قطعة", "شريط", "علبة", "كرتون", "كيلو", "متر", "لتر", "طن", "جرام");
+        List<String> units = Arrays.asList(
+                "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
+                "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
+                "حقنة", "مل", "جرام", "قطعة");
         unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(units));
         if (baseUnitComboBox != null) {
             baseUnitComboBox.setItems(FXCollections.observableArrayList(units));
-            baseUnitComboBox.setValue("قطعة");
+            baseUnitComboBox.setValue("شريط");
         }
         if (unitOfMeasureComboBox.getValue() == null) {
-            unitOfMeasureComboBox.setValue("قطعة");
+            unitOfMeasureComboBox.setValue("شريط");
         }
     }
 
@@ -427,15 +439,37 @@ public class ProductController {
         minimumStockField.setText(product.getMinimumStock() != null ? String.valueOf(product.getMinimumStock()) : "");
         maximumStockField.setText(product.getMaximumStock() != null ? String.valueOf(product.getMaximumStock()) : "");
         unitOfMeasureComboBox.setValue(product.getUnitOfMeasure());
+        loadBatchFields(product);
+        loadStripsPerBox(product);
         if (baseUnitComboBox != null) {
             String baseUnit = product.getBaseUnit() != null ? product.getBaseUnit() : product.getUnitOfMeasure();
-            baseUnitComboBox.setValue(baseUnit != null ? baseUnit : "قطعة");
+            baseUnitComboBox.setValue(baseUnit != null ? baseUnit : "شريط");
         }
         isActiveCheckBox.setSelected(product.getIsActive());
         loadPackagingRows(product);
 
         applySellingPriceEditRestriction();
         updateAllProfitMargins();
+    }
+
+    private void loadBatchFields(Product product) {
+        if (expiryDatePicker == null || product == null || product.getId() == null) {
+            return;
+        }
+
+        findPreferredBatch(product).map(ProductBatch::getExpiryDate).ifPresent(expiryDatePicker::setValue);
+    }
+
+    private void loadStripsPerBox(Product product) {
+        if (stripsPerBoxField == null || product == null || product.getId() == null) {
+            return;
+        }
+
+        productUnitService.getUnitsForProductOrDefault(product).stream()
+                .filter(unit -> unit.getUnitName() != null && unit.getUnitName().trim().equals("علبة"))
+                .filter(unit -> unit.getEffectiveConversionFactor() > 1)
+                .findFirst()
+                .ifPresent(unit -> stripsPerBoxField.setText(formatQuantity(unit.getEffectiveConversionFactor())));
     }
 
     private void loadPackagingRows(Product product) {
@@ -597,10 +631,12 @@ public class ProductController {
             if (isEditMode) {
                 savedProduct = inventoryService.updateProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
+                syncOpeningBatch(savedProduct);
                 showInfo("تم التحديث", "تم تحديث المنتج بنجاح");
             } else {
                 savedProduct = inventoryService.createProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
+                syncOpeningBatch(savedProduct);
                 showInfo("تم الإضافة", "تم إضافة المنتج بنجاح");
             }
 
@@ -624,9 +660,49 @@ public class ProductController {
     }
 
     private List<ProductUnit> buildProductUnits(Product savedProduct) {
-        return packagingRows.stream()
+        List<ProductUnitRow> rows = new ArrayList<>(packagingRows);
+        double stripsPerBox = stripsPerBoxField != null ? parseDouble(stripsPerBoxField.getText()) : 0.0;
+        if (stripsPerBox > 0) {
+            rows.removeIf(row -> "علبة".equals(row.getUnitName()));
+            rows.add(new ProductUnitRow("علبة", "", stripsPerBox, 0, 0, false));
+        }
+
+        return rows.stream()
                 .map(row -> row.toProductUnit(savedProduct))
                 .toList();
+    }
+
+    private void syncOpeningBatch(Product savedProduct) {
+        if (savedProduct == null || savedProduct.getId() == null) {
+            return;
+        }
+
+        double quantity = parseDouble(quantityField.getText());
+        LocalDate expiryDate = expiryDatePicker != null ? expiryDatePicker.getValue() : null;
+        ProductBatch openingBatch = findPreferredBatch(savedProduct).orElse(null);
+        if (quantity <= 0 && openingBatch == null) {
+            return;
+        }
+
+        String batchNumber = openingBatch != null ? openingBatch.getBatchNumber() : "OPENING-" + savedProduct.getProductCode();
+        double currentOpeningQuantity = openingBatch != null ? openingBatch.getQuantity() : 0.0;
+        double quantityDelta = quantity - currentOpeningQuantity;
+        Double unitCost = savedProduct.getCostPrice() != null ? savedProduct.getCostPrice() : savedProduct.getCostPriceUsd();
+        String currency = savedProduct.getCostPrice() != null ? "دينار" : "دولار";
+
+        if (Math.abs(quantityDelta) > 1e-9) {
+            productBatchService.createOrUpdateBatch(
+                    savedProduct,
+                    batchNumber,
+                    expiryDate,
+                    quantityDelta,
+                    unitCost,
+                    currency,
+                    null,
+                    true);
+        } else if (openingBatch != null && !java.util.Objects.equals(expiryDate, openingBatch.getExpiryDate())) {
+            productBatchService.updateBatchExpiry(openingBatch, expiryDate);
+        }
     }
 
     @FXML
@@ -673,7 +749,36 @@ public class ProductController {
             return false;
         }
 
+        if (expiryDatePicker != null && expiryDatePicker.getValue() != null && parseDouble(quantityField.getText()) <= 0) {
+            showError("خطأ", "تاريخ الانتهاء يحتاج كمية افتتاحية أكبر من صفر");
+            quantityField.requestFocus();
+            return false;
+        }
+
+        if (stripsPerBoxField != null && hasText(stripsPerBoxField)) {
+            Double stripsPerBox = parsePositiveDoubleOrNull(stripsPerBoxField.getText());
+            if (stripsPerBox == null) {
+                showError("خطأ", "عدد الشرائط في العلبة يجب أن يكون رقماً أكبر من صفر");
+                stripsPerBoxField.requestFocus();
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    private java.util.Optional<ProductBatch> findPreferredBatch(Product product) {
+        if (product == null || product.getId() == null) {
+            return java.util.Optional.empty();
+        }
+
+        List<ProductBatch> batches = productBatchService.getAllBatches(product.getId());
+        return batches.stream()
+                .filter(batch -> Boolean.TRUE.equals(batch.getIsOpeningBatch()))
+                .findFirst()
+                .or(() -> batches.stream()
+                        .filter(batch -> batch.getExpiryDate() != null)
+                        .findFirst());
     }
 
     private boolean validateRequiredCurrencyPair(String fieldName, TextField iqdField, TextField usdField) {
@@ -746,6 +851,13 @@ public class ProductController {
     private String generateProductCode() {
         long timestamp = System.currentTimeMillis();
         return "PRD" + timestamp;
+    }
+
+    private String formatQuantity(double value) {
+        if (Math.abs(value - Math.rint(value)) < 1e-9) {
+            return String.valueOf((long) Math.rint(value));
+        }
+        return String.valueOf(value);
     }
 
     private void showError(String title, String message) {

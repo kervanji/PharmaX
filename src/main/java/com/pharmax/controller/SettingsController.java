@@ -4,6 +4,7 @@ import com.pharmax.model.Customer;
 import com.pharmax.model.Product;
 import com.pharmax.model.Sale;
 import com.pharmax.service.CustomerService;
+import com.pharmax.service.BackupRestoreService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.ReceiptService;
 import com.pharmax.service.SalesService;
@@ -80,6 +81,7 @@ public class SettingsController {
     private final InventoryService inventoryService = new InventoryService();
     private final SalesService salesService = new SalesService();
     private final ReceiptService receiptService = new ReceiptService();
+    private final BackupRestoreService backupRestoreService = new BackupRestoreService();
     private Stage dialogStage;
 
     @FXML
@@ -481,12 +483,18 @@ public class SettingsController {
         File dbFile = new File(downloadDir, dbName);
 
         try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(new FileInputStream(zipFile))) {
-            java.util.zip.ZipEntry entry = zis.getNextEntry();
-            if (entry != null) {
-                java.nio.file.Files.copy(zis, dbFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                logger.info("Extracted backup to: " + dbFile.getAbsolutePath());
-            } else {
-                throw new IOException("ملف ZIP فارغ");
+            java.util.zip.ZipEntry entry;
+            boolean extracted = false;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".db")) {
+                    java.nio.file.Files.copy(zis, dbFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    logger.info("Extracted backup to: " + dbFile.getAbsolutePath());
+                    extracted = true;
+                    break;
+                }
+            }
+            if (!extracted) {
+                throw new IOException("ملف ZIP لا يحتوي على قاعدة بيانات صالحة");
             }
         }
 
@@ -501,28 +509,22 @@ public class SettingsController {
         confirm.setTitle("تأكيد الاستعادة");
         confirm.setHeaderText("هل أنت متأكد من استعادة البيانات؟");
         confirm.setContentText("سيتم استبدال قاعدة البيانات الحالية بـ:\n" + dbFile.getName()
-                + "\n\nسيتم إنشاء نسخة احتياطية تلقائياً.\nسيتم إغلاق البرنامج وتطبيق الاستعادة عند إعادة التشغيل.");
+                + "\n\nسيتم إنشاء نسخة احتياطية وقائية تلقائياً قبل الاستعادة.\nقد تحتاج إلى إعادة تشغيل البرنامج بعد اكتمال العملية.");
 
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    // Stage the restore file next to pharmax.db
-                    File pendingRestore = new File("PharmaX_restore_pending.db");
-                    java.nio.file.Files.copy(dbFile.toPath(), pendingRestore.toPath(),
-                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    logger.info("Staged restore file: " + pendingRestore.getAbsolutePath());
+                    backupRestoreService.restoreLocalBackup(dbFile);
 
                     Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                    alert.setTitle("جاهز للاستعادة");
+                    alert.setTitle("تمت الاستعادة");
                     alert.setHeaderText(null);
-                    alert.setContentText("تم تجهيز النسخة الاحتياطية للاستعادة.\n"
-                            + "سيتم إغلاق البرنامج الآن.\n"
-                            + "عند إعادة التشغيل سيتم تطبيق الاستعادة تلقائياً.");
+                    alert.setContentText("تمت استعادة النسخة الاحتياطية بنجاح.\n"
+                            + "يرجى إعادة تشغيل البرنامج لضمان إعادة فتح قاعدة البيانات المحدثة.");
                     alert.showAndWait();
-                    System.exit(0);
                 } catch (Exception e) {
-                    logger.error("Failed to stage restore file", e);
-                    showError("خطأ", "فشل تجهيز ملف الاستعادة: " + e.getMessage());
+                    logger.error("Failed to restore backup file", e);
+                    showError("خطأ", "فشل في استعادة النسخة الاحتياطية: " + e.getMessage());
                 }
             }
         });
@@ -581,6 +583,7 @@ public class SettingsController {
             File backupFile = new File(dir, backupFileName);
 
             Files.copy(sourceDb.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            backupRestoreService.writeBackupMetadata(backupFile, "manual");
 
             backupStatusLabel.setText("✓ تم إنشاء النسخة الاحتياطية: " + backupFileName);
             backupStatusLabel.setStyle("-fx-text-fill: -fx-success-text;");
@@ -619,19 +622,7 @@ public class SettingsController {
         confirm.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    // Close database connections first
-                    com.pharmax.database.DatabaseManager.shutdown();
-
-                    // Backup current database before restore
-                    File currentDb = new File("pharmax.db");
-                    if (currentDb.exists()) {
-                        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-                        File preRestoreBackup = new File("PharmaX_pre_restore_" + timestamp + ".db");
-                        Files.copy(currentDb.toPath(), preRestoreBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    }
-
-                    // Restore from backup
-                    Files.copy(backupFile.toPath(), currentDb.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    backupRestoreService.restoreLocalBackup(backupFile);
 
                     backupStatusLabel.setText("✓ تم استعادة البيانات بنجاح - يرجى إعادة تشغيل البرنامج");
                     backupStatusLabel.setStyle("-fx-text-fill: -fx-success-text;");

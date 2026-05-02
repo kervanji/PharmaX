@@ -2,10 +2,14 @@ package com.pharmax.controller;
 
 import com.pharmax.MainApp;
 import com.pharmax.model.Category;
+import com.pharmax.model.InventoryMovement;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductBatch;
 import com.pharmax.service.CategoryService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.InventoryMovementService;
 import com.pharmax.service.PrintService;
+import com.pharmax.service.ProductBatchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javafx.beans.property.SimpleStringProperty;
@@ -13,12 +17,14 @@ import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.geometry.Insets;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -28,9 +34,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class InventoryListController {
     private static final Logger logger = LoggerFactory.getLogger(InventoryListController.class);
@@ -71,12 +82,19 @@ public class InventoryListController {
     private Label lowStockLabel;
     @FXML
     private Label statusLabel;
+    @FXML
+    private Button batchDetailsButton;
+    @FXML
+    private Button movementHistoryButton;
 
     private final InventoryService inventoryService = new InventoryService();
     private final CategoryService categoryService = new CategoryService();
+    private final ProductBatchService productBatchService = new ProductBatchService();
+    private final InventoryMovementService inventoryMovementService = new InventoryMovementService();
     private ObservableList<Product> productsList;
     private FilteredList<Product> filteredProducts;
     private final DecimalFormat numberFormat;
+    private static final double QTY_EPSILON = 1e-6;
 
     public InventoryListController() {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
@@ -89,6 +107,7 @@ public class InventoryListController {
         setupTableColumns();
         setupFilters();
         setupSearch();
+        setupSelectionActions();
         loadProducts();
     }
 
@@ -195,6 +214,25 @@ public class InventoryListController {
 
     private void setupSearch() {
         searchField.textProperty().addListener((obs, oldVal, newVal) -> applyFilters());
+    }
+
+    private void setupSelectionActions() {
+        if (batchDetailsButton != null) {
+            batchDetailsButton.setDisable(true);
+        }
+        if (movementHistoryButton != null) {
+            movementHistoryButton.setDisable(true);
+        }
+
+        productsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldProduct, product) -> {
+            boolean noSelection = product == null;
+            if (batchDetailsButton != null) {
+                batchDetailsButton.setDisable(noSelection);
+            }
+            if (movementHistoryButton != null) {
+                movementHistoryButton.setDisable(noSelection);
+            }
+        });
     }
 
     private void loadProducts() {
@@ -363,6 +401,26 @@ public class InventoryListController {
     }
 
     @FXML
+    private void handleBatchDetails() {
+        Product selected = productsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showError("خطأ", "الرجاء اختيار منتج أولاً");
+            return;
+        }
+        showBatchDetailsDialog(selected);
+    }
+
+    @FXML
+    private void handleMovementHistory() {
+        Product selected = productsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showError("خطأ", "الرجاء اختيار منتج أولاً");
+            return;
+        }
+        showMovementHistoryDialog(selected);
+    }
+
+    @FXML
     private void handlePrint() {
         try {
             PrintService printService = new PrintService();
@@ -406,5 +464,251 @@ public class InventoryListController {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private void showBatchDetailsDialog(Product product) {
+        List<ProductBatch> batches = productBatchService.getAllBatches(product.getId());
+        List<InventoryMovement> movements = inventoryMovementService.getByProductId(product.getId());
+        Map<Long, String> sourceByBatchId = buildSourceReferenceMap(movements);
+
+        double summaryQuantity = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
+        double batchTotal = productBatchService.getTotalBatchQuantity(product.getId());
+        boolean mismatch = Math.abs(summaryQuantity - batchTotal) > QTY_EPSILON;
+        if (mismatch) {
+            logger.warn("Inventory quantity mismatch for product {}: summary={} batchTotal={}",
+                    product.getName(), summaryQuantity, batchTotal);
+        }
+
+        TableView<BatchRow> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label("لا توجد دفعات مسجلة لهذا المنتج"));
+
+        TableColumn<BatchRow, String> batchNumberCol = new TableColumn<>("رقم التشغيلة");
+        batchNumberCol.setCellValueFactory(new PropertyValueFactory<>("batchNumber"));
+        TableColumn<BatchRow, String> expiryCol = new TableColumn<>("الصلاحية");
+        expiryCol.setCellValueFactory(new PropertyValueFactory<>("expiryDate"));
+        TableColumn<BatchRow, String> qtyCol = new TableColumn<>("الكمية");
+        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+        TableColumn<BatchRow, String> costCol = new TableColumn<>("التكلفة");
+        costCol.setCellValueFactory(new PropertyValueFactory<>("costPrice"));
+        TableColumn<BatchRow, String> saleCol = new TableColumn<>("سعر البيع");
+        saleCol.setCellValueFactory(new PropertyValueFactory<>("salePrice"));
+        TableColumn<BatchRow, String> statusCol = new TableColumn<>("الحالة");
+        statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
+        TableColumn<BatchRow, String> sourceCol = new TableColumn<>("المصدر");
+        sourceCol.setCellValueFactory(new PropertyValueFactory<>("sourceReference"));
+        TableColumn<BatchRow, String> createdCol = new TableColumn<>("تاريخ الإنشاء");
+        createdCol.setCellValueFactory(new PropertyValueFactory<>("createdAt"));
+
+        table.getColumns().addAll(batchNumberCol, expiryCol, qtyCol, costCol, saleCol, statusCol, sourceCol, createdCol);
+
+        List<BatchRow> rows = batches.stream()
+                .sorted(Comparator
+                        .comparing((ProductBatch batch) -> batch.getExpiryDate() == null ? java.time.LocalDate.MAX : batch.getExpiryDate())
+                        .thenComparing(batch -> batch.getCreatedAt() != null ? batch.getCreatedAt() : LocalDateTime.MIN))
+                .map(batch -> BatchRow.from(batch, product, sourceByBatchId.get(batch.getId()), numberFormat))
+                .toList();
+        table.setItems(FXCollections.observableArrayList(rows));
+        table.setPrefHeight(Math.max(180, Math.min(420, 120 + rows.size() * 28.0)));
+
+        Label title = new Label("المنتج: " + safeText(product.getName()));
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        Label totalInfo = new Label("الكمية الظاهرة: " + numberFormat.format(summaryQuantity)
+                + " | إجمالي الدفعات: " + numberFormat.format(batchTotal));
+        Label warning = new Label(mismatch
+                ? "تحذير: مجموع كميات الدفعات لا يطابق quantity_in_stock"
+                : "لا يوجد تعارض بين ملخص الكمية وكميات الدفعات");
+        warning.setStyle(mismatch
+                ? "-fx-text-fill: -fx-danger-text; -fx-font-weight: bold;"
+                : "-fx-text-fill: -fx-success-text;");
+
+        VBox content = new VBox(10, title, totalInfo, warning, table);
+        content.setPadding(new Insets(14));
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("تفاصيل الدفعات");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(980);
+        dialog.showAndWait();
+    }
+
+    private void showMovementHistoryDialog(Product product) {
+        List<InventoryMovement> movements = new ArrayList<>(inventoryMovementService.getByProductId(product.getId()));
+        movements.sort(Comparator
+                .comparing((InventoryMovement movement) -> movement.getCreatedAt() != null ? movement.getCreatedAt() : LocalDateTime.MIN)
+                .reversed()
+                .thenComparing((InventoryMovement movement) -> movement.getId() != null ? movement.getId() : 0L, Comparator.reverseOrder()));
+
+        TableView<MovementRow> table = new TableView<>();
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setPlaceholder(new Label("لا توجد حركات مخزون لهذا المنتج"));
+
+        TableColumn<MovementRow, String> dateCol = new TableColumn<>("التاريخ");
+        dateCol.setCellValueFactory(new PropertyValueFactory<>("createdAt"));
+        TableColumn<MovementRow, String> typeCol = new TableColumn<>("الحركة");
+        typeCol.setCellValueFactory(new PropertyValueFactory<>("movementType"));
+        TableColumn<MovementRow, String> qtyCol = new TableColumn<>("التغير");
+        qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantityChanged"));
+        TableColumn<MovementRow, String> beforeCol = new TableColumn<>("قبل");
+        beforeCol.setCellValueFactory(new PropertyValueFactory<>("quantityBefore"));
+        TableColumn<MovementRow, String> afterCol = new TableColumn<>("بعد");
+        afterCol.setCellValueFactory(new PropertyValueFactory<>("quantityAfter"));
+        TableColumn<MovementRow, String> batchCol = new TableColumn<>("التشغيلة");
+        batchCol.setCellValueFactory(new PropertyValueFactory<>("batchNumber"));
+        TableColumn<MovementRow, String> refTypeCol = new TableColumn<>("نوع المرجع");
+        refTypeCol.setCellValueFactory(new PropertyValueFactory<>("referenceType"));
+        TableColumn<MovementRow, String> refIdCol = new TableColumn<>("رقم المرجع");
+        refIdCol.setCellValueFactory(new PropertyValueFactory<>("referenceId"));
+        TableColumn<MovementRow, String> noteCol = new TableColumn<>("ملاحظات");
+        noteCol.setCellValueFactory(new PropertyValueFactory<>("note"));
+
+        table.getColumns().addAll(dateCol, typeCol, qtyCol, beforeCol, afterCol, batchCol, refTypeCol, refIdCol, noteCol);
+        table.setItems(FXCollections.observableArrayList(
+                movements.stream().map(movement -> MovementRow.from(movement, numberFormat)).toList()));
+        table.setPrefHeight(Math.max(180, Math.min(460, 120 + movements.size() * 28.0)));
+
+        Label title = new Label("حركة المخزون للمنتج: " + safeText(product.getName()));
+        title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        VBox content = new VBox(10, title, table);
+        content.setPadding(new Insets(14));
+
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("حركة المخزون");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(1080);
+        dialog.showAndWait();
+    }
+
+    private Map<Long, String> buildSourceReferenceMap(List<InventoryMovement> movements) {
+        Map<Long, String> sourceByBatchId = new HashMap<>();
+        for (InventoryMovement movement : movements) {
+            if (movement.getBatch() == null || movement.getBatch().getId() == null) {
+                continue;
+            }
+            sourceByBatchId.computeIfAbsent(movement.getBatch().getId(), batchId -> {
+                if ("voucher_purchase".equals(movement.getReferenceType()) && movement.getReferenceId() != null) {
+                    return "سند شراء #" + movement.getReferenceId();
+                }
+                if (movement.getBatch().getIsOpeningBatch() != null && movement.getBatch().getIsOpeningBatch()) {
+                    return "رصيد افتتاحي";
+                }
+                if (movement.getReferenceType() != null && movement.getReferenceId() != null) {
+                    return movement.getReferenceType() + " #" + movement.getReferenceId();
+                }
+                return "-";
+            });
+        }
+        return sourceByBatchId;
+    }
+
+    private String safeText(String value) {
+        return value != null && !value.isBlank() ? value : "-";
+    }
+
+    public static class BatchRow {
+        private final String batchNumber;
+        private final String expiryDate;
+        private final String quantity;
+        private final String costPrice;
+        private final String salePrice;
+        private final String status;
+        private final String sourceReference;
+        private final String createdAt;
+
+        private BatchRow(String batchNumber,
+                         String expiryDate,
+                         String quantity,
+                         String costPrice,
+                         String salePrice,
+                         String status,
+                         String sourceReference,
+                         String createdAt) {
+            this.batchNumber = batchNumber;
+            this.expiryDate = expiryDate;
+            this.quantity = quantity;
+            this.costPrice = costPrice;
+            this.salePrice = salePrice;
+            this.status = status;
+            this.sourceReference = sourceReference;
+            this.createdAt = createdAt;
+        }
+
+        public static BatchRow from(ProductBatch batch, Product product, String sourceReference, DecimalFormat format) {
+            return new BatchRow(
+                    batch.getBatchNumber() != null ? batch.getBatchNumber() : "-",
+                    batch.getExpiryDate() != null ? batch.getExpiryDate().toString() : "-",
+                    format.format(batch.getQuantity() != null ? batch.getQuantity() : 0.0),
+                    batch.getUnitCost() != null ? format.format(batch.getUnitCost()) : "-",
+                    product.getUnitPrice() != null ? format.format(product.getUnitPrice()) : "-",
+                    batch.getStatus() != null ? batch.getStatus() : "-",
+                    sourceReference != null ? sourceReference : "-",
+                    batch.getCreatedAt() != null ? batch.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-");
+        }
+
+        public String getBatchNumber() { return batchNumber; }
+        public String getExpiryDate() { return expiryDate; }
+        public String getQuantity() { return quantity; }
+        public String getCostPrice() { return costPrice; }
+        public String getSalePrice() { return salePrice; }
+        public String getStatus() { return status; }
+        public String getSourceReference() { return sourceReference; }
+        public String getCreatedAt() { return createdAt; }
+    }
+
+    public static class MovementRow {
+        private final String createdAt;
+        private final String movementType;
+        private final String quantityChanged;
+        private final String quantityBefore;
+        private final String quantityAfter;
+        private final String batchNumber;
+        private final String referenceType;
+        private final String referenceId;
+        private final String note;
+
+        private MovementRow(String createdAt,
+                            String movementType,
+                            String quantityChanged,
+                            String quantityBefore,
+                            String quantityAfter,
+                            String batchNumber,
+                            String referenceType,
+                            String referenceId,
+                            String note) {
+            this.createdAt = createdAt;
+            this.movementType = movementType;
+            this.quantityChanged = quantityChanged;
+            this.quantityBefore = quantityBefore;
+            this.quantityAfter = quantityAfter;
+            this.batchNumber = batchNumber;
+            this.referenceType = referenceType;
+            this.referenceId = referenceId;
+            this.note = note;
+        }
+
+        public static MovementRow from(InventoryMovement movement, DecimalFormat format) {
+            return new MovementRow(
+                    movement.getCreatedAt() != null ? movement.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-",
+                    movement.getMovementType() != null ? movement.getMovementType() : "-",
+                    format.format(movement.getQuantityDelta() != null ? movement.getQuantityDelta() : 0.0),
+                    movement.getQuantityBefore() != null ? format.format(movement.getQuantityBefore()) : "-",
+                    movement.getQuantityAfter() != null ? format.format(movement.getQuantityAfter()) : "-",
+                    movement.getBatch() != null && movement.getBatch().getBatchNumber() != null ? movement.getBatch().getBatchNumber() : "-",
+                    movement.getReferenceType() != null ? movement.getReferenceType() : "-",
+                    movement.getReferenceId() != null ? String.valueOf(movement.getReferenceId()) : "-",
+                    movement.getNote() != null ? movement.getNote() : "-");
+        }
+
+        public String getCreatedAt() { return createdAt; }
+        public String getMovementType() { return movementType; }
+        public String getQuantityChanged() { return quantityChanged; }
+        public String getQuantityBefore() { return quantityBefore; }
+        public String getQuantityAfter() { return quantityAfter; }
+        public String getBatchNumber() { return batchNumber; }
+        public String getReferenceType() { return referenceType; }
+        public String getReferenceId() { return referenceId; }
+        public String getNote() { return note; }
     }
 }

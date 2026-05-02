@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.CashboxController"
+      stylesheets="@../styles/main.css"
+      spacing="15"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="💵 الصندوق والإقفال اليومي" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-success-dark;"/>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="التاريخ:" style="-fx-font-weight: bold;"/>
+        <DatePicker fx:id="ledgerDatePicker" onAction="#handleRefresh"/>
+        <Button text="تحديث" onAction="#handleRefresh"
+                style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="closingStatusLabel" text="-" style="-fx-text-fill: -fx-form-sublabel;"/>
+    </HBox>
+
+    <HBox spacing="16">
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-form-section-bg; -fx-padding: 16; -fx-background-radius: 12;">
+            <Label text="الرصيد الافتتاحي" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="openingCashLabel" text="0 د.ع" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-success-bg; -fx-padding: 16; -fx-background-radius: 12;">
+            <Label text="إجمالي الداخل" style="-fx-font-size: 13px; -fx-text-fill: -fx-success-dark;"/>
+            <Label fx:id="totalInLabel" text="0 د.ع" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-success-dark;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-danger-bg; -fx-padding: 16; -fx-background-radius: 12;">
+            <Label text="إجمالي الخارج" style="-fx-font-size: 13px; -fx-text-fill: -fx-danger-text;"/>
+            <Label fx:id="totalOutLabel" text="0 د.ع" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+              style="-fx-background-color: -fx-badge-warning-bg; -fx-padding: 16; -fx-background-radius: 12;">
+            <Label text="الرصيد المتوقع" style="-fx-font-size: 13px; -fx-text-fill: -fx-warning-dark;"/>
+            <Label fx:id="expectedCashLabel" text="0 د.ع" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-dark;"/>
+        </VBox>
+    </HBox>
+
+    <TableView fx:id="ledgerTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="150"/>
+            <TableColumn fx:id="entryTypeColumn" text="نوع الحركة" prefWidth="130"/>
+            <TableColumn fx:id="directionColumn" text="الاتجاه" prefWidth="70"/>
+            <TableColumn fx:id="amountColumn" text="المبلغ" prefWidth="100"/>
+            <TableColumn fx:id="currencyColumn" text="العملة" prefWidth="80"/>
+            <TableColumn fx:id="sourceTypeColumn" text="المصدر" prefWidth="110"/>
+            <TableColumn fx:id="sourceIdColumn" text="رقم المصدر" prefWidth="90"/>
+            <TableColumn fx:id="descriptionColumn" text="الوصف" prefWidth="260"/>
+        </columns>
+        <placeholder>
+            <Label text="لا توجد حركات نقدية لهذا التاريخ"/>
+        </placeholder>
+    </TableView>
+
+    <HBox spacing="20" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <VBox spacing="10">
+            <Label text="النقد الفعلي:" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="actualCashField" promptText="أدخل النقد الفعلي"/>
+        </VBox>
+        <VBox spacing="10" HBox.hgrow="ALWAYS">
+            <Label text="ملاحظات الإقفال:" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="closingNotesArea" prefRowCount="2" promptText="ملاحظات اختيارية"/>
+        </VBox>
+        <VBox alignment="CENTER" spacing="10">
+            <Button text="إقفال اليوم" onAction="#handleCloseDay"
+                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12 20; -fx-background-radius: 8;"/>
+            <Button text="إغلاق" onAction="#handleClose"
+                    style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 12 20; -fx-background-radius: 8;"/>
+        </VBox>
+    </HBox>
+</VBox>

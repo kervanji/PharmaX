@@ -309,10 +309,19 @@ public class MainController {
                     "linear-gradient(to bottom right, #ea580c, #f97316)", "handleNewProduct"),
             new TileDef("purchase", "🛍️", "purchases.png", "المشتريات",
                     "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
+            new TileDef("purchase-return", "↩️", "returns.png", "مرتجع شراء",
+                    "linear-gradient(to bottom right, #a16207, #ca8a04)", "handlePurchaseReturn"),
             new TileDef("product-return", "↩️", "returns.png", "إرجاع مواد",
                     "linear-gradient(to bottom right, #db2777, #ec4899)", "handleProductReturn"),
             new TileDef("low-stock", "⚠️", "low_stock_alert.png", "منخفض المخزون",
                     "linear-gradient(to bottom right, #b91c1c, #dc2626)", "handleLowStock"),
+            new TileDef("expiry-alerts", "⏰", "low_stock_alert.png", "تنبيهات الانتهاء",
+                    "linear-gradient(to bottom right, #c2410c, #ea580c)", "handleExpiryAlerts"),
+            new TileDef("pharmacy-reports", "📊", "sales_reports.png", "التقارير",
+                    "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handlePharmacyReports",
+                    false, true, false),
+            new TileDef("cashbox", "💵", "settings.png", "الصندوق",
+                    "linear-gradient(to bottom right, #15803d, #16a34a)", "handleCashbox"),
             new TileDef("barcode-print", "▥", "barcode_printing.png", "طباعة باركود",
                     "linear-gradient(to bottom right, #475569, #64748b)", "handleBarcodePrint"),
             new TileDef("user-management", "👤", "user_management.png", "إدارة المستخدمين",
@@ -1233,6 +1242,16 @@ public class MainController {
     }
 
     @FXML
+    private void handleExpiryAlerts() {
+        TabManager.getInstance().openTab(
+                "expiry-alerts",
+                "تنبيهات الانتهاء",
+                "low_stock.svg",
+                "/views/ExpiryAlerts.fxml",
+                null);
+    }
+
+    @FXML
     private void handleAddStock() {
         TabManager.getInstance().openTab(
                 "add-stock",
@@ -1287,6 +1306,23 @@ public class MainController {
                 "sales_reports.svg",
                 "/views/SalesReport.fxml",
                 null);
+    }
+
+    @FXML
+    private void handlePharmacyReports() {
+        if (!SessionManager.getInstance().canAccessReports()) {
+            showError("غير مسموح", "ليس لديك صلاحية الوصول للتقارير");
+            return;
+        }
+        TabManager.getInstance().openTab(
+                "pharmacy-reports",
+                "التقارير",
+                "sales_reports.svg",
+                "/views/PharmacyReports.fxml",
+                (PharmacyReportsController controller) -> {
+                    controller.setTabMode(true);
+                    controller.setTabId("pharmacy-reports");
+                });
     }
 
     @FXML
@@ -1653,6 +1689,40 @@ public class MainController {
         } catch (Exception e) {
             logger.error("Failed to open purchase", e);
             showError("خطأ", "فشل في فتح المشتريات: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handlePurchaseReturn() {
+        try {
+            TabManager.getInstance().openTab(
+                    "purchase-return",
+                    "↩️ مرتجع شراء",
+                    "/views/PurchaseReturn.fxml",
+                    (PurchaseReturnController controller) -> {
+                        controller.setTabMode(true);
+                        controller.setTabId("purchase-return");
+                    });
+        } catch (Exception e) {
+            logger.error("Failed to open purchase return", e);
+            showError("خطأ", "فشل في فتح مرتجع الشراء: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    private void handleCashbox() {
+        try {
+            TabManager.getInstance().openTab(
+                    "cashbox",
+                    "💵 الصندوق",
+                    "/views/Cashbox.fxml",
+                    (CashboxController controller) -> {
+                        controller.setTabMode(true);
+                        controller.setTabId("cashbox");
+                    });
+        } catch (Exception e) {
+            logger.error("Failed to open cashbox", e);
+            showError("خطأ", "فشل في فتح شاشة الصندوق: " + e.getMessage());
         }
     }
 

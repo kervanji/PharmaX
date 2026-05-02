@@ -38,6 +38,14 @@
         <Button text="تحديث" onAction="#handleRefresh"
                 style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8;"/>
     </HBox>
+
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <Label text="عرض المنتج المحدد:" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
+        <Button fx:id="batchDetailsButton" text="تفاصيل الدفعات" onAction="#handleBatchDetails" disable="true"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-font-size: 13px; -fx-padding: 8 14; -fx-background-radius: 8;"/>
+        <Button fx:id="movementHistoryButton" text="حركة المخزون" onAction="#handleMovementHistory" disable="true"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-font-size: 13px; -fx-padding: 8 14; -fx-background-radius: 8;"/>
+    </HBox>
     
     <HBox spacing="16">
         <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"

@@ -19,6 +19,8 @@ import java.util.Optional;
 
 public class AuthService {
     private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
+    private final AccessControlService accessControlService = new AccessControlService();
+    private final AuditLogService auditLogService = new AuditLogService();
     
     public AuthService() {
         ensureDefaultAdminExists();
@@ -72,11 +74,13 @@ public class AuthService {
             
             if (user == null) {
                 logger.warn("Authentication failed: User not found - {}", username);
+                auditLogService.record("LOGIN_FAILED", "user", null, "اسم المستخدم غير موجود: " + username);
                 return Optional.empty();
             }
             
             if (!user.isActive()) {
                 logger.warn("Authentication failed: User inactive - {}", username);
+                auditLogService.record("LOGIN_FAILED", "user", user.getId(), "المستخدم معطل: " + username);
                 return Optional.empty();
             }
             
@@ -84,11 +88,12 @@ public class AuthService {
             if (user.getPinHash().equals(hashedPin)) {
                 // Success - update last login
                 user.setLastLoginAt(LocalDateTime.now());
-                updateUser(user);
+                persistUser(user, false);
                 logger.info("User authenticated successfully: {}", username);
                 return Optional.of(user);
             } else {
                 logger.warn("Authentication failed: Invalid PIN - {}", username);
+                auditLogService.record("LOGIN_FAILED", "user", user.getId(), "رمز الدخول غير صحيح للمستخدم: " + username);
                 return Optional.empty();
             }
         } catch (Exception e) {
@@ -98,10 +103,18 @@ public class AuthService {
     }
     
     public User saveUser(User user) {
+        boolean allowBootstrap = accessControlService.getCurrentUser() == null && getAllUsers().isEmpty();
+        if (!allowBootstrap) {
+            accessControlService.requireManageUsers("USER_CREATE", "user", user != null ? user.getId() : null);
+        }
         Transaction transaction = null;
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             session.persist(user);
+            if (!allowBootstrap) {
+                auditLogService.record(session, "USER_CREATED", "user", user.getId(),
+                        "تم إنشاء المستخدم: " + user.getUsername() + " بالدور " + user.getRole().name());
+            }
             transaction.commit();
             logger.info("User saved: {}", user.getUsername());
             return user;
@@ -115,11 +128,20 @@ public class AuthService {
     }
     
     public void updateUser(User user) {
+        accessControlService.requireManageUsers("USER_UPDATE", "user", user != null ? user.getId() : null);
+        persistUser(user, true);
+    }
+
+    private void persistUser(User user, boolean audit) {
         Transaction transaction = null;
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             user.setUpdatedAt(LocalDateTime.now());
             session.merge(user);
+            if (audit) {
+                auditLogService.record(session, "USER_UPDATED", "user", user.getId(),
+                        "تم تحديث المستخدم: " + user.getUsername() + " بالدور " + user.getRole().name());
+            }
             transaction.commit();
         } catch (Exception e) {
             if (transaction != null) {
@@ -131,11 +153,14 @@ public class AuthService {
     }
     
     public void deleteUser(Long userId) {
+        accessControlService.requireManageUsers("USER_DELETE", "user", userId);
         Transaction transaction = null;
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             User user = session.get(User.class, userId);
             if (user != null) {
+                auditLogService.record(session, "USER_DELETED", "user", user.getId(),
+                        "تم حذف المستخدم: " + user.getUsername());
                 session.remove(user);
             }
             transaction.commit();
@@ -191,22 +216,29 @@ public class AuthService {
     
     public void changePin(User user, String newPin) {
         user.setPinHash(hashPin(newPin));
-        updateUser(user);
+        accessControlService.requireManageUsers("USER_PIN_CHANGE", "user", user != null ? user.getId() : null);
+        persistUser(user, true);
         logger.info("PIN changed for user: {}", user.getUsername());
     }
     
     public void toggleUserActive(Long userId) {
+        accessControlService.requireManageUsers("USER_TOGGLE_ACTIVE", "user", userId);
         getUserById(userId).ifPresent(user -> {
             user.setActive(!user.isActive());
-            updateUser(user);
+            persistUser(user, true);
+            auditLogService.record("USER_STATUS_CHANGED", "user", user.getId(),
+                    "تم تغيير حالة المستخدم " + user.getUsername() + " إلى " + (user.isActive() ? "نشط" : "معطل"));
             logger.info("User {} active status changed to: {}", user.getUsername(), user.isActive());
         });
     }
     
     public void unlockUser(Long userId) {
+        accessControlService.requireManageUsers("USER_UNLOCK", "user", userId);
         getUserById(userId).ifPresent(user -> {
             user.resetFailedAttempts();
-            updateUser(user);
+            persistUser(user, true);
+            auditLogService.record("USER_UNLOCKED", "user", user.getId(),
+                    "تم فك قفل المستخدم: " + user.getUsername());
             logger.info("User {} unlocked", user.getUsername());
         });
     }

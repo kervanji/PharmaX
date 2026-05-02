@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.PurchaseReturnController"
+      stylesheets="@../styles/main.css"
+      spacing="15"
+      style="-fx-background-color: -fx-bg-gradient;">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+    <HBox alignment="CENTER" spacing="10">
+        <Label text="↩️ مرتجع شراء" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-dark;"/>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="المورد/الحساب:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="supplierComboBox" prefWidth="220" onAction="#handleSupplierChange"/>
+
+        <Label text="فاتورة الشراء:" style="-fx-font-weight: bold;"/>
+        <ComboBox fx:id="purchaseVoucherComboBox" prefWidth="220" onAction="#handleVoucherChange"/>
+
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="statusLabel" text="اختر المورد/الحساب لبدء مرتجع الشراء" style="-fx-text-fill: -fx-form-sublabel; -fx-font-size: 12px;"/>
+    </HBox>
+
+    <VBox spacing="10" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <Label text="المواد القابلة لمرتجع شراء:" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <TableView fx:id="purchaseItemsTable" VBox.vgrow="ALWAYS" editable="true">
+            <columns>
+                <TableColumn fx:id="productColumn" text="المنتج" prefWidth="180"/>
+                <TableColumn fx:id="purchasedQtyColumn" text="المشتراة" prefWidth="90"/>
+                <TableColumn fx:id="returnedQtyColumn" text="مرتجع سابقاً" prefWidth="100"/>
+                <TableColumn fx:id="availableQtyColumn" text="المتاح للإرجاع" prefWidth="110"/>
+                <TableColumn fx:id="currentBatchQtyColumn" text="المتاح بالدفعة" prefWidth="110"/>
+                <TableColumn fx:id="batchColumn" text="رقم التشغيلة" prefWidth="120"/>
+                <TableColumn fx:id="expiryColumn" text="الصلاحية" prefWidth="100"/>
+                <TableColumn fx:id="unitCostColumn" text="سعر التكلفة" prefWidth="100"/>
+                <TableColumn fx:id="returnQtyColumn" text="كمية المرتجع" prefWidth="110"/>
+            </columns>
+            <placeholder>
+                <Label text="اختر فاتورة مشتريات لعرض المواد"/>
+            </placeholder>
+        </TableView>
+    </VBox>
+
+    <HBox spacing="20" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
+        <VBox spacing="10" HBox.hgrow="ALWAYS">
+            <Label text="سبب المرتجع:" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="reasonArea" prefRowCount="2" promptText="سبب المرتجع إلى المورد..."/>
+        </VBox>
+
+        <VBox spacing="10" HBox.hgrow="ALWAYS">
+            <Label text="ملاحظات:" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="notesArea" prefRowCount="2" promptText="ملاحظات إضافية..."/>
+        </VBox>
+
+        <VBox spacing="10" alignment="CENTER_RIGHT" style="-fx-min-width: 220;">
+            <HBox spacing="10" alignment="CENTER_RIGHT">
+                <Label text="إجمالي المرتجع:" style="-fx-font-weight: bold; -fx-font-size: 16px;"/>
+                <Label fx:id="totalReturnLabel" text="0 د.ع" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
+            </HBox>
+        </VBox>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER">
+        <Button fx:id="saveButton" text="✅ حفظ مرتجع الشراء" onAction="#handleSave" prefHeight="40" prefWidth="170"
+                style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <Button text="جديد" onAction="#handleNew" prefHeight="40" prefWidth="110"
+                style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="إغلاق" onAction="#handleClose" prefHeight="40" prefWidth="110"
+                style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white;"/>
+    </HBox>
+</VBox>

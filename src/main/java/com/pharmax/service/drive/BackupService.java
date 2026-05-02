@@ -1,5 +1,8 @@
 package com.pharmax.service.drive;
 
+import com.pharmax.service.AccessControlService;
+import com.pharmax.service.AuditLogService;
+import com.pharmax.service.BackupRestoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +35,9 @@ public class BackupService {
     private final GoogleDriveService driveService;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean isBackupRunning = new AtomicBoolean(false);
+    private final AccessControlService accessControlService;
+    private final AuditLogService auditLogService;
+    private final BackupRestoreService backupRestoreService;
 
     public BackupService(GoogleDriveService driveService) {
         this.driveService = driveService;
@@ -40,6 +46,9 @@ public class BackupService {
             t.setDaemon(true);
             return t;
         });
+        this.accessControlService = new AccessControlService();
+        this.auditLogService = new AuditLogService();
+        this.backupRestoreService = new BackupRestoreService();
     }
 
     public boolean isDriveConnected() {
@@ -144,6 +153,13 @@ public class BackupService {
                 zos.write(buffer, 0, length);
             }
             zos.closeEntry();
+
+            ZipEntry metadataEntry = new ZipEntry("backup_metadata.json");
+            zos.putNextEntry(metadataEntry);
+            byte[] metadataBytes = backupRestoreService.buildBackupMetadataJson(sourceFile, "cloud")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            zos.write(metadataBytes);
+            zos.closeEntry();
         }
         return zipFile;
     }
@@ -177,14 +193,11 @@ public class BackupService {
     }
 
     public void restoreFromCloud(String fileId) throws Exception {
+        accessControlService.requireAdmin("BACKUP_RESTORE_CLOUD", "backup", null);
         if (!isDriveConnected())
             throw new IOException("Drive not connected");
 
         logger.info("Initiating cloud restore...");
-
-        // 1. Backup current data (Safety First)
-        logger.info("Creating safety backup before restore...");
-        performBackup();
 
         // 2. Download the backup file
         File tempZip = File.createTempFile("restore_download_", ".zip");
@@ -192,54 +205,28 @@ public class BackupService {
             logger.info("Downloading backup file...");
             driveService.downloadFile(fileId, tempZip);
 
-            // 3. Unzip and verify
-            // For safety, let's extract to a temp db file first
+            // 3. Extract the DB entry to a temp file, then pass through shared restore validation
             File tempDb = File.createTempFile("restore_db_", ".db");
-
-            try (ZipInputStream zis = new ZipInputStream(new FileInputStream(tempZip))) {
-                ZipEntry entry = zis.getNextEntry();
-                // Assumes zip contains one file named PharmaX_snapshot_... or similar, or just
-                // pharmax.db?
-                // Our backup creates zip with entry name = snapshot filename.
-                // We should extract whatever is in there to tempDb.
-                if (entry != null) {
-                    Files.copy(zis, tempDb.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    throw new IOException("Empty zip file");
-                }
-            }
-
-            // 4. Critical Section: Replace Database
-            // We must try to close connections if possible
-            // In a JavaFX app with simple SQLite, often replacing file requires closing App
-            // or Connections.
-            // DatabaseManager.shutdown();
-
-            com.pharmax.database.DatabaseManager.shutdown();
-
-            // Give it a moment to release locks
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-            }
-
-            File currentDb = new File(DB_PATH);
-            File backupOfCurrent = new File(DB_PATH + ".bak");
-
-            // Local file backup just in case
-            if (currentDb.exists()) {
-                Files.copy(currentDb.toPath(), backupOfCurrent.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            Files.copy(tempDb.toPath(), currentDb.toPath(), StandardCopyOption.REPLACE_EXISTING);
-
+            extractDatabaseEntry(tempZip, tempDb);
+            backupRestoreService.restoreCloudBackup(tempDb, fileId);
+            Files.deleteIfExists(tempDb.toPath());
             logger.info("Database restored successfully from cloud backup.");
 
-            // Cleanup temps
-            tempDb.delete();
-
         } finally {
-            tempZip.delete();
+            Files.deleteIfExists(tempZip.toPath());
         }
+    }
+
+    private void extractDatabaseEntry(File zipFile, File targetDb) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".db")) {
+                    Files.copy(zis, targetDb.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    return;
+                }
+            }
+        }
+        throw new IOException("ملف النسخة السحابية لا يحتوي على قاعدة بيانات صالحة");
     }
 }
