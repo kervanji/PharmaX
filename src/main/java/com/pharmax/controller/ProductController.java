@@ -92,6 +92,8 @@ public class ProductController {
     @FXML
     private TableColumn<ProductUnitRow, Boolean> packagingDefaultColumn;
     @FXML
+    private TableColumn<ProductUnitRow, Boolean> packagingActiveColumn;
+    @FXML
     private TextField packagingUnitNameField;
     @FXML
     private TextField packagingBarcodeField;
@@ -103,6 +105,8 @@ public class ProductController {
     private TextField packagingPriceUsdField;
     @FXML
     private CheckBox packagingDefaultCheckBox;
+    @FXML
+    private CheckBox packagingActiveCheckBox;
     @FXML
     private CheckBox isActiveCheckBox;
     @FXML
@@ -191,13 +195,15 @@ public class ProductController {
                 "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
                 "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
                 "حقنة", "مل", "جرام", "قطعة");
-        unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(units));
+        if (unitOfMeasureComboBox != null) {
+            unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(units));
+        }
         if (baseUnitComboBox != null) {
             baseUnitComboBox.setItems(FXCollections.observableArrayList(units));
-            baseUnitComboBox.setValue("شريط");
+            baseUnitComboBox.setValue("حبة");
         }
-        if (unitOfMeasureComboBox.getValue() == null) {
-            unitOfMeasureComboBox.setValue("شريط");
+        if (unitOfMeasureComboBox != null && unitOfMeasureComboBox.getValue() == null) {
+            unitOfMeasureComboBox.setValue("حبة");
         }
     }
 
@@ -216,6 +222,10 @@ public class ProductController {
                 .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getSalePriceUsd()).asObject());
         packagingDefaultColumn
                 .setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().isDefaultUnit()));
+        if (packagingActiveColumn != null) {
+            packagingActiveColumn
+                    .setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().isActiveUnit()));
+        }
         packagingTable.setItems(packagingRows);
         if (packagingConversionField != null
                 && (packagingConversionField.getText() == null || packagingConversionField.getText().isBlank())) {
@@ -232,6 +242,9 @@ public class ProductController {
             packagingPriceField.setText(row.getSalePrice() > 0 ? String.valueOf(row.getSalePrice()) : "");
             packagingPriceUsdField.setText(row.getSalePriceUsd() > 0 ? String.valueOf(row.getSalePriceUsd()) : "");
             packagingDefaultCheckBox.setSelected(row.isDefaultUnit());
+            if (packagingActiveCheckBox != null) {
+                packagingActiveCheckBox.setSelected(row.isActiveUnit());
+            }
         });
     }
 
@@ -438,7 +451,9 @@ public class ProductController {
         quantityField.setText(String.valueOf(product.getQuantityInStock()));
         minimumStockField.setText(product.getMinimumStock() != null ? String.valueOf(product.getMinimumStock()) : "");
         maximumStockField.setText(product.getMaximumStock() != null ? String.valueOf(product.getMaximumStock()) : "");
-        unitOfMeasureComboBox.setValue(product.getUnitOfMeasure());
+        if (unitOfMeasureComboBox != null) {
+            unitOfMeasureComboBox.setValue(product.getUnitOfMeasure());
+        }
         loadBatchFields(product);
         loadStripsPerBox(product);
         if (baseUnitComboBox != null) {
@@ -502,7 +517,8 @@ public class ProductController {
                 conversionFactor,
                 parseDouble(packagingPriceField.getText()),
                 parseDouble(packagingPriceUsdField.getText()),
-                packagingDefaultCheckBox.isSelected()
+                packagingDefaultCheckBox.isSelected(),
+                packagingActiveCheckBox == null || packagingActiveCheckBox.isSelected()
         );
 
         ProductUnitRow selected = packagingTable != null ? packagingTable.getSelectionModel().getSelectedItem() : null;
@@ -513,7 +529,7 @@ public class ProductController {
                 .orElse(null);
 
         if (selected != null && existing != null) {
-            showError("Ø®Ø·Ø£", "ÙˆØ­Ø¯Ø© Ø§Ù„ØªØ¹Ø¨Ø¦Ø© Ù…Ø³Ø¬Ù„Ø© Ù…Ø³Ø¨Ù‚Ø§Ù‹: " + unitName);
+            showError("خطأ", "وحدة التعبئة مسجلة مسبقاً: " + unitName);
             packagingUnitNameField.requestFocus();
             return;
         }
@@ -552,6 +568,9 @@ public class ProductController {
         packagingPriceField.clear();
         packagingPriceUsdField.clear();
         packagingDefaultCheckBox.setSelected(false);
+        if (packagingActiveCheckBox != null) {
+            packagingActiveCheckBox.setSelected(true);
+        }
         if (packagingTable != null) {
             packagingTable.getSelectionModel().clearSelection();
         }
@@ -622,7 +641,7 @@ public class ProductController {
             product.setMaximumStock(parseDoubleOrNull(maximumStockField.getText()));
             String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
                     ? baseUnitComboBox.getValue()
-                    : unitOfMeasureComboBox.getValue();
+                    : unitOfMeasureComboBox != null ? unitOfMeasureComboBox.getValue() : null;
             product.setBaseUnit(baseUnit);
             product.setUnitOfMeasure(baseUnit);
             product.setIsActive(isActiveCheckBox.isSelected());
@@ -661,12 +680,6 @@ public class ProductController {
 
     private List<ProductUnit> buildProductUnits(Product savedProduct) {
         List<ProductUnitRow> rows = new ArrayList<>(packagingRows);
-        double stripsPerBox = stripsPerBoxField != null ? parseDouble(stripsPerBoxField.getText()) : 0.0;
-        if (stripsPerBox > 0) {
-            rows.removeIf(row -> "علبة".equals(row.getUnitName()));
-            rows.add(new ProductUnitRow("علبة", "", stripsPerBox, 0, 0, false));
-        }
-
         return rows.stream()
                 .map(row -> row.toProductUnit(savedProduct))
                 .toList();
@@ -753,15 +766,6 @@ public class ProductController {
             showError("خطأ", "تاريخ الانتهاء يحتاج كمية افتتاحية أكبر من صفر");
             quantityField.requestFocus();
             return false;
-        }
-
-        if (stripsPerBoxField != null && hasText(stripsPerBoxField)) {
-            Double stripsPerBox = parsePositiveDoubleOrNull(stripsPerBoxField.getText());
-            if (stripsPerBox == null) {
-                showError("خطأ", "عدد الشرائط في العلبة يجب أن يكون رقماً أكبر من صفر");
-                stripsPerBoxField.requestFocus();
-                return false;
-            }
         }
 
         return true;
@@ -883,15 +887,17 @@ public class ProductController {
         private double salePrice;
         private double salePriceUsd;
         private boolean defaultUnit;
+        private boolean activeUnit;
 
         public ProductUnitRow(String unitName, String barcode, double conversionFactor,
-                double salePrice, double salePriceUsd, boolean defaultUnit) {
+                double salePrice, double salePriceUsd, boolean defaultUnit, boolean activeUnit) {
             this.unitName = unitName;
             this.barcode = barcode;
             this.conversionFactor = conversionFactor;
             this.salePrice = salePrice;
             this.salePriceUsd = salePriceUsd;
             this.defaultUnit = defaultUnit;
+            this.activeUnit = activeUnit;
         }
 
         public static ProductUnitRow fromUnit(ProductUnit unit) {
@@ -901,7 +907,8 @@ public class ProductController {
                     unit.getEffectiveConversionFactor(),
                     unit.getSalePrice() != null ? unit.getSalePrice() : 0,
                     unit.getSalePriceUsd() != null ? unit.getSalePriceUsd() : 0,
-                    Boolean.TRUE.equals(unit.getIsDefault())
+                    Boolean.TRUE.equals(unit.getIsDefault()),
+                    !Boolean.FALSE.equals(unit.getIsActive())
             );
         }
 
@@ -914,7 +921,7 @@ public class ProductController {
             unit.setSalePrice(salePrice > 0 ? salePrice : null);
             unit.setSalePriceUsd(salePriceUsd > 0 ? salePriceUsd : null);
             unit.setIsDefault(defaultUnit);
-            unit.setIsActive(true);
+            unit.setIsActive(activeUnit);
             return unit;
         }
 
@@ -944,6 +951,10 @@ public class ProductController {
 
         public void setDefaultUnit(boolean defaultUnit) {
             this.defaultUnit = defaultUnit;
+        }
+
+        public boolean isActiveUnit() {
+            return activeUnit;
         }
     }
 }

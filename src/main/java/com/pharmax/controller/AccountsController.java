@@ -124,6 +124,52 @@ public class AccountsController {
         });
     }
 
+    public void applyInitialFilters(Customer customer, String currency, String projectName) {
+        if (customer == null) {
+            return;
+        }
+
+        Customer matchingCustomer = customers.stream()
+                .filter(c -> c.getId() != null && c.getId().equals(customer.getId()))
+                .findFirst()
+                .orElse(customer);
+
+        customerCombo.setItems(customers);
+        customerCombo.setValue(matchingCustomer);
+
+        String normalizedCurrency = normalizeCurrency(currency);
+        if (normalizedCurrency != null) {
+            currencyCombo.setValue(normalizedCurrency);
+        }
+
+        String normalizedProject = projectName != null ? projectName.trim() : "";
+        if (!normalizedProject.isEmpty()) {
+            if (!projectCombo.getItems().contains(normalizedProject)) {
+                projectCombo.getItems().add(normalizedProject);
+            }
+            projectCombo.setValue(normalizedProject);
+            if (projectCombo.getEditor() != null) {
+                projectCombo.getEditor().setText(normalizedProject);
+            }
+        }
+
+        generateStatement();
+    }
+
+    private String normalizeCurrency(String currency) {
+        if (currency == null || currency.trim().isEmpty()) {
+            return null;
+        }
+        String value = currency.trim();
+        if ("IQD".equalsIgnoreCase(value) || "د.ع".equals(value)) {
+            return "دينار";
+        }
+        if ("USD".equalsIgnoreCase(value) || "$".equals(value)) {
+            return "دولار";
+        }
+        return value;
+    }
+
     @FXML
     public void initialize() {
         setupCombos();

@@ -2,10 +2,12 @@ package com.pharmax.controller;
 
 import com.pharmax.database.Repository.ProductRepository;
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductBatch;
 import com.pharmax.model.ProductUnit;
 import com.pharmax.service.BarcodeLabelPrintService;
 import com.pharmax.service.BarcodeService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.ProductUnitService;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
@@ -15,6 +17,7 @@ import javafx.embed.swing.SwingFXUtils;
 import javafx.util.StringConverter;
 
 import java.awt.image.BufferedImage;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class BarcodePrintController {
@@ -22,6 +25,8 @@ public class BarcodePrintController {
     private ComboBox<Product> productComboBox;
     @FXML
     private ComboBox<ProductUnit> unitComboBox;
+    @FXML
+    private ComboBox<ProductBatch> batchComboBox;
     @FXML
     private ComboBox<String> printerComboBox;
     @FXML
@@ -42,13 +47,16 @@ public class BarcodePrintController {
     private final ProductRepository productRepository = new ProductRepository();
     private final InventoryService inventoryService = new InventoryService();
     private final ProductUnitService productUnitService = new ProductUnitService();
+    private final ProductBatchService productBatchService = new ProductBatchService();
     private final BarcodeService barcodeService = new BarcodeService();
     private final BarcodeLabelPrintService printService = new BarcodeLabelPrintService();
+    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     @FXML
     private void initialize() {
         setupProductComboBox();
         setupUnitComboBox();
+        setupBatchComboBox();
         setupPrinterComboBox();
         setupOptions();
         updatePreview();
@@ -72,6 +80,7 @@ public class BarcodePrintController {
         });
         productComboBox.valueProperty().addListener((obs, oldProduct, product) -> {
             loadUnits(product);
+            loadBatches(product);
             updatePreview();
         });
     }
@@ -94,6 +103,25 @@ public class BarcodePrintController {
             }
         });
         unitComboBox.valueProperty().addListener((obs, oldUnit, unit) -> updatePreview());
+    }
+
+    private void setupBatchComboBox() {
+        batchComboBox.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ProductBatch batch) {
+                if (batch == null) {
+                    return "بدون دفعة";
+                }
+                String expiry = batch.getExpiryDate() != null ? batch.getExpiryDate().format(dateFormatter) : "-";
+                return batch.getBatchNumber() + " | " + expiry + " | " + batch.getQuantity();
+            }
+
+            @Override
+            public ProductBatch fromString(String string) {
+                return null;
+            }
+        });
+        batchComboBox.valueProperty().addListener((obs, oldBatch, batch) -> updatePreview());
     }
 
     private void setupPrinterComboBox() {
@@ -142,6 +170,18 @@ public class BarcodePrintController {
                 });
     }
 
+    private void loadBatches(Product product) {
+        batchComboBox.getItems().clear();
+        batchComboBox.setValue(null);
+        if (product == null || product.getId() == null) {
+            return;
+        }
+        List<ProductBatch> batches = productBatchService.getAllBatches(product.getId()).stream()
+                .filter(batch -> batch.getQuantity() != null && batch.getQuantity() > 0)
+                .toList();
+        batchComboBox.getItems().addAll(batches);
+    }
+
     @FXML
     private void handleGenerateBarcode() {
         Product product = productComboBox.getValue();
@@ -187,6 +227,7 @@ public class BarcodePrintController {
     private BarcodeLabelPrintService.BarcodeLabelRequest buildPrintRequest() {
         Product product = productComboBox.getValue();
         ProductUnit unit = unitComboBox.getValue();
+        ProductBatch batch = batchComboBox.getValue();
         if (product == null) {
             throw new IllegalArgumentException("اختر منتجاً أولاً");
         }
@@ -199,7 +240,7 @@ public class BarcodePrintController {
         BarcodeService.LabelOptions options = buildOptions();
         BarcodeLabelPrintService.BarcodeLabelRequest request = new BarcodeLabelPrintService.BarcodeLabelRequest();
         request.setBarcodeText(barcode);
-        request.setProductName(product.getName());
+        request.setProductName(resolveLabelName(product, batch));
         request.setPriceText(resolvePriceText(product, unit));
         request.setCopies(copiesSpinner.getValue());
         request.setPrinterName(printerComboBox.getValue());
@@ -230,6 +271,7 @@ public class BarcodePrintController {
         try {
             Product product = productComboBox != null ? productComboBox.getValue() : null;
             ProductUnit unit = unitComboBox != null ? unitComboBox.getValue() : null;
+            ProductBatch batch = batchComboBox != null ? batchComboBox.getValue() : null;
             String barcode = resolveBarcode(product, unit);
             if (barcode == null || barcode.isBlank()) {
                 previewImageView.setImage(null);
@@ -237,7 +279,7 @@ public class BarcodePrintController {
             }
             BufferedImage image = barcodeService.renderLabel(
                     barcode,
-                    product != null ? product.getName() : "",
+                    product != null ? resolveLabelName(product, batch) : "",
                     resolvePriceText(product, unit),
                     buildOptions()
             );
@@ -255,6 +297,17 @@ public class BarcodePrintController {
             return product.getBarcode().trim();
         }
         return null;
+    }
+
+    private String resolveLabelName(Product product, ProductBatch batch) {
+        if (product == null) {
+            return "";
+        }
+        if (batch == null) {
+            return product.getName();
+        }
+        String expiry = batch.getExpiryDate() != null ? batch.getExpiryDate().format(dateFormatter) : "-";
+        return product.getName() + " | B: " + batch.getBatchNumber() + " | EXP: " + expiry;
     }
 
     private String resolvePriceText(Product product, ProductUnit unit) {

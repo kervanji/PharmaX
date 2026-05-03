@@ -47,6 +47,10 @@
                             <Label text="السعر" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
                             <ComboBox fx:id="priceTypeComboBox" prefWidth="100" nodeOrientation="RIGHT_TO_LEFT"/>
                         </VBox>
+                        <VBox spacing="2" prefWidth="160" minWidth="160" maxWidth="160">
+                            <Label text="وحدة البيع" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
+                            <ComboBox fx:id="unitComboBox" promptText="الوحدة" maxWidth="Infinity" nodeOrientation="RIGHT_TO_LEFT"/>
+                        </VBox>
                         <VBox spacing="2" prefWidth="170" minWidth="170" maxWidth="170">
                             <Label text="الكمية للبيع" textAlignment="RIGHT" style="-fx-font-size: 10px; -fx-text-fill: -fx-form-sublabel;"/>
                             <TextField fx:id="quantityField" promptText="1" maxWidth="Infinity" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
@@ -55,6 +59,9 @@
                     <HBox spacing="15" alignment="CENTER_RIGHT" nodeOrientation="LEFT_TO_RIGHT">
                         <Label fx:id="priceLabel" text="السعر: -" textAlignment="RIGHT" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT" style="-fx-text-fill: -fx-form-sublabel;"/>
                         <Label fx:id="stockLabel" text="المخزون المتاح: -" textAlignment="RIGHT" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT" style="-fx-text-fill: -fx-form-sublabel;"/>
+                        <Label fx:id="productAvailabilitySummaryLabel" text="المتاح: - | أقرب انتهاء: -" textAlignment="RIGHT" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT" style="-fx-text-fill: -fx-text-hint;"/>
+                        <Button fx:id="medicineDetailsButton" text="تفاصيل الدواء والدفعات" onAction="#handleOpenProductBatchDetails" disable="true" nodeOrientation="RIGHT_TO_LEFT"
+                                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8;"/>
                         <Button text="+ إضافة" onAction="#handleAddItem" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;" prefWidth="170"/>
                     </HBox>
                 </VBox>
@@ -84,6 +91,10 @@
                     <columns>
                         <TableColumn fx:id="productNameColumn" text="المنتج" prefWidth="180"/>
                         <TableColumn fx:id="quantityColumn" text="الكمية" prefWidth="80"/>
+                        <TableColumn fx:id="soldUnitColumn" text="الوحدة" prefWidth="80"/>
+                        <TableColumn fx:id="conversionFactorColumn" text="التحويل" prefWidth="70"/>
+                        <TableColumn fx:id="baseQuantityColumn" text="كمية الأساس" prefWidth="95"/>
+                        <TableColumn fx:id="batchPreviewColumn" text="دفعات FEFO" prefWidth="180"/>
                         <TableColumn fx:id="unitPriceColumn" text="السعر" prefWidth="90"/>
                         <TableColumn fx:id="discountColumn" text="الخصم" prefWidth="70"/>
                         <TableColumn fx:id="totalColumn" text="الإجمالي" prefWidth="90"/>

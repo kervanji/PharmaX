@@ -29,6 +29,8 @@
                             <ComboBox fx:id="stockExpiryFilterComboBox" prefWidth="150"/>
                             <Button text="تحديث" onAction="#handleRefreshStock"
                                     style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportStockExcel"/>
+                            <Button text="PDF" onAction="#handleExportStockPdf"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="عدد السجلات:"/>
                             <Label fx:id="stockCountLabel" text="0"/>
@@ -62,6 +64,8 @@
                             <ComboBox fx:id="expiryFilterComboBox" prefWidth="150"/>
                             <Button text="تحديث" onAction="#handleRefreshExpiry"
                                     style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportExpiryExcel"/>
+                            <Button text="PDF" onAction="#handleExportExpiryPdf"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="عدد السجلات:"/>
                             <Label fx:id="expiryCountLabel" text="0"/>
@@ -98,6 +102,8 @@
                             <ComboBox fx:id="movementTypeComboBox" prefWidth="170"/>
                             <Button text="تحديث" onAction="#handleRefreshMovements"
                                     style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportMovementsExcel"/>
+                            <Button text="PDF" onAction="#handleExportMovementsPdf"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="عدد السجلات:"/>
                             <Label fx:id="movementCountLabel" text="0"/>
@@ -137,6 +143,8 @@
                             <TextField fx:id="purchaseSearchField" promptText="منتج أو فاتورة أو دفعة" prefWidth="220"/>
                             <Button text="تحديث" onAction="#handleRefreshPurchases"
                                     style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportPurchasesExcel"/>
+                            <Button text="PDF" onAction="#handleExportPurchasesPdf"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="عدد السجلات:"/>
                             <Label fx:id="purchaseCountLabel" text="0"/>
@@ -165,6 +173,10 @@
                     <VBox spacing="12" alignment="CENTER" style="-fx-padding: 24;">
                         <Label text="تقرير الربح" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
                         <Label fx:id="profitStatusLabel" wrapText="true" maxWidth="700" style="-fx-font-size: 14px; -fx-text-alignment: center;"/>
+                        <HBox spacing="10" alignment="CENTER">
+                            <Button text="Excel" onAction="#handleExportProfitExcel"/>
+                            <Button text="PDF" onAction="#handleExportProfitPdf"/>
+                        </HBox>
                     </VBox>
                 </content>
             </Tab>
@@ -179,6 +191,8 @@
                             <DatePicker fx:id="cashboxToDatePicker"/>
                             <Button text="تحديث" onAction="#handleRefreshCashbox"
                                     style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportCashboxExcel"/>
+                            <Button text="PDF" onAction="#handleExportCashboxPdf"/>
                             <Region HBox.hgrow="ALWAYS"/>
                             <Label text="عدد الأيام:"/>
                             <Label fx:id="cashboxCountLabel" text="0"/>
@@ -196,6 +210,72 @@
                             </columns>
                             <placeholder>
                                 <Label text="لا توجد بيانات صندوق ضمن الفترة المحددة"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+            <Tab text="الأكثر مبيعاً">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="من:"/>
+                            <DatePicker fx:id="velocityFromDatePicker"/>
+                            <Label text="إلى:"/>
+                            <DatePicker fx:id="velocityToDatePicker"/>
+                            <Label text="بحث:"/>
+                            <TextField fx:id="velocitySearchField" promptText="منتج أو كود أو باركود أو فئة" prefWidth="240"/>
+                            <Button text="تحديث" onAction="#handleRefreshVelocity"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportBestSellingExcel"/>
+                            <Button text="PDF" onAction="#handleExportBestSellingPdf"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="bestSellingCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="bestSellingTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="bestProductColumn" text="المنتج" prefWidth="190"/>
+                                <TableColumn fx:id="bestCodeColumn" text="الكود" prefWidth="100"/>
+                                <TableColumn fx:id="bestCategoryColumn" text="الفئة" prefWidth="120"/>
+                                <TableColumn fx:id="bestQtyColumn" text="الكمية المباعة" prefWidth="120"/>
+                                <TableColumn fx:id="bestRevenueColumn" text="الإيراد" prefWidth="120"/>
+                                <TableColumn fx:id="bestLastSaleColumn" text="آخر بيع" prefWidth="140"/>
+                                <TableColumn fx:id="bestStockColumn" text="المخزون الحالي" prefWidth="120"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد مبيعات ضمن الفترة المحددة"/>
+                            </placeholder>
+                        </TableView>
+                    </VBox>
+                </content>
+            </Tab>
+
+            <Tab text="بطيئة الحركة">
+                <content>
+                    <VBox spacing="12" style="-fx-padding: 14;">
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <Label text="استخدم نفس فلاتر تبويب الأكثر مبيعاً ثم اضغط تحديث"/>
+                            <Button text="تحديث" onAction="#handleRefreshVelocity"
+                                    style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-background-radius: 8;"/>
+                            <Button text="Excel" onAction="#handleExportSlowMovingExcel"/>
+                            <Button text="PDF" onAction="#handleExportSlowMovingPdf"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Label text="عدد السجلات:"/>
+                            <Label fx:id="slowMovingCountLabel" text="0"/>
+                        </HBox>
+                        <TableView fx:id="slowMovingTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="slowProductColumn" text="المنتج" prefWidth="190"/>
+                                <TableColumn fx:id="slowCodeColumn" text="الكود" prefWidth="100"/>
+                                <TableColumn fx:id="slowCategoryColumn" text="الفئة" prefWidth="120"/>
+                                <TableColumn fx:id="slowQtyColumn" text="الكمية المباعة" prefWidth="120"/>
+                                <TableColumn fx:id="slowRevenueColumn" text="الإيراد" prefWidth="120"/>
+                                <TableColumn fx:id="slowLastSaleColumn" text="آخر بيع" prefWidth="140"/>
+                                <TableColumn fx:id="slowStockColumn" text="المخزون الحالي" prefWidth="120"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="لا توجد منتجات مطابقة"/>
                             </placeholder>
                         </TableView>
                     </VBox>

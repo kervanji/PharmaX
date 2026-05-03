@@ -1,12 +1,14 @@
 package com.pharmax.controller;
 
 import com.pharmax.model.Customer;
+import com.pharmax.service.PharmacyReportExportService;
 import com.pharmax.service.PharmacyReportService;
 import com.pharmax.util.TabManager;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
@@ -14,8 +16,10 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -96,7 +100,31 @@ public class PharmacyReportsController {
     @FXML private TableColumn<PharmacyReportService.CashboxReportRow, String> cashboxStatusColumn;
     @FXML private Label cashboxCountLabel;
 
+    @FXML private DatePicker velocityFromDatePicker;
+    @FXML private DatePicker velocityToDatePicker;
+    @FXML private TextField velocitySearchField;
+    @FXML private TableView<PharmacyReportService.SalesVelocityRow> bestSellingTable;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> bestProductColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> bestCodeColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> bestCategoryColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> bestQtyColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> bestRevenueColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> bestLastSaleColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> bestStockColumn;
+    @FXML private Label bestSellingCountLabel;
+
+    @FXML private TableView<PharmacyReportService.SalesVelocityRow> slowMovingTable;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> slowProductColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> slowCodeColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> slowCategoryColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> slowQtyColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> slowRevenueColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, String> slowLastSaleColumn;
+    @FXML private TableColumn<PharmacyReportService.SalesVelocityRow, Double> slowStockColumn;
+    @FXML private Label slowMovingCountLabel;
+
     private final PharmacyReportService reportService = new PharmacyReportService();
+    private final PharmacyReportExportService exportService = new PharmacyReportExportService();
     private final DecimalFormat numberFormat = new DecimalFormat("#,##0.##");
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -119,6 +147,7 @@ public class PharmacyReportsController {
         setupPurchaseTab();
         setupProfitTab();
         setupCashboxTab();
+        setupVelocityTabs();
 
         loadPurchaseSuppliers();
         handleRefreshStock();
@@ -126,6 +155,7 @@ public class PharmacyReportsController {
         handleRefreshMovements();
         handleRefreshPurchases();
         handleRefreshCashbox();
+        handleRefreshVelocity();
     }
 
     private void setupStockTab() {
@@ -243,6 +273,33 @@ public class PharmacyReportsController {
         setupNumberColumn(cashboxDifferenceColumn);
     }
 
+    private void setupVelocityTabs() {
+        velocityFromDatePicker.setValue(LocalDate.now().minusDays(30));
+        velocityToDatePicker.setValue(LocalDate.now());
+
+        bestProductColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().productName()));
+        bestCodeColumn.setCellValueFactory(data -> new SimpleStringProperty(safe(data.getValue().productCode())));
+        bestCategoryColumn.setCellValueFactory(data -> new SimpleStringProperty(safe(data.getValue().category())));
+        bestQtyColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().quantitySold()));
+        bestRevenueColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().revenue()));
+        bestLastSaleColumn.setCellValueFactory(data -> new SimpleStringProperty(formatDateTime(data.getValue().lastSaleDate())));
+        bestStockColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().currentStock()));
+        setupNumberColumn(bestQtyColumn);
+        setupNumberColumn(bestRevenueColumn);
+        setupNumberColumn(bestStockColumn);
+
+        slowProductColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().productName()));
+        slowCodeColumn.setCellValueFactory(data -> new SimpleStringProperty(safe(data.getValue().productCode())));
+        slowCategoryColumn.setCellValueFactory(data -> new SimpleStringProperty(safe(data.getValue().category())));
+        slowQtyColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().quantitySold()));
+        slowRevenueColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().revenue()));
+        slowLastSaleColumn.setCellValueFactory(data -> new SimpleStringProperty(formatDateTime(data.getValue().lastSaleDate())));
+        slowStockColumn.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().currentStock()));
+        setupNumberColumn(slowQtyColumn);
+        setupNumberColumn(slowRevenueColumn);
+        setupNumberColumn(slowStockColumn);
+    }
+
     private void loadPurchaseSuppliers() {
         List<Customer> suppliers = reportService.getPurchaseSuppliers();
         purchaseSupplierComboBox.setItems(FXCollections.observableArrayList(suppliers));
@@ -297,6 +354,175 @@ public class PharmacyReportsController {
     }
 
     @FXML
+    private void handleRefreshVelocity() {
+        List<PharmacyReportService.SalesVelocityRow> bestRows = reportService.getBestSellingRows(
+                velocityFromDatePicker.getValue(),
+                velocityToDatePicker.getValue(),
+                velocitySearchField.getText());
+        List<PharmacyReportService.SalesVelocityRow> slowRows = reportService.getSlowMovingRows(
+                velocityFromDatePicker.getValue(),
+                velocityToDatePicker.getValue(),
+                velocitySearchField.getText());
+        bestSellingTable.setItems(FXCollections.observableArrayList(bestRows));
+        slowMovingTable.setItems(FXCollections.observableArrayList(slowRows));
+        bestSellingCountLabel.setText(String.valueOf(bestRows.size()));
+        slowMovingCountLabel.setText(String.valueOf(slowRows.size()));
+    }
+
+    @FXML private void handleExportStockExcel() { exportStock("xlsx"); }
+    @FXML private void handleExportStockPdf() { exportStock("pdf"); }
+    @FXML private void handleExportExpiryExcel() { exportExpiry("xlsx"); }
+    @FXML private void handleExportExpiryPdf() { exportExpiry("pdf"); }
+    @FXML private void handleExportMovementsExcel() { exportMovements("xlsx"); }
+    @FXML private void handleExportMovementsPdf() { exportMovements("pdf"); }
+    @FXML private void handleExportPurchasesExcel() { exportPurchases("xlsx"); }
+    @FXML private void handleExportPurchasesPdf() { exportPurchases("pdf"); }
+    @FXML private void handleExportProfitExcel() { exportProfit("xlsx"); }
+    @FXML private void handleExportProfitPdf() { exportProfit("pdf"); }
+    @FXML private void handleExportCashboxExcel() { exportCashbox("xlsx"); }
+    @FXML private void handleExportCashboxPdf() { exportCashbox("pdf"); }
+    @FXML private void handleExportBestSellingExcel() { exportVelocity("xlsx", true); }
+    @FXML private void handleExportBestSellingPdf() { exportVelocity("pdf", true); }
+    @FXML private void handleExportSlowMovingExcel() { exportVelocity("xlsx", false); }
+    @FXML private void handleExportSlowMovingPdf() { exportVelocity("pdf", false); }
+
+    private void exportStock(String extension) {
+        export("المخزون حسب الدفعة", "stock_by_batch", extension, stockByBatchTable.getItems(), List.of(
+                new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.StockByBatchRow::productName),
+                new PharmacyReportExportService.ReportColumn<>("الكود", PharmacyReportService.StockByBatchRow::productCode),
+                new PharmacyReportExportService.ReportColumn<>("الباركود", PharmacyReportService.StockByBatchRow::barcode),
+                new PharmacyReportExportService.ReportColumn<>("الدفعة", PharmacyReportService.StockByBatchRow::batchNumber),
+                new PharmacyReportExportService.ReportColumn<>("الصلاحية", PharmacyReportService.StockByBatchRow::expiryDate),
+                new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.StockByBatchRow::quantity),
+                new PharmacyReportExportService.ReportColumn<>("التكلفة", PharmacyReportService.StockByBatchRow::unitCost),
+                new PharmacyReportExportService.ReportColumn<>("سعر البيع", PharmacyReportService.StockByBatchRow::salePrice),
+                new PharmacyReportExportService.ReportColumn<>("الحالة", PharmacyReportService.StockByBatchRow::status),
+                new PharmacyReportExportService.ReportColumn<>("المصدر", PharmacyReportService.StockByBatchRow::sourceReference)
+        ));
+    }
+
+    private void exportExpiry(String extension) {
+        export("تقرير الانتهاء", "expiry_report", extension, expiryTable.getItems(), List.of(
+                new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.ExpiryReportRow::productName),
+                new PharmacyReportExportService.ReportColumn<>("الكود", PharmacyReportService.ExpiryReportRow::productCode),
+                new PharmacyReportExportService.ReportColumn<>("الباركود", PharmacyReportService.ExpiryReportRow::barcode),
+                new PharmacyReportExportService.ReportColumn<>("الدفعة", PharmacyReportService.ExpiryReportRow::batchNumber),
+                new PharmacyReportExportService.ReportColumn<>("الصلاحية", PharmacyReportService.ExpiryReportRow::expiryDate),
+                new PharmacyReportExportService.ReportColumn<>("الأيام المتبقية", PharmacyReportService.ExpiryReportRow::daysRemaining),
+                new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.ExpiryReportRow::quantity),
+                new PharmacyReportExportService.ReportColumn<>("الحالة", PharmacyReportService.ExpiryReportRow::status)
+        ));
+    }
+
+    private void exportMovements(String extension) {
+        export("حركات المخزون", "inventory_movements", extension, movementsTable.getItems(), List.of(
+                new PharmacyReportExportService.ReportColumn<>("التاريخ", PharmacyReportService.MovementReportRow::movementDate),
+                new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.MovementReportRow::productName),
+                new PharmacyReportExportService.ReportColumn<>("الكود", PharmacyReportService.MovementReportRow::productCode),
+                new PharmacyReportExportService.ReportColumn<>("الدفعة", PharmacyReportService.MovementReportRow::batchNumber),
+                new PharmacyReportExportService.ReportColumn<>("النوع", PharmacyReportService.MovementReportRow::movementType),
+                new PharmacyReportExportService.ReportColumn<>("قبل", PharmacyReportService.MovementReportRow::quantityBefore),
+                new PharmacyReportExportService.ReportColumn<>("التغير", PharmacyReportService.MovementReportRow::quantityChanged),
+                new PharmacyReportExportService.ReportColumn<>("بعد", PharmacyReportService.MovementReportRow::quantityAfter),
+                new PharmacyReportExportService.ReportColumn<>("المرجع", PharmacyReportService.MovementReportRow::referenceType),
+                new PharmacyReportExportService.ReportColumn<>("رقم المرجع", PharmacyReportService.MovementReportRow::referenceId),
+                new PharmacyReportExportService.ReportColumn<>("ملاحظات", PharmacyReportService.MovementReportRow::note)
+        ));
+    }
+
+    private void exportPurchases(String extension) {
+        export("تقرير المشتريات", "purchase_report", extension, purchasesTable.getItems(), List.of(
+                new PharmacyReportExportService.ReportColumn<>("الفاتورة", PharmacyReportService.PurchaseReportRow::voucherNumber),
+                new PharmacyReportExportService.ReportColumn<>("رقم الفاتورة", PharmacyReportService.PurchaseReportRow::voucherId),
+                new PharmacyReportExportService.ReportColumn<>("التاريخ", PharmacyReportService.PurchaseReportRow::voucherDate),
+                new PharmacyReportExportService.ReportColumn<>("المورد", PharmacyReportService.PurchaseReportRow::supplierName),
+                new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.PurchaseReportRow::productName),
+                new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.PurchaseReportRow::quantity),
+                new PharmacyReportExportService.ReportColumn<>("المبلغ", PharmacyReportService.PurchaseReportRow::amount),
+                new PharmacyReportExportService.ReportColumn<>("الدفعة", PharmacyReportService.PurchaseReportRow::batchNumber),
+                new PharmacyReportExportService.ReportColumn<>("الصلاحية", PharmacyReportService.PurchaseReportRow::expirationDate)
+        ));
+    }
+
+    private void exportCashbox(String extension) {
+        export("تقرير الصندوق", "cashbox_report", extension, cashboxTable.getItems(), cashboxColumns());
+    }
+
+    private void exportProfit(String extension) {
+        export("تقرير الربح", "profit_report", extension, List.of(profitStatusLabel.getText()), List.of(
+                new PharmacyReportExportService.ReportColumn<>("حالة التقرير", value -> value)
+        ));
+    }
+
+    private void exportVelocity(String extension, boolean bestSelling) {
+        TableView<PharmacyReportService.SalesVelocityRow> table = bestSelling ? bestSellingTable : slowMovingTable;
+        export(bestSelling ? "المنتجات الأكثر مبيعاً" : "المنتجات بطيئة الحركة",
+                bestSelling ? "best_selling_products" : "slow_moving_products",
+                extension,
+                table.getItems(),
+                velocityColumns());
+    }
+
+    private List<PharmacyReportExportService.ReportColumn<PharmacyReportService.CashboxReportRow>> cashboxColumns() {
+        return List.of(
+                new PharmacyReportExportService.ReportColumn<>("التاريخ", PharmacyReportService.CashboxReportRow::date),
+                new PharmacyReportExportService.ReportColumn<>("الرصيد الافتتاحي", PharmacyReportService.CashboxReportRow::openingCash),
+                new PharmacyReportExportService.ReportColumn<>("الداخل", PharmacyReportService.CashboxReportRow::totalIn),
+                new PharmacyReportExportService.ReportColumn<>("الخارج", PharmacyReportService.CashboxReportRow::totalOut),
+                new PharmacyReportExportService.ReportColumn<>("الرصيد المتوقع", PharmacyReportService.CashboxReportRow::expectedCash),
+                new PharmacyReportExportService.ReportColumn<>("الرصيد الفعلي", PharmacyReportService.CashboxReportRow::actualCash),
+                new PharmacyReportExportService.ReportColumn<>("الفرق", PharmacyReportService.CashboxReportRow::difference),
+                new PharmacyReportExportService.ReportColumn<>("الحالة", PharmacyReportService.CashboxReportRow::status)
+        );
+    }
+
+    private List<PharmacyReportExportService.ReportColumn<PharmacyReportService.SalesVelocityRow>> velocityColumns() {
+        return List.of(
+                new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.SalesVelocityRow::productName),
+                new PharmacyReportExportService.ReportColumn<>("الكود", PharmacyReportService.SalesVelocityRow::productCode),
+                new PharmacyReportExportService.ReportColumn<>("الباركود", PharmacyReportService.SalesVelocityRow::barcode),
+                new PharmacyReportExportService.ReportColumn<>("الفئة", PharmacyReportService.SalesVelocityRow::category),
+                new PharmacyReportExportService.ReportColumn<>("الكمية المباعة", PharmacyReportService.SalesVelocityRow::quantitySold),
+                new PharmacyReportExportService.ReportColumn<>("الإيراد", PharmacyReportService.SalesVelocityRow::revenue),
+                new PharmacyReportExportService.ReportColumn<>("آخر بيع", PharmacyReportService.SalesVelocityRow::lastSaleDate),
+                new PharmacyReportExportService.ReportColumn<>("المخزون الحالي", PharmacyReportService.SalesVelocityRow::currentStock)
+        );
+    }
+
+    private <T> void export(String title,
+                            String baseFileName,
+                            String extension,
+                            List<T> rows,
+                            List<PharmacyReportExportService.ReportColumn<T>> columns) {
+        try {
+            File selected = showSaveDialog(title, baseFileName, extension);
+            if (selected == null) {
+                return;
+            }
+            if ("pdf".equalsIgnoreCase(extension)) {
+                exportService.exportPdf(selected, title, columns, rows);
+            } else {
+                exportService.exportExcel(selected, title, columns, rows);
+            }
+            showInfo("تم", "تم تصدير التقرير:\n" + selected.getAbsolutePath());
+        } catch (Exception e) {
+            showError("خطأ", "فشل تصدير التقرير: " + e.getMessage());
+        }
+    }
+
+    private File showSaveDialog(String title, String baseFileName, String extension) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("حفظ " + title);
+        fileChooser.setInitialFileName(baseFileName + "." + extension);
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "pdf".equalsIgnoreCase(extension) ? "PDF" : "Excel",
+                "*." + extension
+        ));
+        Stage owner = (Stage) stockByBatchTable.getScene().getWindow();
+        return fileChooser.showSaveDialog(owner);
+    }
+
+    @FXML
     private void handleClose() {
         if (tabMode && tabId != null && !tabId.isBlank()) {
             TabManager.getInstance().closeTab(tabId);
@@ -326,5 +552,21 @@ public class PharmacyReportsController {
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private void showError(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void showInfo(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 }

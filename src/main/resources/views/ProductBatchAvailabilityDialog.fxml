@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="detailsRoot"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.pharmax.controller.ProductBatchAvailabilityDialogController"
+      stylesheets="@../styles/main.css"
+      spacing="14"
+      nodeOrientation="RIGHT_TO_LEFT"
+      style="-fx-background-color: -fx-bg-gradient; -fx-padding: 18;">
+
+    <Label text="تفاصيل الدواء والدفعات"
+           style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+    <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+          style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-border-color: -fx-border-main; -fx-border-radius: 8; -fx-padding: 12;">
+        <Label text="معلومات المنتج"
+               style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+        <GridPane hgap="12" vgap="8" nodeOrientation="RIGHT_TO_LEFT">
+            <columnConstraints>
+                <ColumnConstraints percentWidth="13"/>
+                <ColumnConstraints percentWidth="20"/>
+                <ColumnConstraints percentWidth="13"/>
+                <ColumnConstraints percentWidth="20"/>
+                <ColumnConstraints percentWidth="13"/>
+                <ColumnConstraints percentWidth="21"/>
+            </columnConstraints>
+
+            <Label text="الاسم:" GridPane.rowIndex="0" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="productNameLabel" text="-" GridPane.rowIndex="0" GridPane.columnIndex="1" style="-fx-font-weight: bold;"/>
+            <Label text="الباركود:" GridPane.rowIndex="0" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="barcodeLabel" text="-" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
+            <Label text="الفئة:" GridPane.rowIndex="0" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="categoryLabel" text="-" GridPane.rowIndex="0" GridPane.columnIndex="5"/>
+
+            <Label text="الاسم العلمي:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="scientificNameLabel" text="-" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+            <Label text="الشركة:" GridPane.rowIndex="1" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="manufacturerLabel" text="-" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
+            <Label text="الشكل:" GridPane.rowIndex="1" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="dosageFormLabel" text="-" GridPane.rowIndex="1" GridPane.columnIndex="5"/>
+
+            <Label text="الموقع:" GridPane.rowIndex="2" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="storageLocationLabel" text="-" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+            <Label text="سعر البيع:" GridPane.rowIndex="2" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="salePriceLabel" text="-" GridPane.rowIndex="2" GridPane.columnIndex="3" style="-fx-font-weight: bold;"/>
+            <Label text="المتاح:" GridPane.rowIndex="2" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-sublabel;"/>
+            <Label fx:id="totalAvailableLabel" text="-" GridPane.rowIndex="2" GridPane.columnIndex="5" style="-fx-font-weight: bold;"/>
+        </GridPane>
+    </VBox>
+
+    <VBox spacing="8" VBox.vgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+        <Label text="الدفعات والصلاحية"
+               style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+        <TableView fx:id="batchesTable" prefWidth="860" prefHeight="360" VBox.vgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
+            <columns>
+                <TableColumn fx:id="fefoOrderColumn" text="FEFO" prefWidth="60"/>
+                <TableColumn fx:id="batchNumberColumn" text="رقم الدفعة" prefWidth="140"/>
+                <TableColumn fx:id="expiryDateColumn" text="الصلاحية" prefWidth="120"/>
+                <TableColumn fx:id="daysRemainingColumn" text="الأيام" prefWidth="80"/>
+                <TableColumn fx:id="baseQuantityColumn" text="كمية الأساس" prefWidth="130"/>
+                <TableColumn fx:id="selectedUnitQuantityColumn" text="بالوحدة المختارة" prefWidth="150"/>
+                <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="120"/>
+            </columns>
+            <placeholder>
+                <Label text="لا توجد دفعات لهذا المنتج" textAlignment="RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+            </placeholder>
+        </TableView>
+    </VBox>
+
+    <HBox alignment="CENTER_LEFT" nodeOrientation="LEFT_TO_RIGHT">
+        <Button text="إغلاق" onAction="#handleClose" prefWidth="110"
+                style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10 18;"/>
+    </HBox>
+</VBox>

@@ -22,6 +22,8 @@
         <DatePicker fx:id="ledgerDatePicker" onAction="#handleRefresh"/>
         <Button text="تحديث" onAction="#handleRefresh"
                 style="-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-weight: bold;"/>
+        <Button text="تصدير Excel" onAction="#handleExportExcel"/>
+        <Button text="تصدير PDF" onAction="#handleExportPdf"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Label fx:id="closingStatusLabel" text="-" style="-fx-text-fill: -fx-form-sublabel;"/>
     </HBox>

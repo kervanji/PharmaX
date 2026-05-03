@@ -39,7 +39,9 @@ import com.pharmax.model.Sale;
 import com.pharmax.model.UserRole;
 import com.pharmax.model.VoucherType;
 import com.pharmax.service.CustomerService;
+import com.pharmax.service.CashboxService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.SalesService;
 import com.pharmax.service.VoucherService;
 import org.slf4j.Logger;
@@ -82,6 +84,12 @@ public class MainController {
     private Label lowStockDescLabel;
     @FXML
     private Label lowStockCountLabel;
+    @FXML
+    private Label expiryAlertSummaryLabel;
+    @FXML
+    private Label dataQualityAlertSummaryLabel;
+    @FXML
+    private Label cashboxClosingSummaryLabel;
     @FXML
     private Label pendingPaymentsDescLabel;
     @FXML
@@ -155,6 +163,7 @@ public class MainController {
     private MainApp mainApp;
     @SuppressWarnings("unused") private final CustomerService customerService = new CustomerService();
     private final InventoryService inventoryService = new InventoryService();
+    private final ProductBatchService productBatchService = new ProductBatchService();
     private final SalesService salesService = new SalesService();
     private final VoucherService voucherService = new VoucherService();
 
@@ -348,6 +357,8 @@ public class MainController {
         applyRolePermissions();
         buildDashboardTiles();
         refreshDashboard();
+        loadInstallmentReminderDays();
+        refreshInstallmentAlerts();
         initUpdateUi();
         checkForUpdatesInBackground();
         updateDriveStatusIndicator();
@@ -894,6 +905,40 @@ public class MainController {
                     lowStockCountLabel.setStyle(
                             "-fx-font-size: 12px; -fx-text-fill: -fx-danger-text; -fx-background-color: -fx-badge-danger-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
                 }
+            }
+
+            int expiryAlerts = productBatchService.getExpiryAlertBatches(today).size();
+            if (expiryAlertSummaryLabel != null) {
+                if (expiryAlerts == 0) {
+                    expiryAlertSummaryLabel.setText("لا توجد تنبيهات انتهاء");
+                    expiryAlertSummaryLabel.setStyle(
+                            "-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-background-color: -fx-success-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
+                } else {
+                    expiryAlertSummaryLabel.setText(expiryAlerts + " دفعة تحتاج مراجعة");
+                    expiryAlertSummaryLabel.setStyle(
+                            "-fx-font-size: 12px; -fx-text-fill: -fx-warning-text; -fx-background-color: -fx-badge-warning-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
+                }
+            }
+
+            int qualityAlerts = inventoryService.getDataQualityAlerts().size();
+            if (dataQualityAlertSummaryLabel != null) {
+                if (qualityAlerts == 0) {
+                    dataQualityAlertSummaryLabel.setText("البيانات سليمة");
+                    dataQualityAlertSummaryLabel.setStyle(
+                            "-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-background-color: -fx-success-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
+                } else {
+                    dataQualityAlertSummaryLabel.setText(qualityAlerts + " ملاحظة بيانات");
+                    dataQualityAlertSummaryLabel.setStyle(
+                            "-fx-font-size: 12px; -fx-text-fill: -fx-warning-text; -fx-background-color: -fx-badge-warning-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
+                }
+            }
+
+            if (cashboxClosingSummaryLabel != null) {
+                boolean closedToday = new CashboxService().getClosingByDate(today).isPresent();
+                cashboxClosingSummaryLabel.setText(closedToday ? "تم إقفال اليوم" : "اليوم غير مقفل");
+                cashboxClosingSummaryLabel.setStyle(closedToday
+                        ? "-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-background-color: -fx-success-bg; -fx-padding: 6 10; -fx-background-radius: 8;"
+                        : "-fx-font-size: 12px; -fx-text-fill: -fx-warning-text; -fx-background-color: -fx-badge-warning-bg; -fx-padding: 6 10; -fx-background-radius: 8;");
             }
 
             // Inventory value

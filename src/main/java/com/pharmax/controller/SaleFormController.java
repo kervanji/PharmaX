@@ -74,11 +74,23 @@ public class SaleFormController {
     @FXML
     private Label priceLabel;
     @FXML
+    private Label productAvailabilitySummaryLabel;
+    @FXML
+    private Button medicineDetailsButton;
+    @FXML
     private TableView<SaleItemRow> itemsTable;
     @FXML
     private TableColumn<SaleItemRow, String> productNameColumn;
     @FXML
     private TableColumn<SaleItemRow, Double> quantityColumn;
+    @FXML
+    private TableColumn<SaleItemRow, String> soldUnitColumn;
+    @FXML
+    private TableColumn<SaleItemRow, Double> conversionFactorColumn;
+    @FXML
+    private TableColumn<SaleItemRow, Double> baseQuantityColumn;
+    @FXML
+    private TableColumn<SaleItemRow, String> batchPreviewColumn;
     @FXML
     private TableColumn<SaleItemRow, Double> unitPriceColumn;
     @FXML
@@ -134,6 +146,7 @@ public class SaleFormController {
     private final SalesService salesService;
     private final ReceiptService receiptService;
     private final ProductUnitService productUnitService;
+    private final ProductBatchService productBatchService;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final ObservableList<SaleItemRow> saleItems = FXCollections.observableArrayList();
@@ -155,6 +168,7 @@ public class SaleFormController {
         this.salesService = new SalesService();
         this.receiptService = new ReceiptService();
         this.productUnitService = new ProductUnitService();
+        this.productBatchService = new ProductBatchService();
         this.customerRepository = new CustomerRepository();
         this.productRepository = new ProductRepository();
 
@@ -171,6 +185,7 @@ public class SaleFormController {
         setupProductComboBox();
         setupUnitComboBox();
         setupPriceTypeComboBox();
+        setupProductPreviewPanel();
         setupItemsTable();
         setupDefaults();
         selectDefaultSaleCustomer();
@@ -254,7 +269,15 @@ public class SaleFormController {
             selectedUnit = newUnit;
             updateSelectedProductStockLabel();
             updateSelectedProductPriceLabel();
+            updateProductPreviewPanel();
         });
+    }
+
+    private void setupProductPreviewPanel() {
+        if (quantityField != null) {
+            quantityField.textProperty().addListener((obs, oldValue, newValue) -> updateProductPreviewPanel());
+        }
+        clearProductPreviewPanel();
     }
 
     private void updateExchangeRateVisibility(String currency) {
@@ -651,6 +674,94 @@ public class SaleFormController {
         }
         updateSelectedProductStockLabel();
         updateSelectedProductPriceLabel();
+        updateProductPreviewPanel();
+    }
+
+    private void updateProductPreviewPanel() {
+        Product product = selectedProduct;
+        if (product == null) {
+            clearProductPreviewPanel();
+            return;
+        }
+
+        ProductUnit unit = getSelectedSaleUnit();
+        double factor = unit != null ? unit.getEffectiveConversionFactor() : 1.0;
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        String saleUnit = unit != null && unit.getUnitName() != null ? unit.getUnitName() : baseUnit;
+        try {
+            List<ProductBatch> batches = productBatchService.getAvailableBatches(product.getId());
+            double availableBase = batches.stream().mapToDouble(ProductBatch::getQuantity).sum();
+            double availableSelected = factor > 0 ? availableBase / factor : availableBase;
+            String nearestExpiry = batches.isEmpty() || batches.get(0).getExpiryDate() == null
+                    ? "-"
+                    : batches.get(0).getExpiryDate().toString();
+            setPreviewText(productAvailabilitySummaryLabel,
+                    "المتاح: " + numberFormatter.format(availableBase) + " " + baseUnit
+                            + " / " + numberFormatter.format(availableSelected) + " " + saleUnit
+                            + " | أقرب انتهاء: " + nearestExpiry);
+        } catch (Exception e) {
+            logger.warn("Could not load batch preview for product {}", product.getId(), e);
+            setPreviewText(productAvailabilitySummaryLabel, "المتاح: - | أقرب انتهاء: -");
+        }
+        if (medicineDetailsButton != null) {
+            medicineDetailsButton.setDisable(false);
+        }
+    }
+
+    private void clearProductPreviewPanel() {
+        setPreviewText(productAvailabilitySummaryLabel, "المتاح: - | أقرب انتهاء: -");
+        if (medicineDetailsButton != null) {
+            medicineDetailsButton.setDisable(true);
+        }
+    }
+
+    @FXML
+    private void handleOpenProductBatchDetails() {
+        Product product = selectedProduct != null ? selectedProduct : productComboBox.getValue();
+        if (product == null) {
+            showInfo("تفاصيل الدواء والدفعات", "اختر منتجاً أولاً لعرض التفاصيل");
+            return;
+        }
+
+        try {
+            FXMLLoader loader = new FXMLLoader();
+            loader.setLocation(getClass().getResource("/views/ProductBatchAvailabilityDialog.fxml"));
+            loader.setCharset(StandardCharsets.UTF_8);
+            Parent content = loader.load();
+
+            ProductBatchAvailabilityDialogController controller = loader.getController();
+            ProductUnit saleUnit = getSelectedSaleUnit();
+            Double salePrice = getSelectedPrice(product, saleUnit, IQD_CURRENCY);
+            controller.setProduct(product, saleUnit, salePrice, IQD_CURRENCY);
+
+            Stage stage = new Stage();
+            stage.setTitle("تفاصيل الدواء والدفعات");
+            stage.initModality(Modality.WINDOW_MODAL);
+            if (root != null && root.getScene() != null) {
+                stage.initOwner(root.getScene().getWindow());
+            } else if (dialogStage != null) {
+                stage.initOwner(dialogStage);
+            }
+            Scene scene = new Scene(content);
+            com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
+            com.pharmax.MainApp.applyCurrentFontSize(scene);
+            stage.setScene(scene);
+            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
+            stage.showAndWait();
+        } catch (Exception e) {
+            logger.error("Failed to open product batch availability dialog", e);
+            showError("خطأ", "تعذر فتح تفاصيل الدواء والدفعات: " + e.getMessage());
+        }
+    }
+
+    private void setPreviewText(Label label, String value) {
+        if (label != null) {
+            label.setText(safeText(value));
+        }
+    }
+
+    private String safeText(String value) {
+        return value == null || value.trim().isEmpty() ? "-" : value.trim();
     }
 
     private void updateSelectedProductStockLabel() {
@@ -803,6 +914,20 @@ public class SaleFormController {
             }
         });
         quantityColumn.setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getQuantity()).asObject());
+        if (soldUnitColumn != null) {
+            soldUnitColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSoldUnit()));
+        }
+        if (conversionFactorColumn != null) {
+            conversionFactorColumn
+                    .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getConversionFactor()).asObject());
+        }
+        if (baseQuantityColumn != null) {
+            baseQuantityColumn
+                    .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getBaseQuantity()).asObject());
+        }
+        if (batchPreviewColumn != null) {
+            batchPreviewColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBatchPreview()));
+        }
         unitPriceColumn
                 .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getUnitPrice()).asObject());
         discountColumn
@@ -866,6 +991,7 @@ public class SaleFormController {
                 }
                 row.setQuantity(newValue);
                 row.recalculate();
+                refreshCartBatchPreviews();
                 itemsTable.refresh();
                 updateTotals();
             }
@@ -1126,6 +1252,7 @@ public class SaleFormController {
                 deleteBtn.setOnAction(e -> {
                     SaleItemRow item = getTableView().getItems().get(getIndex());
                     saleItems.remove(item);
+                    refreshCartBatchPreviews();
                     updateTotals();
                 });
             }
@@ -1381,7 +1508,6 @@ public class SaleFormController {
             double newQty = existingItem.getQuantity() + quantity;
             existingItem.setQuantity(newQty);
             existingItem.recalculate();
-            itemsTable.refresh();
         } else {
             SaleItemRow newItem = new SaleItemRow(
                     product.getId(),
@@ -1399,6 +1525,7 @@ public class SaleFormController {
             saleItems.add(newItem);
         }
 
+        refreshCartBatchPreviews();
         updateTotals();
         clearProductSelection();
     }
@@ -1415,6 +1542,73 @@ public class SaleFormController {
         quantityField.setText("1");
         stockLabel.setText("المخزون المتاح: -");
         priceLabel.setText("السعر: -");
+        clearProductPreviewPanel();
+    }
+
+    private void refreshCartBatchPreviews() {
+        Map<Long, List<ProductBatch>> batchesByProductId = new HashMap<>();
+        Map<Long, Double> remainingByBatchId = new HashMap<>();
+
+        for (SaleItemRow row : saleItems) {
+            row.setBatchPreview(buildCumulativeBatchPreviewText(row, batchesByProductId, remainingByBatchId));
+        }
+
+        if (itemsTable != null) {
+            itemsTable.refresh();
+        }
+    }
+
+    private String buildCumulativeBatchPreviewText(SaleItemRow row,
+                                                   Map<Long, List<ProductBatch>> batchesByProductId,
+                                                   Map<Long, Double> remainingByBatchId) {
+        if (row == null || row.getProductId() == null) {
+            return "-";
+        }
+
+        try {
+            List<ProductBatch> batches = batchesByProductId.computeIfAbsent(row.getProductId(),
+                    productBatchService::getAvailableBatches);
+            if (batches.isEmpty()) {
+                return "لا توجد دفعات صالحة";
+            }
+
+            double remainingRequired = Math.max(0.0, row.getBaseQuantity());
+            List<String> parts = new ArrayList<>();
+            for (ProductBatch batch : batches) {
+                if (remainingRequired <= 1e-9) {
+                    break;
+                }
+                Long batchId = batch.getId();
+                double remainingInBatch = remainingByBatchId.computeIfAbsent(batchId,
+                        id -> batch.getQuantity() != null ? batch.getQuantity() : 0.0);
+                if (remainingInBatch <= 1e-9) {
+                    continue;
+                }
+
+                double used = Math.min(remainingRequired, remainingInBatch);
+                String expiry = batch.getExpiryDate() != null ? batch.getExpiryDate().toString() : "-";
+                parts.add(safeText(batch.getBatchNumber()) + " / " + expiry + " / " + numberFormatter.format(used));
+                remainingByBatchId.put(batchId, remainingInBatch - used);
+                remainingRequired -= used;
+            }
+
+            if (remainingRequired > 1e-9) {
+                if (parts.isEmpty()) {
+                    return "غير كافٍ حسب الدفعات الصالحة";
+                }
+                parts.add("غير كافٍ حسب الدفعات الصالحة");
+            }
+
+            if (parts.isEmpty()) {
+                ProductBatch first = batches.get(0);
+                String expiry = first.getExpiryDate() != null ? first.getExpiryDate().toString() : "-";
+                return safeText(first.getBatchNumber()) + " / " + expiry;
+            }
+            return String.join("، ", parts);
+        } catch (Exception e) {
+            logger.warn("Could not build cumulative batch preview for product {}", row.getProductId(), e);
+            return "-";
+        }
     }
 
     private boolean isStockInsufficient(SaleItemRow row) {
@@ -1817,6 +2011,7 @@ public class SaleFormController {
         private String soldUnit;
         private double conversionFactor = 1.0;
         private double baseQuantity;
+        private String batchPreview = "-";
 
         private String currency = "دينار";
         private double exchangeRate = 1500.0;
@@ -1894,6 +2089,14 @@ public class SaleFormController {
 
         public void setBaseQuantity(double baseQuantity) {
             this.baseQuantity = baseQuantity;
+        }
+
+        public String getBatchPreview() {
+            return batchPreview != null ? batchPreview : "-";
+        }
+
+        public void setBatchPreview(String batchPreview) {
+            this.batchPreview = batchPreview;
         }
 
         public double getUnitPrice() {

@@ -574,21 +574,62 @@ public class PaymentVoucherController implements Initializable {
     
     @FXML
     private void showCustomerStatement() {
-        if (selectedCustomer != null) {
-            // TODO: Show customer statement for IQD
-            showAlert(Alert.AlertType.INFORMATION, "كشف حساب", 
-                "كشف حساب " + selectedCustomer.getName() + " بالدينار\nالرصيد: " + 
-                numberFormat.format(selectedCustomer.getBalanceIqd()) + " د.ع");
-        }
+        openCustomerStatement("دينار");
     }
     
     @FXML
     private void showCustomerStatementUsd() {
-        if (selectedCustomer != null) {
-            showAlert(Alert.AlertType.INFORMATION, "كشف حساب", 
-                "كشف حساب " + selectedCustomer.getName() + " بالدولار\nالرصيد: " + 
-                numberFormat.format(selectedCustomer.getBalanceUsd()) + " $");
+        openCustomerStatement("دولار");
+    }
+
+    private void openCustomerStatement(String currency) {
+        if (selectedCustomer == null) {
+            showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار الحساب أولاً");
+            return;
         }
+
+        String projectName = getSelectedProjectName();
+        try {
+            String tabId = "accounts-payment-statement-" + System.nanoTime();
+            String title = "كشف حساب " + currency + " - " + selectedCustomer.getName();
+            AccountsController controller = TabManager.getInstance().openTab(
+                    tabId,
+                    title,
+                    "statement.svg",
+                    "/views/Accounts.fxml",
+                    (AccountsController accountsController) -> {
+                        accountsController.setTabMode(true);
+                        accountsController.setTabId(tabId);
+                        accountsController.applyInitialFilters(selectedCustomer, currency, projectName);
+                    });
+
+            if (controller == null) {
+                showCustomerStatementFallback(currency);
+            }
+        } catch (Exception e) {
+            showCustomerStatementFallback(currency);
+        }
+    }
+
+    private String getSelectedProjectName() {
+        if (projectNameField == null) {
+            return null;
+        }
+        String projectName = projectNameField.getValue();
+        if ((projectName == null || projectName.isBlank()) && projectNameField.getEditor() != null) {
+            projectName = projectNameField.getEditor().getText();
+        }
+        return projectName != null && !projectName.isBlank() ? projectName.trim() : null;
+    }
+
+    private void showCustomerStatementFallback(String currency) {
+        boolean usd = "دولار".equals(currency) || "USD".equalsIgnoreCase(currency);
+        double balance = usd ? selectedCustomer.getBalanceUsd() : selectedCustomer.getBalanceIqd();
+        String suffix = usd ? " $" : " د.ع";
+        showAlert(Alert.AlertType.INFORMATION, "كشف حساب",
+                "تعذر فتح شاشة كشف الحساب.\n"
+                        + "كشف حساب " + selectedCustomer.getName() + " ب" + (usd ? "الدولار" : "الدينار")
+                        + "\nالرصيد: " + numberFormat.format(balance) + suffix);
     }
     
     private static class PreviousVoucherRow {

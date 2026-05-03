@@ -1,193 +1,223 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.geometry.Insets?>
 
-<ScrollPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+<ScrollPane xmlns="http://javafx.com/javafx/17"
+            xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.pharmax.controller.ProductController"
             fitToWidth="true" fitToHeight="true"
             style="-fx-background-color: transparent; -fx-background: transparent;">
-    
+
     <VBox stylesheets="@../styles/main.css"
-          spacing="16"
-          style="-fx-background-color: -fx-bg-gradient; -fx-padding: 24; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';">
-        
-        <Label text="إضافة / تعديل منتج" 
+          spacing="12"
+          nodeOrientation="RIGHT_TO_LEFT"
+          style="-fx-background-color: -fx-bg-gradient; -fx-padding: 18; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';">
+
+        <HBox visible="false" managed="false">
+            <ComboBox fx:id="unitOfMeasureComboBox"/>
+            <DatePicker fx:id="expiryDatePicker"/>
+            <TextField fx:id="stripsPerBoxField"/>
+            <TextField fx:id="wholesalePriceField"/>
+            <TextField fx:id="wholesalePriceUsdField"/>
+            <TextField fx:id="specialPriceField"/>
+            <TextField fx:id="specialPriceUsdField"/>
+            <Label fx:id="profitMarginWholesaleLabel"/>
+            <Label fx:id="profitMarginSpecialLabel"/>
+        </HBox>
+
+        <Label text="إضافة / تعديل منتج"
                style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
-        
-        <HBox spacing="24">
-            <!-- عمود اليمين (المعلومات الأساسية) -->
-            <GridPane hgap="12" vgap="12" HBox.hgrow="ALWAYS" prefWidth="500">
+
+        <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+              style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
+            <Label text="معلومات المنتج الأساسية"
+                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+            <GridPane hgap="12" vgap="10" nodeOrientation="RIGHT_TO_LEFT">
                 <columnConstraints>
-                    <ColumnConstraints percentWidth="30"/>
-                    <ColumnConstraints percentWidth="70"/>
+                    <ColumnConstraints percentWidth="14"/>
+                    <ColumnConstraints percentWidth="36"/>
+                    <ColumnConstraints percentWidth="14"/>
+                    <ColumnConstraints percentWidth="36"/>
                 </columnConstraints>
-                
-                <Label text="كود المنتج:" GridPane.rowIndex="0" GridPane.columnIndex="0" 
+
+                <Label text="كود المنتج:" GridPane.rowIndex="0" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="productCodeField" GridPane.rowIndex="0" GridPane.columnIndex="1"
                            promptText="سيتم توليده تلقائياً"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                
+
+                <Label text="الباركود:" GridPane.rowIndex="0" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="barcodeField" GridPane.rowIndex="0" GridPane.columnIndex="3"
+                           promptText="باركود المنتج الرئيسي"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
                 <Label text="اسم المنتج:*" GridPane.rowIndex="1" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="nameField" GridPane.rowIndex="1" GridPane.columnIndex="1"
                            promptText="أدخل اسم المنتج"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                
-                <Label text="الفئة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
+
+                <Label text="الفئة:" GridPane.rowIndex="1" GridPane.columnIndex="2"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <HBox spacing="8" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                <HBox spacing="8" GridPane.rowIndex="1" GridPane.columnIndex="3">
                     <ComboBox fx:id="categoryComboBox" HBox.hgrow="ALWAYS" maxWidth="Infinity"
                               promptText="اختر الفئة"
                               style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
                     <Button text="+" onAction="#handleAddCategory"
                             style="-fx-background-color: #2a8cff; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-min-width: 36;"/>
                 </HBox>
-                
-                <Label text="الباركود:" GridPane.rowIndex="3" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="barcodeField" GridPane.rowIndex="3" GridPane.columnIndex="1"
-                           promptText="أدخل الباركود (اختياري)"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                
-                <Label text="وحدة القياس:" GridPane.rowIndex="4" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <ComboBox fx:id="unitOfMeasureComboBox" GridPane.rowIndex="4" GridPane.columnIndex="1"
-                          maxWidth="Infinity" promptText="اختر وحدة القياس"
-                          style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
 
-                <Label text="تاريخ الانتهاء:" GridPane.rowIndex="5" GridPane.columnIndex="0"
+                <Label text="الحالة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <DatePicker fx:id="expiryDatePicker" GridPane.rowIndex="5" GridPane.columnIndex="1"
-                            promptText="اختياري"
-                            style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
-
-                <Label text="عدد الشرائط في العلبة:" GridPane.rowIndex="6" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="stripsPerBoxField" GridPane.rowIndex="6" GridPane.columnIndex="1"
-                           promptText="مثلاً 2 أو 3"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                          
-                <Label text="الحالة:" GridPane.rowIndex="7" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <CheckBox fx:id="isActiveCheckBox" GridPane.rowIndex="7" GridPane.columnIndex="1"
-                          text="نشط" selected="true"
-                          style="-fx-font-size: 14px;"/>
+                <CheckBox fx:id="isActiveCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                          text="نشط" selected="true" style="-fx-font-size: 14px;"/>
             </GridPane>
-            
-            <!-- فاصل عمودي -->
-            <Separator orientation="VERTICAL"/>
-            
-            <!-- عمود اليسار (التسعير والمخزون) -->
-            <GridPane hgap="12" vgap="12" HBox.hgrow="ALWAYS" prefWidth="500">
+        </VBox>
+
+        <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+              style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
+            <Label text="التسعير"
+                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+            <GridPane hgap="12" vgap="10" nodeOrientation="RIGHT_TO_LEFT">
                 <columnConstraints>
-                    <ColumnConstraints percentWidth="25"/>
-                    <ColumnConstraints percentWidth="75"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="34"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="34"/>
                 </columnConstraints>
-                
-                <Label text="الكمية في المخزون:" GridPane.rowIndex="0" GridPane.columnIndex="0"
+
+                <Label text="سعر التكلفة:*" GridPane.rowIndex="0" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="quantityField" GridPane.rowIndex="0" GridPane.columnIndex="1"
-                           promptText="0"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                
-                <Label text="الحد الأدنى للمخزون:" GridPane.rowIndex="1" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="minimumStockField" GridPane.rowIndex="1" GridPane.columnIndex="1"
-                           promptText="0"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                
-                <Label text="الحد الأقصى للمخزون:" GridPane.rowIndex="2" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="maximumStockField" GridPane.rowIndex="2" GridPane.columnIndex="1"
-                           promptText="غير محدد"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                           
-                <!-- فاصل أفقي للتسعير -->
-                <Separator GridPane.rowIndex="3" GridPane.columnIndex="0" GridPane.columnSpan="2"/>
-                
-                <!-- سعر التكلفة: دينار + دولار -->
-                <Label text="سعر التكلفة:*" GridPane.rowIndex="4" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <HBox spacing="6" GridPane.rowIndex="4" GridPane.columnIndex="1" alignment="CENTER_LEFT">
-                    <TextField fx:id="costPriceField" HBox.hgrow="ALWAYS"
-                               promptText="0.00 د.ع"
+                <HBox spacing="6" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                    <TextField fx:id="costPriceField" HBox.hgrow="ALWAYS" promptText="0.00 د.ع"
                                style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                    <Label text="|" style="-fx-text-fill: -fx-border-input; -fx-font-size: 16px;"/>
-                    <TextField fx:id="costPriceUsdField" HBox.hgrow="ALWAYS"
-                               promptText="0.00 $"
+                    <TextField fx:id="costPriceUsdField" HBox.hgrow="ALWAYS" promptText="0.00 $"
                                style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
                 </HBox>
-                
-                <Label text="طريقة التسعير:" GridPane.rowIndex="5" GridPane.columnIndex="0"
+
+                <Label text="طريقة التسعير:" GridPane.rowIndex="0" GridPane.columnIndex="2"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <HBox spacing="12" GridPane.rowIndex="5" GridPane.columnIndex="1">
-                    <RadioButton fx:id="manualPriceRadio" text="سعر يدوي" selected="true"
-                                style="-fx-font-size: 13px;"/>
-                    <RadioButton fx:id="percentagePriceRadio" text="نسبة مئوية"
-                                style="-fx-font-size: 13px;"/>
+                <HBox spacing="12" GridPane.rowIndex="0" GridPane.columnIndex="3">
+                    <RadioButton fx:id="manualPriceRadio" text="سعر يدوي" selected="true" style="-fx-font-size: 13px;"/>
+                    <RadioButton fx:id="percentagePriceRadio" text="نسبة مئوية" style="-fx-font-size: 13px;"/>
                 </HBox>
-                
-                <!-- السعر المفرد + هامش الربح -->
-                <Label text="السعر المفرد:*" GridPane.rowIndex="6" GridPane.columnIndex="0"
+
+                <Label text="سعر البيع:*" GridPane.rowIndex="1" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <VBox spacing="4" GridPane.rowIndex="6" GridPane.columnIndex="1">
-                    <HBox spacing="6" alignment="CENTER_LEFT">
-                        <TextField fx:id="unitPriceField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 د.ع"
+                <VBox spacing="4" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="3">
+                    <HBox spacing="6">
+                        <TextField fx:id="unitPriceField" HBox.hgrow="ALWAYS" promptText="0.00 د.ع"
                                    style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
                         <TextField fx:id="profitPercentageField" HBox.hgrow="ALWAYS" visible="false" managed="false"
                                    promptText="نسبة الربح %"
                                    style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                        <Label text="|" style="-fx-text-fill: -fx-border-input; -fx-font-size: 16px;"/>
-                        <TextField fx:id="unitPriceUsdField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 $"
+                        <TextField fx:id="unitPriceUsdField" HBox.hgrow="ALWAYS" promptText="0.00 $"
                                    style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
                     </HBox>
                     <Label fx:id="profitMarginRetailLabel" text="هامش: 0.00 د.ع (0%)"
                            style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
                 </VBox>
-                
-                <!-- سعر الجملة + هامش الربح -->
-                <Label text="سعر الجملة:" GridPane.rowIndex="7" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <VBox spacing="4" GridPane.rowIndex="7" GridPane.columnIndex="1">
-                    <HBox spacing="6" alignment="CENTER_LEFT">
-                        <TextField fx:id="wholesalePriceField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 د.ع"
-                                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                        <Label text="|" style="-fx-text-fill: -fx-border-input; -fx-font-size: 16px;"/>
-                        <TextField fx:id="wholesalePriceUsdField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 $"
-                                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                    </HBox>
-                    <Label fx:id="profitMarginWholesaleLabel" text="هامش: 0.00 د.ع (0%)"
-                           style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
-                </VBox>
-                
-                <!-- السعر الخاص + هامش الربح -->
-                <Label text="السعر الخاص:" GridPane.rowIndex="8" GridPane.columnIndex="0"
-                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <VBox spacing="4" GridPane.rowIndex="8" GridPane.columnIndex="1">
-                    <HBox spacing="6" alignment="CENTER_LEFT">
-                        <TextField fx:id="specialPriceField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 د.ع"
-                                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                        <Label text="|" style="-fx-text-fill: -fx-border-input; -fx-font-size: 16px;"/>
-                        <TextField fx:id="specialPriceUsdField" HBox.hgrow="ALWAYS"
-                                   promptText="0.00 $"
-                                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
-                    </HBox>
-                    <Label fx:id="profitMarginSpecialLabel" text="هامش: 0.00 د.ع (0%)"
-                           style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
-                </VBox>
             </GridPane>
-        </HBox>
-        
-        <Region VBox.vgrow="ALWAYS"/>
-        
-        <HBox spacing="12" alignment="CENTER_LEFT" style="-fx-padding: 16 0 0 0; -fx-border-color: -fx-border-main transparent transparent transparent; -fx-border-width: 1 0 0 0;">
+        </VBox>
+
+        <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+              style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
+            <Label text="المخزون والتنبيهات"
+                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+            <GridPane hgap="12" vgap="10" nodeOrientation="RIGHT_TO_LEFT">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="18"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="18"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="16"/>
+                </columnConstraints>
+
+                <Label text="الكمية الحالية:" GridPane.rowIndex="0" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="quantityField" GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="0"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+                <Label text="الحد الأدنى:" GridPane.rowIndex="0" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="minimumStockField" GridPane.rowIndex="0" GridPane.columnIndex="3" promptText="0"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+                <Label text="الحد الأقصى:" GridPane.rowIndex="0" GridPane.columnIndex="4"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="maximumStockField" GridPane.rowIndex="0" GridPane.columnIndex="5" promptText="غير محدد"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+            </GridPane>
+        </VBox>
+
+        <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+              style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
+            <Label text="وحدات التعبئة والباركود"
+                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+
+            <GridPane hgap="10" vgap="8" nodeOrientation="RIGHT_TO_LEFT">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="12"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="12"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="12"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="16"/>
+                </columnConstraints>
+
+                <Label text="وحدة الأساس:" GridPane.rowIndex="0" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="baseUnitComboBox" GridPane.rowIndex="0" GridPane.columnIndex="1" prefWidth="180" promptText="وحدة الأساس"/>
+
+                <Label text="اسم الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingUnitNameField" GridPane.rowIndex="1" GridPane.columnIndex="1"
+                           promptText="حبة / شريط / علبة / كرتون"/>
+                <Label text="باركود الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingBarcodeField" GridPane.rowIndex="1" GridPane.columnIndex="3" promptText="اختياري"/>
+                <Label text="معامل التحويل لوحدة الأساس:" GridPane.rowIndex="1" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingConversionField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="مثال: 10 أو 100"/>
+
+                <HBox spacing="12" GridPane.rowIndex="1" GridPane.columnIndex="6" alignment="CENTER_RIGHT">
+                    <CheckBox fx:id="packagingDefaultCheckBox" text="افتراضي"/>
+                    <CheckBox fx:id="packagingActiveCheckBox" text="نشط" selected="true"/>
+                </HBox>
+
+                <Label text="سعر البيع للوحدة:" GridPane.rowIndex="2" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingPriceField" GridPane.rowIndex="2" GridPane.columnIndex="1" promptText="0.00 د.ع"/>
+                <Label text="سعر الوحدة دولار:" GridPane.rowIndex="2" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingPriceUsdField" GridPane.rowIndex="2" GridPane.columnIndex="3" promptText="0.00 $"/>
+                <HBox spacing="8" GridPane.rowIndex="2" GridPane.columnIndex="4" GridPane.columnSpan="3" alignment="CENTER_RIGHT">
+                    <Button text="إضافة / تحديث وحدة" onAction="#handleAddPackagingUnit"
+                            style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+                    <Button text="حذف الوحدة" onAction="#handleRemovePackagingUnit"
+                            style="-fx-background-color: -fx-danger; -fx-text-fill: white;"/>
+                </HBox>
+            </GridPane>
+
+            <TableView fx:id="packagingTable" prefHeight="150" nodeOrientation="RIGHT_TO_LEFT">
+                <columns>
+                    <TableColumn fx:id="packagingUnitColumn" text="الوحدة" prefWidth="130"/>
+                    <TableColumn fx:id="packagingBarcodeColumn" text="الباركود" prefWidth="150"/>
+                    <TableColumn fx:id="packagingConversionColumn" text="معامل التحويل لوحدة الأساس" prefWidth="180"/>
+                    <TableColumn fx:id="packagingPriceColumn" text="سعر البيع دينار" prefWidth="130"/>
+                    <TableColumn fx:id="packagingPriceUsdColumn" text="سعر البيع دولار" prefWidth="130"/>
+                    <TableColumn fx:id="packagingDefaultColumn" text="افتراضي" prefWidth="90"/>
+                    <TableColumn fx:id="packagingActiveColumn" text="نشط" prefWidth="80"/>
+                </columns>
+                <placeholder>
+                    <Label text="لا توجد وحدات تعبئة بعد" textAlignment="RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
+                </placeholder>
+            </TableView>
+        </VBox>
+
+        <HBox spacing="12" alignment="CENTER_LEFT" nodeOrientation="LEFT_TO_RIGHT"
+              style="-fx-padding: 10 0 0 0; -fx-border-color: -fx-border-main transparent transparent transparent; -fx-border-width: 1 0 0 0;">
             <Button text="حفظ" onAction="#handleSave" prefWidth="120"
                     style="-fx-background-color: linear-gradient(to right, -fx-accent-light, -fx-accent-color); -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 12 24; -fx-background-radius: 10;"/>
             <Button text="إلغاء" onAction="#handleCancel" prefWidth="100"

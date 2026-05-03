@@ -5,6 +5,7 @@ import com.pharmax.model.CashboxLedger;
 import com.pharmax.model.Customer;
 import com.pharmax.model.DailyClosing;
 import com.pharmax.model.InventoryMovement;
+import com.pharmax.model.Product;
 import com.pharmax.model.ProductBatch;
 import com.pharmax.model.SaleItem;
 import com.pharmax.model.SaleItemBatch;
@@ -256,6 +257,103 @@ public class PharmacyReportService {
         return rows;
     }
 
+    public List<SalesVelocityRow> getBestSellingRows(LocalDate fromDate, LocalDate toDate, String searchTerm) {
+        LocalDateTime start = fromDate != null ? fromDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
+        LocalDateTime end = toDate != null ? toDate.atTime(23, 59, 59) : LocalDate.now().atTime(23, 59, 59);
+        String search = normalize(searchTerm);
+
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            List<SaleItem> items = session.createQuery(
+                    "SELECT si FROM SaleItem si " +
+                            "JOIN FETCH si.sale s " +
+                            "JOIN FETCH si.product p " +
+                            "WHERE s.saleDate BETWEEN :start AND :end",
+                    SaleItem.class)
+                    .setParameter("start", start)
+                    .setParameter("end", end)
+                    .list();
+
+            Map<Long, SalesVelocityAccumulator> byProduct = new LinkedHashMap<>();
+            for (SaleItem item : items) {
+                Product product = item.getProduct();
+                if (product == null || product.getId() == null || !matchesProductSearch(product, search)) {
+                    continue;
+                }
+                SalesVelocityAccumulator accumulator = byProduct.computeIfAbsent(product.getId(),
+                        id -> new SalesVelocityAccumulator(product));
+                accumulator.addSale(
+                        item.getEffectiveBaseQuantity(),
+                        item.getTotalPrice() != null ? item.getTotalPrice() : 0.0,
+                        item.getSale() != null ? item.getSale().getSaleDate() : null
+                );
+            }
+
+            return byProduct.values().stream()
+                    .map(SalesVelocityAccumulator::toRow)
+                    .sorted(Comparator.comparing(SalesVelocityRow::quantitySold, Comparator.nullsLast(Double::compareTo)).reversed()
+                            .thenComparing(Comparator.comparing(SalesVelocityRow::revenue, Comparator.nullsLast(Double::compareTo)).reversed())
+                            .thenComparing(SalesVelocityRow::productName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+        }
+    }
+
+    public List<SalesVelocityRow> getSlowMovingRows(LocalDate fromDate, LocalDate toDate, String searchTerm) {
+        LocalDateTime start = fromDate != null ? fromDate.atStartOfDay() : LocalDate.now().minusDays(30).atStartOfDay();
+        LocalDateTime end = toDate != null ? toDate.atTime(23, 59, 59) : LocalDate.now().atTime(23, 59, 59);
+        String search = normalize(searchTerm);
+
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            List<Product> products = session.createQuery(
+                    "FROM Product p WHERE p.isActive = true ORDER BY p.name ASC",
+                    Product.class).list();
+            Map<Long, SalesVelocityAccumulator> byProduct = products.stream()
+                    .filter(product -> product.getId() != null)
+                    .filter(product -> matchesProductSearch(product, search))
+                    .collect(Collectors.toMap(
+                            Product::getId,
+                            SalesVelocityAccumulator::new,
+                            (a, b) -> a,
+                            LinkedHashMap::new
+                    ));
+
+            if (byProduct.isEmpty()) {
+                return List.of();
+            }
+
+            List<SaleItem> items = session.createQuery(
+                    "SELECT si FROM SaleItem si " +
+                            "JOIN FETCH si.sale s " +
+                            "JOIN FETCH si.product p " +
+                            "WHERE s.saleDate BETWEEN :start AND :end",
+                    SaleItem.class)
+                    .setParameter("start", start)
+                    .setParameter("end", end)
+                    .list();
+
+            for (SaleItem item : items) {
+                Product product = item.getProduct();
+                if (product == null || product.getId() == null) {
+                    continue;
+                }
+                SalesVelocityAccumulator accumulator = byProduct.get(product.getId());
+                if (accumulator != null) {
+                    accumulator.addSale(
+                            item.getEffectiveBaseQuantity(),
+                            item.getTotalPrice() != null ? item.getTotalPrice() : 0.0,
+                            item.getSale() != null ? item.getSale().getSaleDate() : null
+                    );
+                }
+            }
+
+            return byProduct.values().stream()
+                    .map(SalesVelocityAccumulator::toRow)
+                    .sorted(Comparator.comparing(SalesVelocityRow::quantitySold, Comparator.nullsLast(Double::compareTo))
+                            .thenComparing(row -> row.lastSaleDate() != null ? row.lastSaleDate() : LocalDateTime.MIN)
+                            .thenComparing(SalesVelocityRow::productName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+        }
+    }
+
     private boolean hasReliableCostSnapshot(SaleItem item) {
         if (item == null) {
             return false;
@@ -356,6 +454,16 @@ public class PharmacyReportService {
                 || contains(item.getBatchNumber(), search);
     }
 
+    private boolean matchesProductSearch(Product product, String search) {
+        if (search.isBlank()) {
+            return true;
+        }
+        return contains(product.getName(), search)
+                || contains(product.getProductCode(), search)
+                || contains(product.getBarcode(), search)
+                || contains(product.getCategory(), search);
+    }
+
     private String classifyExpiry(LocalDate expiryDate, LocalDate today) {
         if (expiryDate == null) {
             return "-";
@@ -434,4 +542,45 @@ public class PharmacyReportService {
                                    Double actualCash,
                                    Double difference,
                                    String status) {}
+
+    public record SalesVelocityRow(String productName,
+                                   String productCode,
+                                   String barcode,
+                                   String category,
+                                   Double quantitySold,
+                                   Double revenue,
+                                   LocalDateTime lastSaleDate,
+                                   Double currentStock) {}
+
+    private static class SalesVelocityAccumulator {
+        private final Product product;
+        private double quantitySold;
+        private double revenue;
+        private LocalDateTime lastSaleDate;
+
+        private SalesVelocityAccumulator(Product product) {
+            this.product = product;
+        }
+
+        private void addSale(double quantity, double amount, LocalDateTime saleDate) {
+            quantitySold += quantity;
+            revenue += amount;
+            if (saleDate != null && (lastSaleDate == null || saleDate.isAfter(lastSaleDate))) {
+                lastSaleDate = saleDate;
+            }
+        }
+
+        private SalesVelocityRow toRow() {
+            return new SalesVelocityRow(
+                    product.getName(),
+                    product.getProductCode(),
+                    product.getBarcode(),
+                    product.getCategory(),
+                    quantitySold,
+                    revenue,
+                    lastSaleDate,
+                    product.getQuantityInStock()
+            );
+        }
+    }
 }

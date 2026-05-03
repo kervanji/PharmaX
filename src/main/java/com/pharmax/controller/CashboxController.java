@@ -3,6 +3,7 @@ package com.pharmax.controller;
 import com.pharmax.model.CashboxLedger;
 import com.pharmax.model.DailyClosing;
 import com.pharmax.service.CashboxService;
+import com.pharmax.service.PharmacyReportExportService;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -10,12 +11,17 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class CashboxController {
     @FXML private DatePicker ledgerDatePicker;
@@ -37,6 +43,7 @@ public class CashboxController {
     @FXML private Label closingStatusLabel;
 
     private final CashboxService cashboxService = new CashboxService();
+    private final PharmacyReportExportService exportService = new PharmacyReportExportService();
     private final DecimalFormat numberFormat = new DecimalFormat("#,##0.##");
     private boolean tabMode = false;
     private String tabId;
@@ -121,6 +128,103 @@ public class CashboxController {
     }
 
     @FXML
+    private void handleExportExcel() {
+        exportCashbox("xlsx");
+    }
+
+    @FXML
+    private void handleExportPdf() {
+        exportCashbox("pdf");
+    }
+
+    private void exportCashbox(String extension) {
+        try {
+            LocalDate selectedDate = ledgerDatePicker.getValue() != null ? ledgerDatePicker.getValue() : LocalDate.now();
+            File selected = showSaveDialog(extension, selectedDate);
+            if (selected == null) {
+                return;
+            }
+
+            List<CashboxExportRow> rows = buildExportRows(selectedDate);
+            List<PharmacyReportExportService.ReportColumn<CashboxExportRow>> columns = List.of(
+                    new PharmacyReportExportService.ReportColumn<>("التاريخ", CashboxExportRow::date),
+                    new PharmacyReportExportService.ReportColumn<>("الرصيد الافتتاحي", CashboxExportRow::openingCash),
+                    new PharmacyReportExportService.ReportColumn<>("إجمالي الداخل", CashboxExportRow::totalIn),
+                    new PharmacyReportExportService.ReportColumn<>("إجمالي الخارج", CashboxExportRow::totalOut),
+                    new PharmacyReportExportService.ReportColumn<>("الرصيد المتوقع", CashboxExportRow::expectedCash),
+                    new PharmacyReportExportService.ReportColumn<>("الرصيد الفعلي", CashboxExportRow::actualCash),
+                    new PharmacyReportExportService.ReportColumn<>("الفرق", CashboxExportRow::difference),
+                    new PharmacyReportExportService.ReportColumn<>("حالة الإقفال", CashboxExportRow::closingStatus),
+                    new PharmacyReportExportService.ReportColumn<>("وقت الحركة", CashboxExportRow::transactionDate),
+                    new PharmacyReportExportService.ReportColumn<>("نوع الحركة", CashboxExportRow::entryType),
+                    new PharmacyReportExportService.ReportColumn<>("الاتجاه", CashboxExportRow::direction),
+                    new PharmacyReportExportService.ReportColumn<>("المبلغ", CashboxExportRow::amount),
+                    new PharmacyReportExportService.ReportColumn<>("المصدر", CashboxExportRow::sourceType),
+                    new PharmacyReportExportService.ReportColumn<>("رقم المصدر", CashboxExportRow::sourceId),
+                    new PharmacyReportExportService.ReportColumn<>("الوصف", CashboxExportRow::description)
+            );
+
+            String title = "تقرير الصندوق اليومي " + selectedDate;
+            if ("pdf".equalsIgnoreCase(extension)) {
+                exportService.exportPdf(selected, title, columns, rows);
+            } else {
+                exportService.exportExcel(selected, title, columns, rows);
+            }
+            showInfo("تم", "تم تصدير تقرير الصندوق:\n" + selected.getAbsolutePath());
+        } catch (Exception e) {
+            showError("خطأ", "فشل تصدير تقرير الصندوق: " + e.getMessage());
+        }
+    }
+
+    private List<CashboxExportRow> buildExportRows(LocalDate selectedDate) {
+        List<CashboxLedger> entries = cashboxService.getLedgerForDate(selectedDate);
+        CashboxService.CashTotals totals = cashboxService.calculateTotals(selectedDate);
+        Optional<DailyClosing> closing = cashboxService.getClosingByDate(selectedDate);
+        String status = closing.map(DailyClosing::getStatus).orElse("OPEN");
+        Double actualCash = closing.map(DailyClosing::getActualCash).orElse(null);
+        Double difference = closing.map(DailyClosing::getDifferenceAmount).orElse(null);
+
+        List<CashboxExportRow> rows = new ArrayList<>();
+        if (entries.isEmpty()) {
+            rows.add(new CashboxExportRow(selectedDate, totals.openingCash(), totals.totalIn(), totals.totalOut(),
+                    totals.expectedCash(), actualCash, difference, status, null, "-", "-", null, "-", null, "-"));
+            return rows;
+        }
+
+        for (CashboxLedger entry : entries) {
+            rows.add(new CashboxExportRow(
+                    selectedDate,
+                    totals.openingCash(),
+                    totals.totalIn(),
+                    totals.totalOut(),
+                    totals.expectedCash(),
+                    actualCash,
+                    difference,
+                    status,
+                    entry.getTransactionDate(),
+                    entry.getEntryType(),
+                    entry.getDirection(),
+                    entry.getAmount(),
+                    entry.getSourceType(),
+                    entry.getSourceId(),
+                    entry.getDescription()
+            ));
+        }
+        return rows;
+    }
+
+    private File showSaveDialog(String extension, LocalDate selectedDate) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("حفظ تقرير الصندوق");
+        fileChooser.setInitialFileName("cashbox_" + selectedDate + "." + extension);
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                "pdf".equalsIgnoreCase(extension) ? "PDF" : "Excel",
+                "*." + extension
+        ));
+        return fileChooser.showSaveDialog((Stage) ledgerTable.getScene().getWindow());
+    }
+
+    @FXML
     private void handleClose() {
         if (tabMode && tabId != null && !tabId.isBlank()) {
             TabManager.getInstance().closeTab(tabId);
@@ -160,4 +264,20 @@ public class CashboxController {
         alert.setContentText(message);
         alert.showAndWait();
     }
+
+    private record CashboxExportRow(LocalDate date,
+                                    Double openingCash,
+                                    Double totalIn,
+                                    Double totalOut,
+                                    Double expectedCash,
+                                    Double actualCash,
+                                    Double difference,
+                                    String closingStatus,
+                                    LocalDateTime transactionDate,
+                                    String entryType,
+                                    String direction,
+                                    Double amount,
+                                    String sourceType,
+                                    Long sourceId,
+                                    String description) {}
 }

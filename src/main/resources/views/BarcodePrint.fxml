@@ -32,19 +32,24 @@
                 <ComboBox fx:id="unitComboBox" GridPane.rowIndex="1" GridPane.columnIndex="1"
                           maxWidth="Infinity" promptText="قطعة / شريط / كرتون" nodeOrientation="RIGHT_TO_LEFT"/>
 
-                <Label text="الطابعة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
+                <Label text="الدفعة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <ComboBox fx:id="printerComboBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                <ComboBox fx:id="batchComboBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="اختياري: اختر دفعة لإظهارها على الملصق" nodeOrientation="RIGHT_TO_LEFT"/>
+
+                <Label text="الطابعة:" GridPane.rowIndex="3" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="printerComboBox" GridPane.rowIndex="3" GridPane.columnIndex="1"
                           maxWidth="Infinity" promptText="الطابعة الافتراضية" nodeOrientation="RIGHT_TO_LEFT"/>
 
-                <Label text="عدد الملصقات:" GridPane.rowIndex="3" GridPane.columnIndex="0"
+                <Label text="عدد الملصقات:" GridPane.rowIndex="4" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <Spinner fx:id="copiesSpinner" GridPane.rowIndex="3" GridPane.columnIndex="1"
+                <Spinner fx:id="copiesSpinner" GridPane.rowIndex="4" GridPane.columnIndex="1"
                          editable="true" prefWidth="120"/>
 
-                <Label text="حجم الملصق:" GridPane.rowIndex="4" GridPane.columnIndex="0"
+                <Label text="حجم الملصق:" GridPane.rowIndex="5" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <HBox GridPane.rowIndex="4" GridPane.columnIndex="1" spacing="8" alignment="CENTER_RIGHT">
+                <HBox GridPane.rowIndex="5" GridPane.columnIndex="1" spacing="8" alignment="CENTER_RIGHT">
                     <TextField fx:id="widthField" prefWidth="80" alignment="CENTER_RIGHT"/>
                     <Label text="مم ×"/>
                     <TextField fx:id="heightField" prefWidth="80" alignment="CENTER_RIGHT"/>
