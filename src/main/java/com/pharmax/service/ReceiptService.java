@@ -22,7 +22,9 @@ import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.Phrase;
 import com.itextpdf.text.Rectangle;
 import com.itextpdf.text.pdf.BaseFont;
+import com.itextpdf.text.pdf.ColumnText;
 import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfContentByte;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import org.slf4j.Logger;
@@ -55,6 +57,7 @@ public class ReceiptService {
 
     private static final String PREF_BANNER_PATH = "receipt.banner.path";
     private static final String PREF_LAST_RECEIPT_NUMBER = "receipt.last.number";
+    private static final String PREF_COMPANY_NAME = "company.name";
 
     // Company information
     private static final String APP_NAME = "PharmaX";
@@ -930,44 +933,52 @@ public class ReceiptService {
 
         boolean compact = TEMPLATE_THERMAL_58MM.equals(template);
         Rectangle pageSize = createThermalPageSize(sale, compact);
-        float margin = compact ? 5f : 7f;
-        Document document = new Document(pageSize, margin, margin, 8f, 8f);
-        PdfWriter.getInstance(document, baos);
+        Document document = new Document(pageSize, 0f, 0f, 0f, 0f);
+        PdfWriter writer = PdfWriter.getInstance(document, baos);
         document.open();
 
         BaseFont baseFont = loadArabicBaseFont();
-        Font titleFont = new Font(baseFont, compact ? 11 : 13, Font.BOLD);
+        Font titleFont = new Font(baseFont, compact ? 12 : 14, Font.BOLD);
         Font boldFont = new Font(baseFont, compact ? 8 : 9, Font.BOLD);
+        Font productFont = new Font(baseFont, compact ? 8 : 9, Font.BOLD);
         Font bodyFont = new Font(baseFont, compact ? 7 : 8, Font.NORMAL);
         Font smallFont = new Font(baseFont, compact ? 6 : 7, Font.NORMAL);
 
-        // No logo
-        addThermalCenteredText(document, "صيدلية / Pharmacy", titleFont, 1f, 2f);
-        addThermalSeparator(document, bodyFont);
+        PdfContentByte canvas = writer.getDirectContent();
+        float leftX = compact ? 10f : 14f;
+        float rightX = pageSize.getWidth() - (compact ? 10f : 14f);
+        float centerX = pageSize.getWidth() / 2f;
+        float y = pageSize.getHeight() - (compact ? 9f : 10f);
+
+        y = drawThermalLogo(writer, pageSize, y, compact);
+        y = drawThermalStoreHeader(canvas, centerX, y, titleFont, bodyFont, smallFont);
+        y = drawThermalSeparator(canvas, leftX, rightX, y);
 
         String saleCurrency = sale.getCurrency() != null ? sale.getCurrency() : "دينار";
-        addThermalInfoRow(document, "رقم الوصل", safeText(sale.getSaleCode()), boldFont, bodyFont);
-        addThermalInfoRow(document, "التاريخ", sale.getSaleDate() != null
+        y = drawRTLLine(canvas, "رقم الوصل: " + safeText(sale.getSaleCode()), rightX, y, bodyFont);
+        y = drawRTLLine(canvas, "التاريخ: " + (sale.getSaleDate() != null
                 ? sale.getSaleDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                : "-", boldFont, bodyFont);
-        addThermalInfoRow(document, "البائع", safeText(sale.getCreatedBy()), boldFont, bodyFont);
-        addThermalInfoRow(document, "الدفع", getPaymentMethodArabic(sale.getPaymentMethod()), boldFont, bodyFont);
-        addThermalSeparator(document, bodyFont);
+                : "-"), rightX, y, bodyFont);
+        y = drawRTLLine(canvas, "البائع: " + safeText(sale.getCreatedBy()), rightX, y, bodyFont);
+        y = drawThermalSeparator(canvas, leftX, rightX, y - 2f);
 
-        addThermalCenteredText(document, "تفاصيل المواد", boldFont, 1f, 2f);
+        y = drawCenteredLine(canvas, "تفاصيل المواد", centerX, y, boldFont, PdfWriter.RUN_DIRECTION_RTL);
+        y -= 2f;
         List<SaleItem> items = sale.getSaleItems() != null ? sale.getSaleItems() : Collections.emptyList();
-        int rowNo = 1;
-        for (SaleItem item : items) {
-            addThermalItem(document, item, rowNo++, saleCurrency, bodyFont, smallFont, compact);
+        for (int i = 0; i < items.size(); i++) {
+            y = drawThermalReceiptItem(canvas, items.get(i), saleCurrency, productFont, bodyFont, compact, rightX, y);
+            if (i < items.size() - 1) {
+                y -= 2f;
+            }
         }
 
-        addThermalSeparator(document, bodyFont);
-        addThermalTotals(document, sale, items, saleCurrency, boldFont, bodyFont);
-        addThermalSeparator(document, bodyFont);
+        y = drawThermalSeparator(canvas, leftX, rightX, y - 2f);
+        y = drawThermalTotals(canvas, sale, items, saleCurrency, boldFont, bodyFont, rightX, y);
+        y = drawThermalSeparator(canvas, leftX, rightX, y - 2f);
 
-        addThermalCenteredText(document, "شكراً لزيارتكم", boldFont, 3f, 1f);
-        addThermalCenteredText(document, "المواد المباعة لا ترد إلا بوجود الوصل", smallFont, 0f, 1f);
-        addThermalCenteredText(document, "Powered by KervanjiHolding.com", smallFont, 1f, 0f);
+        y = drawCenteredLine(canvas, "شكراً لزيارتكم", centerX, y, boldFont, PdfWriter.RUN_DIRECTION_RTL);
+        y = drawCenteredLine(canvas, "المواد المباعة لا ترد إلا بوجود الوصل", centerX, y, smallFont, PdfWriter.RUN_DIRECTION_RTL);
+        drawCenteredLine(canvas, "Powered by KervanjiHolding.com", centerX, y, smallFont, PdfWriter.RUN_DIRECTION_LTR);
 
         document.close();
         return baos.toByteArray();
@@ -976,16 +987,8 @@ public class ReceiptService {
     private Rectangle createThermalPageSize(Sale sale, boolean compact) {
         float width = mmToPoints(compact ? 58f : 80f);
         int itemCount = sale != null && sale.getSaleItems() != null ? sale.getSaleItems().size() : 0;
-        int batchRows = 0;
-        if (sale != null && sale.getSaleItems() != null) {
-            for (SaleItem item : sale.getSaleItems()) {
-                if (item.getDiscountAmount() != null && item.getDiscountAmount() > 0) {
-                    batchRows++;
-                }
-            }
-        }
-        float minHeight = compact ? 520f : 580f;
-        float height = minHeight + (itemCount * (compact ? 34f : 40f)) + (batchRows * 12f);
+        float minHeight = compact ? 300f : 330f;
+        float height = minHeight + (itemCount * (compact ? 58f : 64f));
         return new Rectangle(width, height);
     }
 
@@ -993,18 +996,142 @@ public class ReceiptService {
         return mm * 72f / 25.4f;
     }
 
-    private void addThermalLogo(Document document, float paperWidth, boolean compact) {
+    private float drawThermalLogo(PdfWriter writer, Rectangle pageSize, float y, boolean compact) {
         try {
             Image logo = loadBannerImage();
             if (logo == null) {
+                return y;
+            }
+            logo.scaleToFit(mmToPoints(compact ? 14f : 18f), mmToPoints(compact ? 8f : 10f));
+            float logoWidth = logo.getScaledWidth();
+            float logoHeight = logo.getScaledHeight();
+            float logoY = y - logoHeight;
+            logo.setAbsolutePosition((pageSize.getWidth() - logoWidth) / 2f, logoY);
+            writer.getDirectContent().addImage(logo);
+            return logoY - (compact ? 14f : 16f);
+        } catch (Exception e) {
+            logger.warn("Thermal receipt logo skipped", e);
+            return y;
+        }
+    }
+
+    private float drawThermalStoreHeader(PdfContentByte canvas, float centerX, float y, Font titleFont, Font bodyFont,
+            Font smallFont) {
+        String storeName = getConfiguredPreference(PREF_COMPANY_NAME);
+        String phone = getConfiguredPreference("company.phone", "pharmacy.phone", "store.phone", "receipt.phone");
+        String address = getConfiguredPreference("company.address", "pharmacy.address", "store.address", "receipt.address");
+
+        y = drawCenteredLine(canvas, storeName.isBlank() ? "صيدلية مطورة" : storeName, centerX, y, titleFont,
+                PdfWriter.RUN_DIRECTION_RTL);
+        if (!phone.isBlank()) {
+            y = drawCenteredLine(canvas, phone, centerX, y, bodyFont, PdfWriter.RUN_DIRECTION_RTL);
+        }
+        if (!address.isBlank()) {
+            y = drawCenteredLine(canvas, address, centerX, y, smallFont, PdfWriter.RUN_DIRECTION_RTL);
+        }
+        return y - 4f;
+    }
+
+    private float drawThermalReceiptItem(PdfContentByte canvas, SaleItem item, String currency, Font productFont,
+            Font bodyFont, boolean compact, float rightX, float y) {
+        String productName = item.getProduct() != null && item.getProduct().getName() != null
+                ? item.getProduct().getName()
+                : "-";
+        String unit = item.getSoldUnit() != null && !item.getSoldUnit().trim().isEmpty()
+                ? item.getSoldUnit()
+                : item.getProduct() != null && item.getProduct().getUnitOfMeasure() != null
+                        ? item.getProduct().getUnitOfMeasure()
+                        : "-";
+        double qty = item.getQuantity() != null ? item.getQuantity() : 0.0;
+
+        y = drawRTLLine(canvas, limitText(productName, compact ? 32 : 46), rightX, y, productFont);
+        y = drawRTLLine(canvas, "الكمية: " + formatAmount(qty) + " " + unit, rightX, y, bodyFont);
+        y = drawRTLLine(canvas, "السعر: " + formatThermalCurrency(item.getUnitPrice(), currency), rightX, y, bodyFont);
+        y = drawRTLLine(canvas, "الإجمالي: " + formatThermalCurrency(item.getTotalPrice(), currency), rightX, y, bodyFont);
+        return y - 2f;
+    }
+
+    private float drawThermalTotals(PdfContentByte canvas, Sale sale, List<SaleItem> items, String currency,
+            Font boldFont, Font bodyFont, float rightX, float y) {
+        double itemDiscount = items.stream()
+                .mapToDouble(item -> item.getDiscountAmount() != null ? item.getDiscountAmount() : 0.0)
+                .sum();
+        double saleDiscount = sale.getDiscountAmount() != null ? sale.getDiscountAmount() : 0.0;
+        double paid = sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
+        double finalAmount = sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
+        double remaining = Math.max(0.0, finalAmount - paid);
+        double totalDiscount = itemDiscount + saleDiscount;
+
+        y = drawRTLLine(canvas, "المجموع: " + formatThermalCurrency(sale.getTotalAmount(), currency), rightX, y, bodyFont);
+        if (totalDiscount > 0) {
+            y = drawRTLLine(canvas, "الخصم: " + formatThermalCurrency(totalDiscount, currency), rightX, y, bodyFont);
+        }
+        y = drawRTLLine(canvas, "الصافي: " + formatThermalCurrency(finalAmount, currency), rightX, y, boldFont);
+        y = drawRTLLine(canvas, "المدفوع: " + formatThermalCurrency(paid, currency), rightX, y, bodyFont);
+        if (remaining > 0) {
+            y = drawRTLLine(canvas, "المتبقي: " + formatThermalCurrency(remaining, currency), rightX, y, bodyFont);
+        }
+        return y;
+    }
+
+    private float drawRTLLine(PdfContentByte canvas, String text, float rightX, float y, Font font) {
+        ColumnText.showTextAligned(canvas, Element.ALIGN_RIGHT, new Phrase(text != null ? text : "", font),
+                rightX, y, 0f, PdfWriter.RUN_DIRECTION_RTL, 0);
+        return y - lineAdvance(font);
+    }
+
+    private float drawCenteredLine(PdfContentByte canvas, String text, float centerX, float y, Font font, int runDirection) {
+        ColumnText.showTextAligned(canvas, Element.ALIGN_CENTER, new Phrase(text != null ? text : "", font),
+                centerX, y, 0f, runDirection, 0);
+        return y - lineAdvance(font);
+    }
+
+    private float drawThermalSeparator(PdfContentByte canvas, float leftX, float rightX, float y) {
+        float centerX = (leftX + rightX) / 2f;
+        float separatorWidth = (rightX - leftX) * 0.70f;
+        float separatorLeftX = centerX - (separatorWidth / 2f);
+        float separatorRightX = centerX + (separatorWidth / 2f);
+
+        canvas.saveState();
+        canvas.setLineWidth(0.25f);
+        canvas.moveTo(separatorLeftX, y);
+        canvas.lineTo(separatorRightX, y);
+        canvas.stroke();
+        canvas.restoreState();
+        return y - 8f;
+    }
+
+    private float lineAdvance(Font font) {
+        return font.getSize() + 3f;
+    }
+
+    private void addThermalLogo(Document document, float paperWidth, boolean compact) {
+        try {
+            Image logo = loadConfiguredReceiptLogoImage();
+            if (logo == null) {
                 return;
             }
-            logo.scaleToFit(paperWidth * (compact ? 0.58f : 0.62f), compact ? 30f : 38f);
+            logo.scaleToFit(mmToPoints(compact ? 16f : 20f), mmToPoints(compact ? 10f : 13f));
             logo.setAlignment(Image.ALIGN_CENTER);
-            logo.setSpacingAfter(3f);
+            logo.setSpacingAfter(1f);
             document.add(logo);
         } catch (Exception e) {
             logger.warn("Thermal receipt logo skipped", e);
+        }
+    }
+
+    private void addThermalStoreHeader(Document document, Font titleFont, Font bodyFont, Font smallFont)
+            throws DocumentException {
+        String storeName = getConfiguredPreference(PREF_COMPANY_NAME);
+        String phone = getConfiguredPreference("company.phone", "pharmacy.phone", "store.phone", "receipt.phone");
+        String address = getConfiguredPreference("company.address", "pharmacy.address", "store.address", "receipt.address");
+
+        addThermalCenteredText(document, storeName.isBlank() ? "صيدلية مطورة" : storeName, titleFont, 0f, 1f);
+        if (!phone.isBlank()) {
+            addThermalCenteredText(document, phone, bodyFont, 0f, 1f);
+        }
+        if (!address.isBlank()) {
+            addThermalCenteredText(document, address, smallFont, 0f, 1f);
         }
     }
 
@@ -1043,6 +1170,34 @@ public class ReceiptService {
         document.add(itemTable);
     }
 
+    private void addThermalReceiptItem(Document document, SaleItem item, String currency, Font productFont,
+            Font bodyFont, boolean compact) throws DocumentException {
+        String productName = item.getProduct() != null && item.getProduct().getName() != null
+                ? item.getProduct().getName()
+                : "-";
+        String unit = item.getSoldUnit() != null && !item.getSoldUnit().trim().isEmpty()
+                ? item.getSoldUnit()
+                : item.getProduct() != null && item.getProduct().getUnitOfMeasure() != null
+                        ? item.getProduct().getUnitOfMeasure()
+                        : "-";
+        double qty = item.getQuantity() != null ? item.getQuantity() : 0.0;
+
+        PdfPTable itemTable = new PdfPTable(1);
+        itemTable.setWidthPercentage(100);
+        itemTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        itemTable.setSpacingBefore(2f);
+        itemTable.setSpacingAfter(3f);
+
+        itemTable.addCell(createThermalTextCell(limitText(productName, compact ? 32 : 46), productFont,
+                Element.ALIGN_RIGHT, 1f, PdfPCell.NO_BORDER));
+
+        document.add(itemTable);
+
+        addThermalInfoRow(document, "الكمية", formatAmount(qty) + " " + unit, bodyFont, bodyFont);
+        addThermalInfoRow(document, "السعر", formatThermalCurrency(item.getUnitPrice(), currency), bodyFont, bodyFont);
+        addThermalInfoRow(document, "الإجمالي", formatThermalCurrency(item.getTotalPrice(), currency), bodyFont, bodyFont);
+    }
+
     private void addThermalTotals(Document document, Sale sale, List<SaleItem> items, String currency, Font boldFont,
             Font bodyFont) throws DocumentException {
         double itemDiscount = items.stream()
@@ -1055,26 +1210,27 @@ public class ReceiptService {
 
         double totalDiscount = itemDiscount + saleDiscount;
 
-        addThermalInfoRow(document, "المجموع", formatCurrency(sale.getTotalAmount(), currency), boldFont, bodyFont);
+        addThermalInfoRow(document, "المجموع", formatThermalCurrency(sale.getTotalAmount(), currency), boldFont, bodyFont);
         if (totalDiscount > 0) {
-            addThermalInfoRow(document, "الخصم", formatCurrency(totalDiscount, currency), boldFont, bodyFont);
+            addThermalInfoRow(document, "الخصم", formatThermalCurrency(totalDiscount, currency), boldFont, bodyFont);
         }
-        addThermalInfoRow(document, "الصافي", formatCurrency(finalAmount, currency), boldFont, boldFont);
-        addThermalInfoRow(document, "المدفوع", formatCurrency(paid, currency), boldFont, bodyFont);
+        addThermalInfoRow(document, "الصافي", formatThermalCurrency(finalAmount, currency), boldFont, boldFont);
+        addThermalInfoRow(document, "المدفوع", formatThermalCurrency(paid, currency), boldFont, bodyFont);
         if (remaining > 0) {
-            addThermalInfoRow(document, "المتبقي", formatCurrency(remaining, currency), boldFont, bodyFont);
+            addThermalInfoRow(document, "المتبقي", formatThermalCurrency(remaining, currency), boldFont, bodyFont);
         }
     }
 
     private void addThermalInfoRow(Document document, String label, String value, Font labelFont, Font valueFont)
             throws DocumentException {
-        PdfPTable row = new PdfPTable(2);
+        String line = label + ": " + (value != null && !value.isBlank() ? value : "-");
+        Font lineFont = valueFont.getSize() >= labelFont.getSize() && valueFont.getStyle() == Font.BOLD
+                ? valueFont
+                : labelFont;
+        PdfPTable row = new PdfPTable(1);
         row.setWidthPercentage(100);
         row.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
-        row.setWidths(new float[] { 1.05f, 1.45f });
-        row.addCell(createThermalTextCell(label + ":", labelFont, Element.ALIGN_RIGHT, 1f, PdfPCell.NO_BORDER));
-        row.addCell(createThermalTextCell(value != null && !value.isBlank() ? value : "-", valueFont, Element.ALIGN_LEFT,
-                1f, PdfPCell.NO_BORDER));
+        row.addCell(createThermalTextCell(line, lineFont, Element.ALIGN_RIGHT, 0.8f, PdfPCell.NO_BORDER));
         document.add(row);
     }
 
@@ -1111,32 +1267,6 @@ public class ReceiptService {
         return cell;
     }
 
-    private String buildBatchExpiryText(SaleItem item) {
-        if (item == null) {
-            return "";
-        }
-        String batch = item.getBatchNumberSnapshot();
-        String expiry = item.getExpirationDateSnapshot();
-        if ((batch == null || batch.isBlank()) && item.getBatch() != null) {
-            batch = item.getBatch().getBatchNumber();
-        }
-        if ((expiry == null || expiry.isBlank()) && item.getBatch() != null && item.getBatch().getExpiryDate() != null) {
-            expiry = item.getBatch().getExpiryDate().toString();
-        }
-
-        StringBuilder sb = new StringBuilder();
-        if (batch != null && !batch.isBlank()) {
-            sb.append("Batch: ").append(batch);
-        }
-        if (expiry != null && !expiry.isBlank()) {
-            if (sb.length() > 0) {
-                sb.append(" | ");
-            }
-            sb.append("Exp: ").append(expiry);
-        }
-        return sb.toString();
-    }
-
     private String limitText(String text, int maxChars) {
         if (text == null) {
             return "-";
@@ -1148,8 +1278,32 @@ public class ReceiptService {
         return trimmed.substring(0, Math.max(0, maxChars - 1)) + "…";
     }
 
+    private String formatThermalCurrency(Double value, String currency) {
+        double amount = value != null ? value : 0.0;
+        java.text.DecimalFormat df = Math.abs(amount - Math.rint(amount)) < 0.0001
+                ? new java.text.DecimalFormat("#,##0")
+                : new java.text.DecimalFormat("#,##0.##");
+        return df.format(amount) + " " + normalizeCurrencyLabel(currency);
+    }
+
     private String safeText(String value) {
         return value != null && !value.isBlank() ? value : "-";
+    }
+
+    private String getConfiguredPreference(String... keys) {
+        Preferences receiptPrefs = Preferences.userNodeForPackage(ReceiptService.class);
+        Preferences settingsPrefs = Preferences.userNodeForPackage(com.pharmax.controller.SettingsController.class);
+        for (String key : keys) {
+            String value = receiptPrefs.get(key, "");
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+            value = settingsPrefs.get(key, "");
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private String normalizeCurrencyLabel(String currency) {
@@ -1188,6 +1342,22 @@ public class ReceiptService {
 
         logger.warn("Arabic font not found on system. Falling back to Helvetica.");
         return BaseFont.createFont(BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+    }
+
+    private Image loadConfiguredReceiptLogoImage() {
+        try {
+            Preferences prefs = Preferences.userNodeForPackage(ReceiptService.class);
+            String bannerPath = prefs.get(PREF_BANNER_PATH, null);
+            if (bannerPath != null && !bannerPath.trim().isEmpty()) {
+                java.io.File f = new java.io.File(bannerPath);
+                if (f.exists() && f.isFile()) {
+                    return Image.getInstance(f.getAbsolutePath());
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load configured receipt logo", e);
+        }
+        return null;
     }
 
     private Image loadBannerImage() {
