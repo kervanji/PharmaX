@@ -2,6 +2,7 @@ package com.pharmax.controller;
 
 import com.pharmax.model.Product;
 import com.pharmax.service.InventoryService;
+import com.pharmax.util.SessionManager;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -54,7 +55,19 @@ public class LowStockController {
     @FXML
     private void initialize() {
         setupTableColumns();
+        applyVisibilityRestrictions();
         loadLowStockProducts();
+    }
+
+    private void applyVisibilityRestrictions() {
+        boolean canSeeCost = SessionManager.getInstance().canSeeCost();
+        if (costColumn != null) {
+            costColumn.setVisible(canSeeCost);
+        }
+        if (restockCostLabel != null && restockCostLabel.getParent() != null) {
+            restockCostLabel.getParent().setVisible(canSeeCost);
+            restockCostLabel.getParent().setManaged(canSeeCost);
+        }
     }
     
     private void setupTableColumns() {
@@ -72,14 +85,16 @@ public class LowStockController {
             return new SimpleDoubleProperty(needed).asObject();
         });
         
-        costColumn.setCellValueFactory(cellData -> {
-            Product p = cellData.getValue();
-            double min = p.getMinimumStock() != null ? p.getMinimumStock() : 0.0;
-            double curr = p.getQuantityInStock() != null ? p.getQuantityInStock() : 0.0;
-            double needed = Math.max(0, min - curr);
-            double cost = needed * (p.getCostPrice() != null ? p.getCostPrice() : 0);
-            return new SimpleStringProperty(String.format("%s د.ع", numberFormat.format(cost)));
-        });
+        if (SessionManager.getInstance().canSeeCost()) {
+            costColumn.setCellValueFactory(cellData -> {
+                Product p = cellData.getValue();
+                double min = p.getMinimumStock() != null ? p.getMinimumStock() : 0.0;
+                double curr = p.getQuantityInStock() != null ? p.getQuantityInStock() : 0.0;
+                double needed = Math.max(0, min - curr);
+                double cost = needed * (p.getCostPrice() != null ? p.getCostPrice() : 0);
+                return new SimpleStringProperty(String.format("%s د.ع", numberFormat.format(cost)));
+            });
+        }
         
         currentStockColumn.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -153,7 +168,9 @@ public class LowStockController {
         
         lowStockCountLabel.setText(String.valueOf(lowStock));
         outOfStockLabel.setText(String.valueOf(outOfStock));
-        restockCostLabel.setText(String.format("%s د.ع", numberFormat.format(totalRestockCost)));
+        if (SessionManager.getInstance().canSeeCost()) {
+            restockCostLabel.setText(String.format("%s د.ع", numberFormat.format(totalRestockCost)));
+        }
     }
     
     private void updateLastUpdateTime() {

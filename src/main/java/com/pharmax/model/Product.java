@@ -68,6 +68,9 @@ public class Product {
     @Column(name = "is_active")
     private Boolean isActive;
 
+    @Column(name = "is_quick_sale")
+    private Boolean isQuickSale;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -86,6 +89,7 @@ public class Product {
         this.quantityInStock = 0.0;
         this.minimumStock = 0.0;
         this.isActive = true;
+        this.isQuickSale = false;
     }
 
     // Getters and Setters
@@ -247,6 +251,14 @@ public class Product {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public Boolean getIsQuickSale() {
+        return isQuickSale;
+    }
+
+    public void setIsQuickSale(Boolean isQuickSale) {
+        this.isQuickSale = isQuickSale;
     }
 
     public LocalDateTime getCreatedAt() {

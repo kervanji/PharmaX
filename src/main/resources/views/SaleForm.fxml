@@ -64,6 +64,11 @@
                                 style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8;"/>
                         <Button text="+ إضافة" onAction="#handleAddItem" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;" prefWidth="170"/>
                     </HBox>
+                    <VBox spacing="6" nodeOrientation="RIGHT_TO_LEFT">
+                        <Label text="أزرار البيع السريع" textAlignment="RIGHT" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: -fx-form-sublabel;"/>
+                        <FlowPane fx:id="quickSaleButtonsPane" hgap="8" vgap="8" prefWrapLength="780"
+                                  nodeOrientation="RIGHT_TO_LEFT" visible="false" managed="false"/>
+                    </VBox>
                 </VBox>
 
                 <!-- Customer Selection -->
@@ -216,6 +221,10 @@
                         style="-fx-background-color: -fx-success; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold;"/>
                 <Button text="إلغاء" onAction="#handleCancel" maxWidth="Infinity" prefHeight="30"
                         style="-fx-background-color: -fx-danger; -fx-text-fill: white; -fx-font-size: 13px;"/>
+                <CheckBox fx:id="printCheckbox" text="طباعة الفاتورة بعد البيع" selected="true"
+                          nodeOrientation="RIGHT_TO_LEFT"/>
+                <CheckBox fx:id="quickSaleCheckbox" text="بيع سريع" visible="false" managed="false"
+                          nodeOrientation="RIGHT_TO_LEFT"/>
             </VBox>
                 </VBox>
             </content>

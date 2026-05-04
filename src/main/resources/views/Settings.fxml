@@ -161,6 +161,15 @@
                     <ComboBox fx:id="themeComboBox" prefWidth="200"/>
                 </HBox>
             </VBox>
+
+            <VBox spacing="10" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 8;">
+                <Label text="خيارات شاشة البيع" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Label text="يحدد الأدمن هنا إذا كان خيار البيع السريع يظهر في فاتورة البيع" style="-fx-text-fill: -fx-form-sublabel;"/>
+                <CheckBox fx:id="allowQuickSaleCheckBox" text="إظهار خيار البيع السريع"/>
+                <CheckBox fx:id="defaultQuickSaleCheckBox" text="تفعيل البيع السريع افتراضياً"/>
+                <Button text="حفظ خيارات البيع" onAction="#handleSaveSaleOptions"
+                        style="-fx-background-color: -fx-accent-light; -fx-text-fill: white;"/>
+            </VBox>
             
             <VBox spacing="10" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 8;">
                 <Label text="إعادة تعيين البيانات" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: -fx-danger-text;"/>

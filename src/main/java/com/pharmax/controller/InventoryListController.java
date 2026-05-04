@@ -10,6 +10,7 @@ import com.pharmax.service.InventoryService;
 import com.pharmax.service.InventoryMovementService;
 import com.pharmax.service.PrintService;
 import com.pharmax.service.ProductBatchService;
+import com.pharmax.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javafx.beans.property.SimpleStringProperty;
@@ -86,6 +87,8 @@ public class InventoryListController {
     private Button batchDetailsButton;
     @FXML
     private Button movementHistoryButton;
+    @FXML
+    private Button printReportButton;
 
     private final InventoryService inventoryService = new InventoryService();
     private final CategoryService categoryService = new CategoryService();
@@ -108,7 +111,23 @@ public class InventoryListController {
         setupFilters();
         setupSearch();
         setupSelectionActions();
+        applyVisibilityRestrictions();
         loadProducts();
+    }
+
+    private void applyVisibilityRestrictions() {
+        boolean canSeeCost = SessionManager.getInstance().canSeeCost();
+        if (costPriceColumn != null) {
+            costPriceColumn.setVisible(canSeeCost);
+        }
+        if (inventoryValueLabel != null && inventoryValueLabel.getParent() != null) {
+            inventoryValueLabel.getParent().setVisible(canSeeCost);
+            inventoryValueLabel.getParent().setManaged(canSeeCost);
+        }
+        if (printReportButton != null) {
+            printReportButton.setVisible(canSeeCost);
+            printReportButton.setManaged(canSeeCost);
+        }
     }
 
     private void setupTableColumns() {
@@ -283,8 +302,10 @@ public class InventoryListController {
 
         totalProductsLabel.setText(String.valueOf(allProducts.size()));
         totalStockLabel.setText(String.valueOf(inventoryService.getTotalStockCount()));
-        inventoryValueLabel
-                .setText(String.format("%s د.ع", numberFormat.format(inventoryService.getTotalInventoryValue())));
+        if (SessionManager.getInstance().canSeeCost()) {
+            inventoryValueLabel
+                    .setText(String.format("%s د.ع", numberFormat.format(inventoryService.getTotalInventoryValue())));
+        }
         lowStockLabel.setText(String.valueOf(inventoryService.getLowStockProducts().size()));
     }
 
@@ -422,6 +443,10 @@ public class InventoryListController {
 
     @FXML
     private void handlePrint() {
+        if (!SessionManager.getInstance().canSeeCost()) {
+            showError("غير متاح", "طباعة تقرير المخزون غير متاحة للبائع.");
+            return;
+        }
         try {
             PrintService printService = new PrintService();
 
@@ -500,8 +525,11 @@ public class InventoryListController {
         TableColumn<BatchRow, String> createdCol = new TableColumn<>("تاريخ الإنشاء");
         createdCol.setCellValueFactory(new PropertyValueFactory<>("createdAt"));
 
+        boolean canSeeCost = SessionManager.getInstance().canSeeCost();
         @SuppressWarnings("unchecked")
-        var batchColumns = new TableColumn[]{batchNumberCol, expiryCol, qtyCol, costCol, saleCol, statusCol, sourceCol, createdCol};
+        var batchColumns = canSeeCost
+                ? new TableColumn[]{batchNumberCol, expiryCol, qtyCol, costCol, saleCol, statusCol, sourceCol, createdCol}
+                : new TableColumn[]{batchNumberCol, expiryCol, qtyCol, saleCol, statusCol, sourceCol, createdCol};
         table.getColumns().addAll(batchColumns);
 
         List<BatchRow> rows = batches.stream()

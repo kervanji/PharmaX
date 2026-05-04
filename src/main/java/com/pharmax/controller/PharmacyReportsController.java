@@ -3,6 +3,7 @@ package com.pharmax.controller;
 import com.pharmax.model.Customer;
 import com.pharmax.service.PharmacyReportExportService;
 import com.pharmax.service.PharmacyReportService;
+import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
@@ -12,6 +13,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -27,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class PharmacyReportsController {
+    @FXML private TabPane reportsTabPane;
     @FXML private TextField stockSearchField;
     @FXML private ComboBox<String> stockExpiryFilterComboBox;
     @FXML private TableView<PharmacyReportService.StockByBatchRow> stockByBatchTable;
@@ -148,6 +151,7 @@ public class PharmacyReportsController {
         setupProfitTab();
         setupCashboxTab();
         setupVelocityTabs();
+        applyRoleVisibilityRestrictions();
 
         loadPurchaseSuppliers();
         handleRefreshStock();
@@ -156,6 +160,15 @@ public class PharmacyReportsController {
         handleRefreshPurchases();
         handleRefreshCashbox();
         handleRefreshVelocity();
+    }
+
+    private void applyRoleVisibilityRestrictions() {
+        if (stockCostColumn != null) {
+            stockCostColumn.setVisible(SessionManager.getInstance().canSeeCost());
+        }
+        if (!SessionManager.getInstance().canSeeProfit() && reportsTabPane != null) {
+            reportsTabPane.getTabs().removeIf(tab -> "الربح".equals(tab.getText()));
+        }
     }
 
     private void setupStockTab() {
@@ -387,18 +400,21 @@ public class PharmacyReportsController {
     @FXML private void handleExportSlowMovingPdf() { exportVelocity("pdf", false); }
 
     private void exportStock(String extension) {
-        export("المخزون حسب الدفعة", "stock_by_batch", extension, stockByBatchTable.getItems(), List.of(
+        var columns = new java.util.ArrayList<>(List.of(
                 new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.StockByBatchRow::productName),
                 new PharmacyReportExportService.ReportColumn<>("الكود", PharmacyReportService.StockByBatchRow::productCode),
                 new PharmacyReportExportService.ReportColumn<>("الباركود", PharmacyReportService.StockByBatchRow::barcode),
                 new PharmacyReportExportService.ReportColumn<>("الدفعة", PharmacyReportService.StockByBatchRow::batchNumber),
                 new PharmacyReportExportService.ReportColumn<>("الصلاحية", PharmacyReportService.StockByBatchRow::expiryDate),
-                new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.StockByBatchRow::quantity),
-                new PharmacyReportExportService.ReportColumn<>("التكلفة", PharmacyReportService.StockByBatchRow::unitCost),
-                new PharmacyReportExportService.ReportColumn<>("سعر البيع", PharmacyReportService.StockByBatchRow::salePrice),
-                new PharmacyReportExportService.ReportColumn<>("الحالة", PharmacyReportService.StockByBatchRow::status),
-                new PharmacyReportExportService.ReportColumn<>("المصدر", PharmacyReportService.StockByBatchRow::sourceReference)
+                new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.StockByBatchRow::quantity)
         ));
+        if (SessionManager.getInstance().canSeeCost()) {
+            columns.add(new PharmacyReportExportService.ReportColumn<>("التكلفة", PharmacyReportService.StockByBatchRow::unitCost));
+        }
+        columns.add(new PharmacyReportExportService.ReportColumn<>("سعر البيع", PharmacyReportService.StockByBatchRow::salePrice));
+        columns.add(new PharmacyReportExportService.ReportColumn<>("الحالة", PharmacyReportService.StockByBatchRow::status));
+        columns.add(new PharmacyReportExportService.ReportColumn<>("المصدر", PharmacyReportService.StockByBatchRow::sourceReference));
+        export("المخزون حسب الدفعة", "stock_by_batch", extension, stockByBatchTable.getItems(), columns);
     }
 
     private void exportExpiry(String extension) {
@@ -449,6 +465,10 @@ public class PharmacyReportsController {
     }
 
     private void exportProfit(String extension) {
+        if (!SessionManager.getInstance().canSeeProfit()) {
+            showError("غير متاح", "تصدير تقرير الربح غير متاح للبائع.");
+            return;
+        }
         export("تقرير الربح", "profit_report", extension, List.of(profitStatusLabel.getText()), List.of(
                 new PharmacyReportExportService.ReportColumn<>("حالة التقرير", value -> value)
         ));

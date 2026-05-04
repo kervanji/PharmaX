@@ -89,7 +89,7 @@
     </TableView>
     
     <HBox alignment="CENTER_RIGHT" spacing="12">
-        <Button text="طباعة التقرير" onAction="#handlePrint"
+        <Button fx:id="printReportButton" text="طباعة التقرير" onAction="#handlePrint"
                 style="-fx-background-color: -fx-accent-color; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8;"/>
         <Label fx:id="statusLabel" text="جاهز" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
     </HBox>

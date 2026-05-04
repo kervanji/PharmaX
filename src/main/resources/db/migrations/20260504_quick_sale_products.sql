@@ -1,0 +1,1 @@
+ALTER TABLE products ADD COLUMN is_quick_sale BOOLEAN DEFAULT 0;

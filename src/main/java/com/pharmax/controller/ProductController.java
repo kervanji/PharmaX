@@ -114,6 +114,8 @@ public class ProductController {
     @FXML
     private CheckBox isActiveCheckBox;
     @FXML
+    private CheckBox quickSaleProductCheckBox;
+    @FXML
     private Button deleteButton;
     @FXML
     private VBox openingBatchSection;
@@ -165,6 +167,7 @@ public class ProductController {
 
     private void applyRoleRestrictions() {
         boolean canSeeCost = SessionManager.getInstance().canSeeCost();
+        boolean canManageQuickSaleProducts = SessionManager.getInstance().isAdmin();
 
         if (!canSeeCost) {
             // Hide cost price - show ****** instead
@@ -190,6 +193,15 @@ public class ProductController {
             profitMarginWholesaleLabel.setManaged(false);
             profitMarginSpecialLabel.setVisible(false);
             profitMarginSpecialLabel.setManaged(false);
+        }
+
+        if (quickSaleProductCheckBox != null) {
+            quickSaleProductCheckBox.setVisible(canManageQuickSaleProducts);
+            quickSaleProductCheckBox.setManaged(canManageQuickSaleProducts);
+            quickSaleProductCheckBox.setDisable(!canManageQuickSaleProducts);
+            if (!canManageQuickSaleProducts) {
+                quickSaleProductCheckBox.setSelected(false);
+            }
         }
 
         applySellingPriceEditRestriction();
@@ -512,6 +524,9 @@ public class ProductController {
             baseUnitComboBox.setValue(baseUnit != null ? baseUnit : "شريط");
         }
         isActiveCheckBox.setSelected(product.getIsActive());
+        if (quickSaleProductCheckBox != null) {
+            quickSaleProductCheckBox.setSelected(Boolean.TRUE.equals(product.getIsQuickSale()));
+        }
         loadPackagingRows(product);
 
         // Hide opening batch section in edit mode
@@ -699,6 +714,11 @@ public class ProductController {
             product.setBaseUnit(baseUnit);
             product.setUnitOfMeasure(baseUnit);
             product.setIsActive(isActiveCheckBox.isSelected());
+            if (SessionManager.getInstance().isAdmin()) {
+                product.setIsQuickSale(quickSaleProductCheckBox != null && quickSaleProductCheckBox.isSelected());
+            } else if (product.getIsQuickSale() == null) {
+                product.setIsQuickSale(false);
+            }
 
             Product savedProduct;
             if (isEditMode) {

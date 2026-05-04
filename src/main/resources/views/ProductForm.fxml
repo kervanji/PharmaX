@@ -75,6 +75,11 @@
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <CheckBox fx:id="isActiveCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
                           text="نشط" selected="true" style="-fx-font-size: 14px;"/>
+
+                <Label text="البيع السريع:" GridPane.rowIndex="2" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <CheckBox fx:id="quickSaleProductCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="3"
+                          text="إظهار كزر في شاشة البيع" selected="false" style="-fx-font-size: 14px;"/>
             </GridPane>
         </VBox>
 

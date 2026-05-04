@@ -13,12 +13,14 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Modality;
 import javafx.util.StringConverter;
 import javafx.application.Platform;
+import com.pharmax.util.AppConfigStore;
 import com.pharmax.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +79,8 @@ public class SaleFormController {
     private Label productAvailabilitySummaryLabel;
     @FXML
     private Button medicineDetailsButton;
+    @FXML
+    private FlowPane quickSaleButtonsPane;
     @FXML
     private TableView<SaleItemRow> itemsTable;
     @FXML
@@ -145,6 +149,14 @@ public class SaleFormController {
     private Label balanceStatusLabel;
     @FXML
     private TextArea notesArea;
+    @FXML
+    private CheckBox printCheckbox;
+    @FXML
+    private CheckBox quickSaleCheckbox;
+
+    private static final String QUICK_SALE_ENABLED_KEY = "sale.quick.enabled";
+    private static final String QUICK_SALE_DEFAULT_KEY = "sale.quick.default";
+    private final AppConfigStore configStore = new AppConfigStore();
 
     private Stage dialogStage;
     private final SalesService salesService;
@@ -189,9 +201,11 @@ public class SaleFormController {
         setupProductComboBox();
         setupUnitComboBox();
         setupPriceTypeComboBox();
+        setupQuickSaleButtons();
         setupProductPreviewPanel();
         setupItemsTable();
         setupDefaults();
+        setupSaleOptions();
         selectDefaultSaleCustomer();
         applyRoleRestrictions();
 
@@ -247,6 +261,40 @@ public class SaleFormController {
                 updateSelectedProductPriceLabel();
             });
         }
+    }
+
+    private void setupSaleOptions() {
+        boolean allowQuickSale = isQuickSaleAllowed();
+        boolean quickSaleDefault = isQuickSaleDefaultEnabled();
+
+        if (printCheckbox != null) {
+            printCheckbox.setSelected(true);
+        }
+        if (quickSaleCheckbox != null) {
+            quickSaleCheckbox.setVisible(allowQuickSale);
+            quickSaleCheckbox.setManaged(allowQuickSale);
+            quickSaleCheckbox.setSelected(allowQuickSale && quickSaleDefault);
+            quickSaleCheckbox.selectedProperty().addListener((obs, oldVal, quickSale) -> updateQuickSaleState());
+        }
+        updateQuickSaleState();
+    }
+
+    private void updateQuickSaleState() {
+        boolean quickSale = quickSaleCheckbox != null && quickSaleCheckbox.isVisible() && quickSaleCheckbox.isSelected();
+        if (printCheckbox != null) {
+            if (quickSale) {
+                printCheckbox.setSelected(false);
+            }
+            printCheckbox.setDisable(quickSale);
+        }
+    }
+
+    private boolean isQuickSaleAllowed() {
+        return Boolean.parseBoolean(configStore.load().getProperty(QUICK_SALE_ENABLED_KEY, "false"));
+    }
+
+    private boolean isQuickSaleDefaultEnabled() {
+        return Boolean.parseBoolean(configStore.load().getProperty(QUICK_SALE_DEFAULT_KEY, "false"));
     }
 
     private void setupUnitComboBox() {
@@ -355,6 +403,7 @@ public class SaleFormController {
 
     private void applyRoleRestrictions() {
         boolean seller = SessionManager.getInstance().isSeller();
+        boolean allowQuickSale = isQuickSaleAllowed();
 
         if (currencyComboBox != null) {
             currencyComboBox.setValue(IQD_CURRENCY);
@@ -396,6 +445,14 @@ public class SaleFormController {
             paidAmountField.setVisible(false);
             paidAmountField.setManaged(false);
         }
+        if (quickSaleCheckbox != null) {
+            quickSaleCheckbox.setVisible(allowQuickSale);
+            quickSaleCheckbox.setManaged(allowQuickSale);
+            if (!allowQuickSale) {
+                quickSaleCheckbox.setSelected(false);
+            }
+        }
+        updateQuickSaleState();
     }
 
     private void setupCategoryFilter(List<Product> products) {
@@ -596,6 +653,7 @@ public class SaleFormController {
         filteredProducts = new FilteredList<>(FXCollections.observableArrayList(products), p -> true);
         productComboBox.setItems(filteredProducts);
         productComboBox.setEditable(true);
+        setupQuickSaleButtons();
 
         setupCategoryFilter(products);
 
@@ -636,6 +694,73 @@ public class SaleFormController {
                 handleProductSelection(selected);
             }
         });
+    }
+
+    private void setupQuickSaleButtons() {
+        if (quickSaleButtonsPane == null) {
+            return;
+        }
+
+        List<Product> quickSaleProducts = productRepository.findAll().stream()
+                .filter(product -> Boolean.TRUE.equals(product.getIsActive()))
+                .filter(product -> Boolean.TRUE.equals(product.getIsQuickSale()))
+                .sorted((left, right) -> {
+                    String leftName = left != null && left.getName() != null ? left.getName() : "";
+                    String rightName = right != null && right.getName() != null ? right.getName() : "";
+                    return leftName.compareToIgnoreCase(rightName);
+                })
+                .toList();
+
+        quickSaleButtonsPane.getChildren().clear();
+        quickSaleButtonsPane.setVisible(!quickSaleProducts.isEmpty());
+        quickSaleButtonsPane.setManaged(!quickSaleProducts.isEmpty());
+
+        for (Product product : quickSaleProducts) {
+            Button quickSaleButton = new Button(product.getName());
+            quickSaleButton.setMnemonicParsing(false);
+            quickSaleButton.setWrapText(true);
+            quickSaleButton.setFocusTraversable(false);
+            quickSaleButton.setPrefWidth(150);
+            quickSaleButton.setPrefHeight(42);
+            quickSaleButton.setStyle(
+                    "-fx-background-color: -fx-bg-surface; " +
+                    "-fx-text-fill: -fx-form-label; " +
+                    "-fx-border-color: -fx-border-input; " +
+                    "-fx-border-radius: 10; " +
+                    "-fx-background-radius: 10; " +
+                    "-fx-font-weight: bold; " +
+                    "-fx-padding: 8 12;");
+            quickSaleButton.setOnAction(event -> handleQuickSaleProduct(product));
+            quickSaleButtonsPane.getChildren().add(quickSaleButton);
+        }
+    }
+
+    private void handleQuickSaleProduct(Product product) {
+        if (product == null || product.getId() == null) {
+            return;
+        }
+
+        Product freshProduct = productRepository.findById(product.getId()).orElse(product);
+        ProductUnit saleUnit = resolveQuickSaleUnit(freshProduct);
+        addProductToSale(freshProduct, 1.0, saleUnit);
+    }
+
+    private ProductUnit resolveQuickSaleUnit(Product product) {
+        if (product == null || product.getId() == null) {
+            return null;
+        }
+
+        List<ProductUnit> units = unitsByProduct.computeIfAbsent(product.getId(),
+                id -> productUnitService.getUnitsForProductOrDefault(product));
+
+        return units.stream()
+                .filter(unit -> Boolean.TRUE.equals(unit.getIsActive()))
+                .filter(unit -> Boolean.TRUE.equals(unit.getIsDefault()))
+                .findFirst()
+                .orElseGet(() -> units.stream()
+                        .filter(unit -> Boolean.TRUE.equals(unit.getIsActive()))
+                        .findFirst()
+                        .orElse(null));
     }
 
     private void handleProductBarcodeLookup(String barcodeText) {
@@ -823,6 +948,11 @@ public class SaleFormController {
     }
 
     private Double getSelectedPrice(Product product, ProductUnit saleUnit, String currency) {
+        String priceType = priceTypeComboBox != null ? priceTypeComboBox.getValue() : "مفرد";
+        return getSelectedPrice(product, saleUnit, currency, priceType);
+    }
+
+    private Double getSelectedPrice(Product product, ProductUnit saleUnit, String currency, String selectedPriceType) {
         if (product == null)
             return null;
         String priceType = priceTypeComboBox != null ? priceTypeComboBox.getValue() : "مفرد";
@@ -857,6 +987,46 @@ public class SaleFormController {
             return unitComboBox.getValue();
         }
         return selectedUnit;
+    }
+
+    private ProductUnit findUnitForRow(SaleItemRow row, String unitName) {
+        if (row == null || row.getProductId() == null || unitName == null) {
+            return null;
+        }
+        List<ProductUnit> units = unitsByProduct.getOrDefault(row.getProductId(), List.of());
+        return units.stream()
+                .filter(unit -> unitName.equals(unit.getUnitName()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void applyUnitChangeToRow(SaleItemRow row, ProductUnit newUnit) {
+        if (row == null || row.getProductId() == null || newUnit == null) {
+            return;
+        }
+
+        Product product = productRepository.findById(row.getProductId()).orElse(null);
+        if (product == null) {
+            showError("خطأ", "تعذر العثور على المنتج لتغيير الوحدة");
+            return;
+        }
+
+        Double unitPriceIqd = getSelectedPrice(product, newUnit, IQD_CURRENCY);
+        if (unitPriceIqd == null || unitPriceIqd <= 0) {
+            showError("خطأ", "لا يوجد سعر معروف للوحدة المحددة");
+            return;
+        }
+
+        row.setSoldUnit(newUnit.getUnitName());
+        row.setConversionFactor(newUnit.getEffectiveConversionFactor());
+        row.setUnitPricing(unitPriceIqd, getSelectedPrice(product, newUnit, "دولار"));
+        populateUnitPriceDisplays(row, product);
+        row.recalculate();
+        refreshCartBatchPreviews();
+        if (itemsTable != null) {
+            itemsTable.refresh();
+        }
+        updateTotals();
     }
 
     private boolean isRetailPriceType(String priceType) {
@@ -920,6 +1090,55 @@ public class SaleFormController {
         quantityColumn.setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getQuantity()).asObject());
         if (soldUnitColumn != null) {
             soldUnitColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSoldUnit()));
+            soldUnitColumn.setCellFactory(col -> new TableCell<>() {
+                private final ComboBox<ProductUnit> comboBox = new ComboBox<>();
+                private boolean updating = false;
+
+                {
+                    comboBox.setMaxWidth(Double.MAX_VALUE);
+                    comboBox.setConverter(new StringConverter<>() {
+                        @Override
+                        public String toString(ProductUnit unit) {
+                            return unit != null ? unit.getUnitName() : "";
+                        }
+
+                        @Override
+                        public ProductUnit fromString(String string) {
+                            return null;
+                        }
+                    });
+                    comboBox.setOnAction(e -> {
+                        if (updating) {
+                            return;
+                        }
+                        SaleItemRow row = getCellRow(this);
+                        ProductUnit selected = comboBox.getValue();
+                        if (row != null && selected != null) {
+                            applyUnitChangeToRow(row, selected);
+                        }
+                    });
+                }
+
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty) {
+                        setGraphic(null);
+                        return;
+                    }
+                    SaleItemRow row = getCellRow(this);
+                    if (row == null) {
+                        setGraphic(null);
+                        return;
+                    }
+                    List<ProductUnit> units = unitsByProduct.getOrDefault(row.getProductId(), List.of());
+                    updating = true;
+                    comboBox.setItems(FXCollections.observableArrayList(units));
+                    comboBox.setValue(findUnitForRow(row, row.getSoldUnit()));
+                    updating = false;
+                    setGraphic(comboBox);
+                }
+            });
         }
         if (conversionFactorColumn != null) {
             conversionFactorColumn
@@ -1500,8 +1719,6 @@ public class SaleFormController {
             showError("خطأ", "الرجاء اختيار منتج");
             return;
         }
-        product = productRepository.findById(product.getId()).orElse(product);
-        selectedProduct = product;
 
         double quantity;
         try {
@@ -1513,13 +1730,18 @@ public class SaleFormController {
             return;
         }
 
-        ProductUnit saleUnit = getSelectedSaleUnit();
+        addProductToSale(product, quantity, getSelectedSaleUnit());
+    }
+
+    private void addProductToSale(Product product, double quantity, ProductUnit saleUnit) {
+        product = productRepository.findById(product.getId()).orElse(product);
+        selectedProduct = product;
+
         double conversionFactor = saleUnit != null ? saleUnit.getEffectiveConversionFactor() : 1.0;
         String soldUnit = saleUnit != null && saleUnit.getUnitName() != null
                 ? saleUnit.getUnitName()
                 : productUnitService.resolveBaseUnit(product);
         double baseQuantity = quantity * conversionFactor;
-
         double discountPercent = 0;
         String itemCurrency = resolveProductCurrency(product, saleUnit);
         Double itemPrice = getSelectedPrice(product, saleUnit, itemCurrency);
@@ -1600,6 +1822,7 @@ public class SaleFormController {
                 item.setBoxPriceDisplay(display);
             }
         }
+
     }
 
     private void refreshCartBatchPreviews() {
@@ -1851,17 +2074,20 @@ public class SaleFormController {
         List<Sale> sales = createSales();
         if (!sales.isEmpty()) {
             try {
-                List<Receipt> receipts = new ArrayList<>();
-                for (Sale sale : sales) {
-                    Receipt receipt = receiptService.generateReceipt(sale.getId(), "DEFAULT", "System");
-                    receipts.add(receipt);
-                    if (receipt.getFilePath() == null) {
-                        continue;
-                    }
+                boolean quickSale = quickSaleCheckbox != null && quickSaleCheckbox.isVisible() && quickSaleCheckbox.isSelected();
+                boolean printAfterSave = printCheckbox != null && printCheckbox.isSelected();
 
-                    File pdfFile = new File(receipt.getFilePath());
-                    if (pdfFile.exists()) {
-                        printReceiptPdf(pdfFile);
+                if (!quickSale) {
+                    for (Sale sale : sales) {
+                        Receipt receipt = receiptService.generateReceipt(sale.getId(), "DEFAULT", "System");
+                        if (!printAfterSave || receipt.getFilePath() == null) {
+                            continue;
+                        }
+
+                        File pdfFile = new File(receipt.getFilePath());
+                        if (pdfFile.exists()) {
+                            printReceiptPdf(pdfFile);
+                        }
                     }
                 }
                 resetSaleForm();
@@ -2007,6 +2233,16 @@ public class SaleFormController {
         paidAmountCurrencyLabel.setText(IQD_CURRENCY);
         balanceLabel.setText("0");
         balanceStatusLabel.setText("");
+        if (printCheckbox != null) {
+            printCheckbox.setSelected(true);
+            printCheckbox.setDisable(false);
+        }
+        if (quickSaleCheckbox != null) {
+            boolean allowQuickSale = isQuickSaleAllowed();
+            quickSaleCheckbox.setVisible(allowQuickSale);
+            quickSaleCheckbox.setManaged(allowQuickSale);
+            quickSaleCheckbox.setSelected(allowQuickSale && isQuickSaleDefaultEnabled());
+        }
         if (notesArea != null) {
             notesArea.clear();
         }
@@ -2015,6 +2251,7 @@ public class SaleFormController {
         }
         selectDefaultSaleCustomer();
         applyRoleRestrictions();
+        updateQuickSaleState();
     }
 
     private void showError(String title, String message) {
@@ -2093,6 +2330,10 @@ public class SaleFormController {
         public void setSavedUnitPriceUsd(Double savedUnitPriceUsd) {
             this.savedUnitPriceUsd = savedUnitPriceUsd;
         }
+        public void setUnitPricing(Double unitPriceIqd, Double unitPriceUsd) {
+            this.baseUnitPriceIqd = unitPriceIqd != null ? unitPriceIqd : 0.0;
+            this.savedUnitPriceUsd = unitPriceUsd;
+        }
 
         public void setCurrencyAndRate(String currency, double exchangeRate) {
             this.currency = currency != null ? currency : "دينار";
@@ -2128,6 +2369,15 @@ public class SaleFormController {
         public void setQuantity(double quantity) {
             this.quantity = quantity;
             this.baseQuantity = quantity * conversionFactor;
+        }
+
+        public void setSoldUnit(String soldUnit) {
+            this.soldUnit = soldUnit != null ? soldUnit : "ÙˆØ­Ø¯Ø©";
+        }
+
+        public void setConversionFactor(double conversionFactor) {
+            this.conversionFactor = conversionFactor > 0 ? conversionFactor : 1.0;
+            this.baseQuantity = quantity * this.conversionFactor;
         }
 
         public String getPriceType() {

@@ -8,6 +8,7 @@ import com.pharmax.service.BackupRestoreService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.ReceiptService;
 import com.pharmax.service.SalesService;
+import com.pharmax.util.AppConfigStore;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import com.pharmax.util.ThemeManager;
@@ -75,6 +76,10 @@ public class SettingsController {
     private ProgressBar backupProgressBar;
     @FXML
     private ComboBox<ThemeManager.ThemeType> themeComboBox;
+    @FXML
+    private CheckBox allowQuickSaleCheckBox;
+    @FXML
+    private CheckBox defaultQuickSaleCheckBox;
 
     private com.pharmax.service.drive.BackupService backupService;
     private final CustomerService customerService = new CustomerService();
@@ -82,7 +87,10 @@ public class SettingsController {
     private final SalesService salesService = new SalesService();
     private final ReceiptService receiptService = new ReceiptService();
     private final BackupRestoreService backupRestoreService = new BackupRestoreService();
+    private final AppConfigStore configStore = new AppConfigStore();
     private Stage dialogStage;
+    private static final String QUICK_SALE_ENABLED_KEY = "sale.quick.enabled";
+    private static final String QUICK_SALE_DEFAULT_KEY = "sale.quick.default";
 
     @FXML
     private void initialize() {
@@ -137,11 +145,35 @@ public class SettingsController {
             });
         }
 
+        loadSaleOptions();
+
         // Initialize Drive Services
         com.pharmax.MainApp app = TabManager.getInstance().getMainApp();
         if (app != null) {
             this.backupService = app.getBackupService();
             updateDriveStatus();
+        }
+    }
+
+    private void loadSaleOptions() {
+        var props = configStore.load();
+        boolean allowQuickSale = Boolean.parseBoolean(props.getProperty(QUICK_SALE_ENABLED_KEY, "false"));
+        boolean defaultQuickSale = Boolean.parseBoolean(props.getProperty(QUICK_SALE_DEFAULT_KEY, "false"));
+
+        if (allowQuickSaleCheckBox != null) {
+            allowQuickSaleCheckBox.setSelected(allowQuickSale);
+            allowQuickSaleCheckBox.selectedProperty().addListener((obs, oldVal, selected) -> {
+                if (!selected && defaultQuickSaleCheckBox != null) {
+                    defaultQuickSaleCheckBox.setSelected(false);
+                }
+                if (defaultQuickSaleCheckBox != null) {
+                    defaultQuickSaleCheckBox.setDisable(!selected);
+                }
+            });
+        }
+        if (defaultQuickSaleCheckBox != null) {
+            defaultQuickSaleCheckBox.setSelected(allowQuickSale && defaultQuickSale);
+            defaultQuickSaleCheckBox.setDisable(!allowQuickSale);
         }
     }
 
@@ -637,6 +669,22 @@ public class SettingsController {
                 }
             }
         });
+    }
+
+    @FXML
+    private void handleSaveSaleOptions() {
+        boolean allowQuickSale = allowQuickSaleCheckBox != null && allowQuickSaleCheckBox.isSelected();
+        boolean defaultQuickSale = allowQuickSale && defaultQuickSaleCheckBox != null && defaultQuickSaleCheckBox.isSelected();
+
+        var props = configStore.load();
+        props.setProperty(QUICK_SALE_ENABLED_KEY, String.valueOf(allowQuickSale));
+        props.setProperty(QUICK_SALE_DEFAULT_KEY, String.valueOf(defaultQuickSale));
+        configStore.save(props);
+
+        if (defaultQuickSaleCheckBox != null) {
+            defaultQuickSaleCheckBox.setDisable(!allowQuickSale);
+        }
+        showSuccess("تم", "تم حفظ خيارات شاشة البيع بنجاح");
     }
 
     @FXML

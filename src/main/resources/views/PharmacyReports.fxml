@@ -17,7 +17,7 @@
                 style="-fx-background-color: -fx-scrollbar-thumb-hover; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 8 16; -fx-background-radius: 8;"/>
     </HBox>
 
-    <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
+    <TabPane fx:id="reportsTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
         <tabs>
             <Tab text="المخزون حسب الدفعة">
                 <content>
