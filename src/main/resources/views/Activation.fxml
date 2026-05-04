@@ -28,9 +28,10 @@
 
                 <VBox spacing="4" alignment="CENTER" style="-fx-background-color: rgba(255,255,255,0.05); -fx-padding: 10; -fx-background-radius: 8; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 8;">
                     <Label text="معلومات المطور" style="-fx-text-fill: -fx-text-main; -fx-font-size: 14px; -fx-font-weight: bold;"/>
-                    <Label text="المطور: المطور (ضع اسمك هنا)" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
+                    <Label text="المطور: KervanjiHolding" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
                     <Label text="البرنامج: PharmaX" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
-                    <Label text="واتساب/هاتف: ضع رقمك هنا" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
+                    <Label text="واتساب/هاتف: 07730199732" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
+                    <Label text="الموقع الإلكتروني: kervanjiholding.com" style="-fx-text-fill: -fx-text-muted; -fx-font-size: 12px;"/>
                 </VBox>
 
                 <VBox spacing="8" alignment="CENTER">
@@ -70,7 +71,7 @@
             <padding>
                 <Insets bottom="20"/>
             </padding>
-            <Label text="© 2025 KervanjiHolding" style="-fx-text-fill: rgba(255,255,255,0.5); -fx-font-size: 11px;"/>
+            <Label text="© 2026 KervanjiHolding" style="-fx-text-fill: rgba(255,255,255,0.5); -fx-font-size: 11px;"/>
         </VBox>
     </bottom>
 </BorderPane>
