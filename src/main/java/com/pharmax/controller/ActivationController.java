@@ -6,6 +6,8 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 
 public class ActivationController {
     @FXML private TextField activationCodeField;
@@ -62,6 +64,19 @@ public class ActivationController {
                 statusLabel.setText("");
             }
             showError(result.message);
+        }
+    }
+
+    @FXML
+    private void handleCopyDeviceCode() {
+        if (deviceIdLabel != null && !deviceIdLabel.getText().isEmpty()) {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(deviceIdLabel.getText());
+            clipboard.setContent(content);
+            if (statusLabel != null) {
+                statusLabel.setText("تم نسخ كود الجهاز بنجاح");
+            }
         }
     }
 

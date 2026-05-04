@@ -109,7 +109,7 @@ public class MainApp extends Application {
             SessionManager.getInstance().setOnLogoutCallback(this::showLoginScreen);
 
             // License gate (offline activation)
-            if (new LicenseService().isActivated()) {
+            if (new LicenseService().isTrialValidOrActivated()) {
                 // Show login screen first
                 showLoginScreen();
             } else {
