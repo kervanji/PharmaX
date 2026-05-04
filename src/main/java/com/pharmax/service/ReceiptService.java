@@ -20,6 +20,7 @@ import com.itextpdf.text.Image;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.Phrase;
+import com.itextpdf.text.Rectangle;
 import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
@@ -44,6 +45,10 @@ import java.util.prefs.Preferences;
 
 public class ReceiptService {
     private static final Logger logger = LoggerFactory.getLogger(ReceiptService.class);
+    public static final String TEMPLATE_A4 = "DEFAULT";
+    public static final String TEMPLATE_THERMAL_80MM = "THERMAL_80MM";
+    public static final String TEMPLATE_THERMAL_58MM = "THERMAL_58MM";
+
     private final ReceiptRepository receiptRepository;
     private final SaleRepository saleRepository;
     private final SaleReturnRepository returnRepository;
@@ -709,6 +714,10 @@ public class ReceiptService {
     }
 
     private byte[] generateReceiptPDF(Sale sale, String template) throws DocumentException, IOException {
+        if (TEMPLATE_THERMAL_58MM.equals(template) || TEMPLATE_THERMAL_80MM.equals(template)) {
+            return generateThermalReceiptPDF(sale, template);
+        }
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         final float bannerTargetHeight = 120f;
@@ -914,6 +923,243 @@ public class ReceiptService {
         document.close();
 
         return baos.toByteArray();
+    }
+
+    private byte[] generateThermalReceiptPDF(Sale sale, String template) throws DocumentException, IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        boolean compact = TEMPLATE_THERMAL_58MM.equals(template);
+        Rectangle pageSize = createThermalPageSize(sale, compact);
+        float margin = compact ? 5f : 7f;
+        Document document = new Document(pageSize, margin, margin, 8f, 8f);
+        PdfWriter.getInstance(document, baos);
+        document.open();
+
+        BaseFont baseFont = loadArabicBaseFont();
+        Font titleFont = new Font(baseFont, compact ? 11 : 13, Font.BOLD);
+        Font boldFont = new Font(baseFont, compact ? 8 : 9, Font.BOLD);
+        Font bodyFont = new Font(baseFont, compact ? 7 : 8, Font.NORMAL);
+        Font smallFont = new Font(baseFont, compact ? 6 : 7, Font.NORMAL);
+
+        // No logo
+        addThermalCenteredText(document, "صيدلية / Pharmacy", titleFont, 1f, 2f);
+        addThermalSeparator(document, bodyFont);
+
+        String saleCurrency = sale.getCurrency() != null ? sale.getCurrency() : "دينار";
+        addThermalInfoRow(document, "رقم الوصل", safeText(sale.getSaleCode()), boldFont, bodyFont);
+        addThermalInfoRow(document, "التاريخ", sale.getSaleDate() != null
+                ? sale.getSaleDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                : "-", boldFont, bodyFont);
+        addThermalInfoRow(document, "البائع", safeText(sale.getCreatedBy()), boldFont, bodyFont);
+        addThermalInfoRow(document, "الدفع", getPaymentMethodArabic(sale.getPaymentMethod()), boldFont, bodyFont);
+        addThermalSeparator(document, bodyFont);
+
+        addThermalCenteredText(document, "تفاصيل المواد", boldFont, 1f, 2f);
+        List<SaleItem> items = sale.getSaleItems() != null ? sale.getSaleItems() : Collections.emptyList();
+        int rowNo = 1;
+        for (SaleItem item : items) {
+            addThermalItem(document, item, rowNo++, saleCurrency, bodyFont, smallFont, compact);
+        }
+
+        addThermalSeparator(document, bodyFont);
+        addThermalTotals(document, sale, items, saleCurrency, boldFont, bodyFont);
+        addThermalSeparator(document, bodyFont);
+
+        addThermalCenteredText(document, "شكراً لزيارتكم", boldFont, 3f, 1f);
+        addThermalCenteredText(document, "المواد المباعة لا ترد إلا بوجود الوصل", smallFont, 0f, 1f);
+        addThermalCenteredText(document, "Powered by KervanjiHolding.com", smallFont, 1f, 0f);
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    private Rectangle createThermalPageSize(Sale sale, boolean compact) {
+        float width = mmToPoints(compact ? 58f : 80f);
+        int itemCount = sale != null && sale.getSaleItems() != null ? sale.getSaleItems().size() : 0;
+        int batchRows = 0;
+        if (sale != null && sale.getSaleItems() != null) {
+            for (SaleItem item : sale.getSaleItems()) {
+                if (item.getDiscountAmount() != null && item.getDiscountAmount() > 0) {
+                    batchRows++;
+                }
+            }
+        }
+        float minHeight = compact ? 520f : 580f;
+        float height = minHeight + (itemCount * (compact ? 34f : 40f)) + (batchRows * 12f);
+        return new Rectangle(width, height);
+    }
+
+    private float mmToPoints(float mm) {
+        return mm * 72f / 25.4f;
+    }
+
+    private void addThermalLogo(Document document, float paperWidth, boolean compact) {
+        try {
+            Image logo = loadBannerImage();
+            if (logo == null) {
+                return;
+            }
+            logo.scaleToFit(paperWidth * (compact ? 0.58f : 0.62f), compact ? 30f : 38f);
+            logo.setAlignment(Image.ALIGN_CENTER);
+            logo.setSpacingAfter(3f);
+            document.add(logo);
+        } catch (Exception e) {
+            logger.warn("Thermal receipt logo skipped", e);
+        }
+    }
+
+    private void addThermalItem(Document document, SaleItem item, int rowNo, String currency, Font bodyFont,
+            Font smallFont, boolean compact) throws DocumentException {
+        String productName = item.getProduct() != null && item.getProduct().getName() != null
+                ? item.getProduct().getName()
+                : "-";
+        String unit = item.getSoldUnit() != null && !item.getSoldUnit().trim().isEmpty()
+                ? item.getSoldUnit()
+                : item.getProduct() != null && item.getProduct().getUnitOfMeasure() != null
+                        ? item.getProduct().getUnitOfMeasure()
+                        : "-";
+        double qty = item.getQuantity() != null ? item.getQuantity() : 0.0;
+        double unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : 0.0;
+
+        PdfPTable itemTable = new PdfPTable(1);
+        itemTable.setWidthPercentage(100);
+        itemTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        itemTable.setSpacingBefore(1f);
+        itemTable.setSpacingAfter(1f);
+
+        String nameLine = rowNo + ". " + limitText(productName, compact ? 34 : 48);
+        itemTable.addCell(createThermalTextCell(nameLine, bodyFont, Element.ALIGN_RIGHT, 0f, PdfPCell.NO_BORDER));
+
+        String detailLine = formatAmount(qty) + " " + unit + " × "
+                + formatCurrency(unitPrice, currency) + " = " + formatCurrency(item.getTotalPrice(), currency);
+        itemTable.addCell(createThermalTextCell(detailLine, bodyFont, Element.ALIGN_RIGHT, 0f, PdfPCell.NO_BORDER));
+
+        double discount = item.getDiscountAmount() != null ? item.getDiscountAmount() : 0.0;
+        if (discount > 0) {
+            itemTable.addCell(createThermalTextCell("خصم السطر: " + formatCurrency(discount, currency), smallFont,
+                    Element.ALIGN_RIGHT, 0f, PdfPCell.NO_BORDER));
+        }
+
+        document.add(itemTable);
+    }
+
+    private void addThermalTotals(Document document, Sale sale, List<SaleItem> items, String currency, Font boldFont,
+            Font bodyFont) throws DocumentException {
+        double itemDiscount = items.stream()
+                .mapToDouble(item -> item.getDiscountAmount() != null ? item.getDiscountAmount() : 0.0)
+                .sum();
+        double saleDiscount = sale.getDiscountAmount() != null ? sale.getDiscountAmount() : 0.0;
+        double paid = sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
+        double finalAmount = sale.getFinalAmount() != null ? sale.getFinalAmount() : 0.0;
+        double remaining = Math.max(0.0, finalAmount - paid);
+
+        double totalDiscount = itemDiscount + saleDiscount;
+
+        addThermalInfoRow(document, "المجموع", formatCurrency(sale.getTotalAmount(), currency), boldFont, bodyFont);
+        if (totalDiscount > 0) {
+            addThermalInfoRow(document, "الخصم", formatCurrency(totalDiscount, currency), boldFont, bodyFont);
+        }
+        addThermalInfoRow(document, "الصافي", formatCurrency(finalAmount, currency), boldFont, boldFont);
+        addThermalInfoRow(document, "المدفوع", formatCurrency(paid, currency), boldFont, bodyFont);
+        if (remaining > 0) {
+            addThermalInfoRow(document, "المتبقي", formatCurrency(remaining, currency), boldFont, bodyFont);
+        }
+    }
+
+    private void addThermalInfoRow(Document document, String label, String value, Font labelFont, Font valueFont)
+            throws DocumentException {
+        PdfPTable row = new PdfPTable(2);
+        row.setWidthPercentage(100);
+        row.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        row.setWidths(new float[] { 1.05f, 1.45f });
+        row.addCell(createThermalTextCell(label + ":", labelFont, Element.ALIGN_RIGHT, 1f, PdfPCell.NO_BORDER));
+        row.addCell(createThermalTextCell(value != null && !value.isBlank() ? value : "-", valueFont, Element.ALIGN_LEFT,
+                1f, PdfPCell.NO_BORDER));
+        document.add(row);
+    }
+
+    private void addThermalCenteredText(Document document, String text, Font font, float spacingBefore, float spacingAfter)
+            throws DocumentException {
+        PdfPTable wrapper = new PdfPTable(1);
+        wrapper.setWidthPercentage(100);
+        wrapper.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        wrapper.setSpacingBefore(spacingBefore);
+        wrapper.setSpacingAfter(spacingAfter);
+        wrapper.addCell(createThermalTextCell(text, font, Element.ALIGN_CENTER, 0f, PdfPCell.NO_BORDER));
+        document.add(wrapper);
+    }
+
+    private void addThermalSeparator(Document document, Font font) throws DocumentException {
+        PdfPTable separator = new PdfPTable(1);
+        separator.setWidthPercentage(100);
+        separator.setSpacingBefore(2f);
+        separator.setSpacingAfter(2f);
+        PdfPCell cell = createThermalTextCell("--------------------------------", font, Element.ALIGN_CENTER, 0f,
+                PdfPCell.NO_BORDER);
+        cell.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
+        separator.addCell(cell);
+        document.add(separator);
+    }
+
+    private PdfPCell createThermalTextCell(String text, Font font, int alignment, float padding, int border) {
+        PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "", font));
+        cell.setHorizontalAlignment(alignment);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        cell.setPadding(padding);
+        cell.setBorder(border);
+        return cell;
+    }
+
+    private String buildBatchExpiryText(SaleItem item) {
+        if (item == null) {
+            return "";
+        }
+        String batch = item.getBatchNumberSnapshot();
+        String expiry = item.getExpirationDateSnapshot();
+        if ((batch == null || batch.isBlank()) && item.getBatch() != null) {
+            batch = item.getBatch().getBatchNumber();
+        }
+        if ((expiry == null || expiry.isBlank()) && item.getBatch() != null && item.getBatch().getExpiryDate() != null) {
+            expiry = item.getBatch().getExpiryDate().toString();
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (batch != null && !batch.isBlank()) {
+            sb.append("Batch: ").append(batch);
+        }
+        if (expiry != null && !expiry.isBlank()) {
+            if (sb.length() > 0) {
+                sb.append(" | ");
+            }
+            sb.append("Exp: ").append(expiry);
+        }
+        return sb.toString();
+    }
+
+    private String limitText(String text, int maxChars) {
+        if (text == null) {
+            return "-";
+        }
+        String trimmed = text.trim();
+        if (trimmed.length() <= maxChars) {
+            return trimmed;
+        }
+        return trimmed.substring(0, Math.max(0, maxChars - 1)) + "…";
+    }
+
+    private String safeText(String value) {
+        return value != null && !value.isBlank() ? value : "-";
+    }
+
+    private String normalizeCurrencyLabel(String currency) {
+        if ("دولار".equals(currency)) {
+            return "$";
+        }
+        if ("دينار".equals(currency)) {
+            return "د.ع";
+        }
+        return currency != null && !currency.isBlank() ? currency : "د.ع";
     }
 
     private BaseFont loadArabicBaseFont() throws DocumentException, IOException {

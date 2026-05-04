@@ -79,7 +79,7 @@
             <TableColumn fx:id="barcodeColumn" text="الباركود" prefWidth="110"/>
             <TableColumn fx:id="costPriceColumn" text="التكلفة" prefWidth="90"/>
             <TableColumn fx:id="unitPriceColumn" text="سعر البيع" prefWidth="90"/>
-            <TableColumn fx:id="quantityColumn" text="الكمية" prefWidth="70"/>
+            <TableColumn fx:id="quantityColumn" text="الكمية" prefWidth="150"/>
             <TableColumn fx:id="statusColumn" text="الحالة" prefWidth="80"/>
             <TableColumn fx:id="actionsColumn" text="إجراءات" prefWidth="100"/>
         </columns>

@@ -2,7 +2,9 @@ package com.pharmax.controller;
 
 import com.pharmax.model.Sale;
 import com.pharmax.model.SaleItem;
+import com.pharmax.model.SaleReturn;
 import com.pharmax.service.ReceiptService;
+import com.pharmax.service.ReturnService;
 import com.pharmax.service.SalesService;
 import com.pharmax.util.TabManager;
 import javafx.beans.property.SimpleDoubleProperty;
@@ -66,6 +68,7 @@ public class SaleListController {
     @FXML private TableColumn<Sale, String> customerColumn;
     @FXML private TableColumn<Sale, String> dateColumn;
     @FXML private TableColumn<Sale, Double> totalColumn;
+    @FXML private TableColumn<Sale, Double> returnedColumn;
     @FXML private TableColumn<Sale, Double> paidColumn;
     @FXML private TableColumn<Sale, Double> remainingColumn;
     @FXML private TableColumn<Sale, Integer> itemsCountColumn;
@@ -76,14 +79,17 @@ public class SaleListController {
     @FXML private Label totalSalesLabel;
     @FXML private Label totalAmountLabel;
     @FXML private Label paidAmountLabel;
+    @FXML private Label returnedAmountLabel;
     @FXML private Label pendingAmountLabel;
     @FXML private Label avgSaleLabel;
     @FXML private Label itemsCountLabel;
 
     private final SalesService salesService;
     private final ReceiptService receiptService;
+    private final ReturnService returnService;
     private ObservableList<Sale> allSales;
     private List<Sale> filteredSales = List.of();
+    private Map<Long, List<SaleReturn>> returnsBySaleId = Map.of();
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private com.pharmax.MainApp mainApp;
     private boolean tabMode = false;
@@ -104,6 +110,7 @@ public class SaleListController {
     public SaleListController() {
         this.salesService = new SalesService();
         this.receiptService = new ReceiptService();
+        this.returnService = new ReturnService();
     }
 
     @FXML
@@ -119,7 +126,8 @@ public class SaleListController {
                 data.getValue().getCustomer() != null ? data.getValue().getCustomer().getName() : "-"));
         dateColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getSaleDate() != null ? data.getValue().getSaleDate().format(dateFormatter) : "-"));
-        totalColumn.setCellValueFactory(data -> new SimpleDoubleProperty(safeDouble(data.getValue().getFinalAmount())).asObject());
+        totalColumn.setCellValueFactory(data -> new SimpleDoubleProperty(getNetSaleAmount(data.getValue())).asObject());
+        returnedColumn.setCellValueFactory(data -> new SimpleDoubleProperty(getReturnedAmount(data.getValue())).asObject());
         paidColumn.setCellValueFactory(data -> new SimpleDoubleProperty(safeDouble(data.getValue().getPaidAmount())).asObject());
         remainingColumn.setCellValueFactory(data -> new SimpleDoubleProperty(getRemainingAmount(data.getValue())).asObject());
         itemsCountColumn.setCellValueFactory(data -> new SimpleIntegerProperty(getItemCount(data.getValue())).asObject());
@@ -133,6 +141,7 @@ public class SaleListController {
                         : "-"));
 
         setupCurrencyColumn(totalColumn);
+        setupCurrencyColumn(returnedColumn);
         setupCurrencyColumn(paidColumn);
         setupCurrencyColumn(remainingColumn);
 
@@ -203,6 +212,10 @@ public class SaleListController {
 
     private void loadSales() {
         List<Sale> sales = salesService.getAllSales();
+        returnsBySaleId = returnService.getAllReturns().stream()
+                .filter(ret -> ret.getSale() != null && ret.getSale().getId() != null)
+                .filter(ret -> "COMPLETED".equalsIgnoreCase(ret.getReturnStatus()))
+                .collect(Collectors.groupingBy(ret -> ret.getSale().getId(), LinkedHashMap::new, Collectors.toList()));
         allSales = FXCollections.observableArrayList(sales);
         applyFilters();
     }
@@ -316,7 +329,7 @@ public class SaleListController {
                         return false;
                     }
 
-                    double finalAmount = safeDouble(sale.getFinalAmount());
+                    double finalAmount = getNetSaleAmount(sale);
                     if (minAmount != null && finalAmount < minAmount) {
                         return false;
                     }
@@ -339,7 +352,8 @@ public class SaleListController {
 
     private void updateSummaryForFiltered(List<Sale> sales) {
         int totalCount = sales.size();
-        double totalAmount = sales.stream().mapToDouble(s -> safeDouble(s.getFinalAmount())).sum();
+        double totalAmount = sales.stream().mapToDouble(this::getNetSaleAmount).sum();
+        double returnedAmount = sales.stream().mapToDouble(this::getReturnedAmount).sum();
         double paidAmount = sales.stream().mapToDouble(s -> safeDouble(s.getPaidAmount())).sum();
         double pendingAmount = sales.stream().mapToDouble(this::getRemainingAmount).sum();
         int totalItems = sales.stream().mapToInt(this::getItemCount).sum();
@@ -349,6 +363,7 @@ public class SaleListController {
         totalSalesLabel.setText(String.valueOf(totalCount));
         totalAmountLabel.setText(df.format(totalAmount) + " دينار");
         paidAmountLabel.setText(df.format(paidAmount) + " دينار");
+        returnedAmountLabel.setText(df.format(returnedAmount) + " دينار");
         pendingAmountLabel.setText(df.format(pendingAmount) + " دينار");
         avgSaleLabel.setText(df.format(averageAmount) + " دينار");
         itemsCountLabel.setText(String.valueOf(totalItems));
@@ -365,7 +380,8 @@ public class SaleListController {
         details.append("الحالة: ").append(getStatusArabic(sale.getPaymentStatus())).append("\n\n");
         details.append("المجموع: ").append(df.format(safeDouble(sale.getTotalAmount()))).append(" دينار\n");
         details.append("الخصم: ").append(df.format(safeDouble(sale.getDiscountAmount()))).append(" دينار\n");
-        details.append("الإجمالي النهائي: ").append(df.format(safeDouble(sale.getFinalAmount()))).append(" دينار\n");
+        details.append("إجمالي المرتجعات: ").append(df.format(getReturnedAmount(sale))).append(" دينار\n");
+        details.append("الإجمالي النهائي الصافي: ").append(df.format(getNetSaleAmount(sale))).append(" دينار\n");
         details.append("المدفوع: ").append(df.format(safeDouble(sale.getPaidAmount()))).append(" دينار\n");
         details.append("المتبقي: ").append(df.format(getRemainingAmount(sale))).append(" دينار\n");
         details.append("عدد الأصناف: ").append(getItemCount(sale));
@@ -383,6 +399,25 @@ public class SaleListController {
                         .append(" | السعر: ").append(df.format(safeDouble(item.getUnitPrice())))
                         .append(" | الإجمالي: ").append(df.format(safeDouble(item.getTotalPrice())))
                         .append("\n");
+            }
+        }
+
+        List<SaleReturn> returns = getReturnsForSale(sale);
+        if (!returns.isEmpty()) {
+            details.append("\n\nالمرتجعات:\n");
+            int returnIndex = 1;
+            for (SaleReturn saleReturn : returns) {
+                details.append(returnIndex++).append(". ")
+                        .append(saleReturn.getReturnCode() != null ? saleReturn.getReturnCode() : "-")
+                        .append(" | التاريخ: ")
+                        .append(saleReturn.getReturnDate() != null ? saleReturn.getReturnDate().format(dateFormatter) : "-")
+                        .append(" | المبلغ: ")
+                        .append(df.format(safeDouble(saleReturn.getTotalReturnAmount())))
+                        .append(" دينار");
+                if (saleReturn.getReturnReason() != null && !saleReturn.getReturnReason().isBlank()) {
+                    details.append(" | السبب: ").append(saleReturn.getReturnReason());
+                }
+                details.append("\n");
             }
         }
 
@@ -425,7 +460,7 @@ public class SaleListController {
         alert.setHeaderText("هل تريد تحديث حالة الدفع إلى 'مدفوع'؟");
         java.text.DecimalFormat df = new java.text.DecimalFormat("#,##0.00");
         alert.setContentText("رقم الفاتورة: " + sale.getSaleCode() + "\nالمبلغ: "
-                + df.format(safeDouble(sale.getFinalAmount())) + " دينار");
+                + df.format(getNetSaleAmount(sale)) + " دينار");
 
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
@@ -565,6 +600,23 @@ public class SaleListController {
         return value != null ? value : 0.0;
     }
 
+    private List<SaleReturn> getReturnsForSale(Sale sale) {
+        if (sale == null || sale.getId() == null) {
+            return List.of();
+        }
+        return returnsBySaleId.getOrDefault(sale.getId(), List.of());
+    }
+
+    private double getReturnedAmount(Sale sale) {
+        return getReturnsForSale(sale).stream()
+                .mapToDouble(ret -> safeDouble(ret.getTotalReturnAmount()))
+                .sum();
+    }
+
+    private double getNetSaleAmount(Sale sale) {
+        return Math.max(0.0, safeDouble(sale != null ? sale.getFinalAmount() : null) - getReturnedAmount(sale));
+    }
+
     private String safeLower(String value) {
         return value != null ? value.toLowerCase() : "";
     }
@@ -581,7 +633,7 @@ public class SaleListController {
     }
 
     private double getRemainingAmount(Sale sale) {
-        return Math.max(0, safeDouble(sale.getFinalAmount()) - safeDouble(sale.getPaidAmount()));
+        return Math.max(0, getNetSaleAmount(sale) - safeDouble(sale.getPaidAmount()));
     }
 
     private int getItemCount(Sale sale) {
@@ -592,7 +644,7 @@ public class SaleListController {
         java.text.DecimalFormat df = new java.text.DecimalFormat("#,##0.00");
         List<Sale> reportSource = filteredSales != null ? filteredSales : List.of();
 
-        double totalAmount = reportSource.stream().mapToDouble(s -> safeDouble(s.getFinalAmount())).sum();
+        double totalAmount = reportSource.stream().mapToDouble(this::getNetSaleAmount).sum();
         double totalPaid = reportSource.stream().mapToDouble(s -> safeDouble(s.getPaidAmount())).sum();
         double totalRemaining = reportSource.stream().mapToDouble(this::getRemainingAmount).sum();
         double totalDiscount = reportSource.stream().mapToDouble(s -> safeDouble(s.getDiscountAmount())).sum();
@@ -603,12 +655,12 @@ public class SaleListController {
                 .collect(Collectors.groupingBy(s -> getStatusArabic(s.getPaymentStatus()), LinkedHashMap::new, Collectors.counting()));
         Map<String, Double> byPaymentMethod = reportSource.stream()
                 .collect(Collectors.groupingBy(s -> getPaymentMethodArabic(s.getPaymentMethod()), LinkedHashMap::new,
-                        Collectors.summingDouble(s -> safeDouble(s.getFinalAmount()))));
+                        Collectors.summingDouble(this::getNetSaleAmount)));
         Map<String, Double> byCreator = reportSource.stream()
                 .collect(Collectors.groupingBy(
                         s -> s.getCreatedBy() != null && !s.getCreatedBy().isBlank() ? s.getCreatedBy() : "-",
                         LinkedHashMap::new,
-                        Collectors.summingDouble(s -> safeDouble(s.getFinalAmount()))));
+                        Collectors.summingDouble(this::getNetSaleAmount)));
 
         Map<String, ProductAggregate> topProducts = new LinkedHashMap<>();
         for (Sale sale : reportSource) {
@@ -670,11 +722,11 @@ public class SaleListController {
         report.append("أعلى الفواتير\n");
         report.append("--------------------------------\n");
         reportSource.stream()
-                .sorted(Comparator.comparingDouble((Sale s) -> safeDouble(s.getFinalAmount())).reversed())
+                .sorted(Comparator.comparingDouble(this::getNetSaleAmount).reversed())
                 .limit(10)
                 .forEach(sale -> report.append(sale.getSaleCode())
                         .append(" | ").append(sale.getSaleDate() != null ? sale.getSaleDate().format(dateFormatter) : "-")
-                        .append(" | ").append(df.format(safeDouble(sale.getFinalAmount()))).append(" دينار")
+                        .append(" | ").append(df.format(getNetSaleAmount(sale))).append(" دينار")
                         .append(" | ").append(getStatusArabic(sale.getPaymentStatus()))
                         .append("\n"));
 
@@ -710,7 +762,7 @@ public class SaleListController {
                 row.createCell(2).setCellValue(sale.getCustomer() != null ? sale.getCustomer().getName() : "-");
                 row.createCell(3).setCellValue(getPaymentMethodArabic(sale.getPaymentMethod()));
                 row.createCell(4).setCellValue(getStatusArabic(sale.getPaymentStatus()));
-                row.createCell(5).setCellValue(safeDouble(sale.getFinalAmount()));
+                row.createCell(5).setCellValue(getNetSaleAmount(sale));
                 row.createCell(6).setCellValue(safeDouble(sale.getPaidAmount()));
                 row.createCell(7).setCellValue(getRemainingAmount(sale));
                 row.createCell(8).setCellValue(safeDouble(sale.getDiscountAmount()));

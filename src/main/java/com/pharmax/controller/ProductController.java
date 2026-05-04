@@ -70,6 +70,8 @@ public class ProductController {
     @FXML
     private TextField quantityField;
     @FXML
+    private Label stockBreakdownLabel;
+    @FXML
     private TextField minimumStockField;
     @FXML
     private TextField maximumStockField;
@@ -79,6 +81,8 @@ public class ProductController {
     private DatePicker expiryDatePicker;
     @FXML
     private TextField stripsPerBoxField;
+    @FXML
+    private Label packagingSummaryLabel;
     @FXML
     private ComboBox<String> baseUnitComboBox;
     @FXML
@@ -128,6 +132,8 @@ public class ProductController {
     @FXML
     private TextField openingBatchQuantityField;
     @FXML
+    private Label openingBatchBreakdownLabel;
+    @FXML
     private DatePicker openingBatchProductionDatePicker;
     @FXML
     private DatePicker openingBatchExpiryDatePicker;
@@ -159,6 +165,7 @@ public class ProductController {
         loadCategories();
         loadUnitsOfMeasure();
         setupPackagingSection();
+        setupUnitBreakdownHelpers();
         setupPriceListeners();
         setupPricingModeToggle();
         setupOpeningBatchToggle();
@@ -286,7 +293,36 @@ public class ProductController {
             if (packagingActiveCheckBox != null) {
                 packagingActiveCheckBox.setSelected(row.isActiveUnit());
             }
+            if ("علبة".equals(row.getUnitName()) && stripsPerBoxField != null && row.getConversionFactor() > 0) {
+                stripsPerBoxField.setText(formatQuantity(row.getConversionFactor()));
+            }
+            refreshUnitBreakdownLabels();
         });
+    }
+
+    private void setupUnitBreakdownHelpers() {
+        if (quantityField != null) {
+            quantityField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        if (openingBatchQuantityField != null) {
+            openingBatchQuantityField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        if (stripsPerBoxField != null) {
+            stripsPerBoxField.textProperty().addListener((obs, oldVal, newVal) -> {
+                syncPackagingEditorWithStripBox();
+                refreshUnitBreakdownLabels();
+            });
+        }
+        if (baseUnitComboBox != null) {
+            baseUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        if (packagingUnitComboBox != null) {
+            packagingUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        if (packagingConversionField != null) {
+            packagingConversionField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        refreshUnitBreakdownLabels();
     }
 
     private void setupPriceListeners() {
@@ -528,12 +564,14 @@ public class ProductController {
             quickSaleProductCheckBox.setSelected(Boolean.TRUE.equals(product.getIsQuickSale()));
         }
         loadPackagingRows(product);
+        syncPackagingEditorWithStripBox();
 
         // Hide opening batch section in edit mode
         hideOpeningBatchSection();
 
         applySellingPriceEditRestriction();
         updateAllProfitMargins();
+        refreshUnitBreakdownLabels();
     }
 
     private void loadBatchFields(Product product) {
@@ -562,6 +600,7 @@ public class ProductController {
         for (ProductUnit unit : units) {
             packagingRows.add(ProductUnitRow.fromUnit(unit));
         }
+        refreshUnitBreakdownLabels();
     }
 
     @FXML
@@ -617,7 +656,11 @@ public class ProductController {
             packagingRows.add(row);
         }
         packagingTable.refresh();
+        if ("علبة".equals(unitName) && stripsPerBoxField != null) {
+            stripsPerBoxField.setText(formatQuantity(conversionFactor));
+        }
         clearPackagingInputs();
+        refreshUnitBreakdownLabels();
     }
 
     @FXML
@@ -627,6 +670,7 @@ public class ProductController {
             packagingRows.remove(selected);
             packagingTable.refresh();
             clearPackagingInputs();
+            refreshUnitBreakdownLabels();
         }
     }
 
@@ -705,7 +749,8 @@ public class ProductController {
                 product.setSpecialPrice(parseDoubleOrNull(specialPriceField.getText()));
                 product.setSpecialPriceUsd(parseDoubleOrNull(specialPriceUsdField.getText()));
             }
-            product.setQuantityInStock(parseDouble(quantityField.getText()));
+            double requestedStockQuantity = parseDouble(quantityField.getText());
+            product.setQuantityInStock(requestedStockQuantity);
             product.setMinimumStock(parseDouble(minimumStockField.getText()));
             product.setMaximumStock(parseDoubleOrNull(maximumStockField.getText()));
             String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
@@ -720,16 +765,17 @@ public class ProductController {
                 product.setIsQuickSale(false);
             }
 
+            syncStripBoxRowFromShortcut();
             Product savedProduct;
             if (isEditMode) {
                 savedProduct = inventoryService.updateProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
-                syncOpeningBatch(savedProduct);
+                syncProductStockState(savedProduct, requestedStockQuantity);
                 showInfo("تم التحديث", "تم تحديث المنتج بنجاح");
             } else {
                 savedProduct = inventoryService.createProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
-                syncOpeningBatch(savedProduct);
+                syncProductStockState(savedProduct, requestedStockQuantity);
                 showInfo("تم الإضافة", "تم إضافة المنتج بنجاح");
             }
 
@@ -759,23 +805,69 @@ public class ProductController {
                 .toList();
     }
 
-    private void syncOpeningBatch(Product savedProduct) {
+    private void syncProductStockState(Product savedProduct, double requestedStockQuantity) {
         if (savedProduct == null || savedProduct.getId() == null) {
             return;
         }
 
-        // Only create opening batch if the checkbox is selected (new product flow)
-        if (openingBatchCheckBox == null || !openingBatchCheckBox.isSelected()) {
+        boolean explicitOpeningBatch = openingBatchCheckBox != null && openingBatchCheckBox.isSelected();
+        List<ProductBatch> existingBatches = productBatchService.getAllBatches(savedProduct.getId());
+        boolean needsImplicitOpeningBatch = requestedStockQuantity > 0 && existingBatches.isEmpty();
+
+        if (!explicitOpeningBatch && !needsImplicitOpeningBatch) {
+            if (!existingBatches.isEmpty()) {
+                double currentBatchTotal = productBatchService.getTotalBatchQuantity(savedProduct.getId());
+                double difference = requestedStockQuantity - currentBatchTotal;
+                
+                if (difference > 1e-9) {
+                    String actor = SessionManager.getInstance().getCurrentUsername();
+                    Double unitCost = savedProduct.getCostPrice() != null ? savedProduct.getCostPrice() : savedProduct.getCostPriceUsd();
+                    String currency = savedProduct.getCostPrice() != null ? "دينار" : "دولار";
+                    
+                    ProductBatch adjustmentBatch = productBatchService.createOrUpdateBatch(
+                            savedProduct,
+                            "ADJ-" + System.currentTimeMillis(),
+                            null,
+                            null,
+                            difference,
+                            unitCost,
+                            currency,
+                            null,
+                            false
+                    );
+                    
+                    if (adjustmentBatch != null && adjustmentBatch.getId() != null) {
+                        boolean alreadyRecorded = inventoryMovementService.existsByReference(
+                                "manual_stock_add", "stock_adjustment", savedProduct.getId(), adjustmentBatch.getId());
+                        if (!alreadyRecorded) {
+                            inventoryMovementService.recordMovement(
+                                    savedProduct,
+                                    adjustmentBatch,
+                                    "manual_stock_add",
+                                    "stock_adjustment",
+                                    savedProduct.getId(),
+                                    adjustmentBatch.getId(),
+                                    difference,
+                                    unitCost,
+                                    "تعديل كمية يدوي من واجهة المنتج",
+                                    actor);
+                        }
+                    }
+                }
+                
+                productBatchService.syncProductSummaryQuantity(savedProduct.getId());
+            }
             return;
         }
 
-        double quantity = parseDouble(openingBatchQuantityField.getText());
+        double quantity = explicitOpeningBatch
+                ? parseDouble(openingBatchQuantityField.getText())
+                : requestedStockQuantity;
         if (quantity <= 0) {
             return;
         }
 
-        // Determine batch number: user-provided or auto-generated
-        String batchNumber = safeTrim(openingBatchNumberField);
+        String batchNumber = explicitOpeningBatch ? safeTrim(openingBatchNumberField) : "";
         if (batchNumber.isEmpty()) {
             batchNumber = "OPENING-" + savedProduct.getId();
         }
@@ -788,9 +880,13 @@ public class ProductController {
             return;
         }
 
-        LocalDate expiryDate = openingBatchExpiryDatePicker != null ? openingBatchExpiryDatePicker.getValue() : null;
-        LocalDate productionDate = openingBatchProductionDatePicker != null ? openingBatchProductionDatePicker.getValue() : null;
-        String notes = safeTrim(openingBatchNotesField);
+        LocalDate expiryDate = explicitOpeningBatch
+                ? (openingBatchExpiryDatePicker != null ? openingBatchExpiryDatePicker.getValue() : null)
+                : (expiryDatePicker != null ? expiryDatePicker.getValue() : null);
+        LocalDate productionDate = explicitOpeningBatch
+                ? (openingBatchProductionDatePicker != null ? openingBatchProductionDatePicker.getValue() : null)
+                : null;
+        String notes = explicitOpeningBatch ? safeTrim(openingBatchNotesField) : "مخزون افتتاحي تلقائي";
 
         Double unitCost = savedProduct.getCostPrice() != null ? savedProduct.getCostPrice() : savedProduct.getCostPriceUsd();
         String currency = savedProduct.getCostPrice() != null ? "دينار" : "دولار";
@@ -922,6 +1018,16 @@ public class ProductController {
             }
         }
 
+        if (isEditMode && product != null && product.getId() != null) {
+            double requestedStockQuantity = parseDouble(quantityField.getText());
+            double currentBatchTotal = productBatchService.getTotalBatchQuantity(product.getId());
+            if (requestedStockQuantity < currentBatchTotal - 1e-9) {
+                showError("خطأ", "لا يمكن تقليل الكمية يدوياً لأنها أقل من إجمالي الدفعات الحالية (" + numberFormat.format(currentBatchTotal) + "). يرجى استخدام شاشة البيع أو التسوية.");
+                quantityField.requestFocus();
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -974,6 +1080,133 @@ public class ProductController {
 
     private boolean hasText(TextField field) {
         return field.getText() != null && !field.getText().trim().isEmpty();
+    }
+
+    private void syncPackagingEditorWithStripBox() {
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        if (stripsPerBox <= 0) {
+            return;
+        }
+        if (baseUnitComboBox != null && !"شريط".equals(baseUnitComboBox.getValue())) {
+            baseUnitComboBox.setValue("شريط");
+        }
+        if (packagingUnitComboBox != null
+                && (packagingUnitComboBox.getValue() == null || packagingUnitComboBox.getValue().isBlank())) {
+            packagingUnitComboBox.setValue("علبة");
+        }
+        if (packagingUnitComboBox != null
+                && "علبة".equals(packagingUnitComboBox.getValue())
+                && packagingConversionField != null) {
+            packagingConversionField.setText(formatQuantity(stripsPerBox));
+        }
+    }
+
+    private void syncStripBoxRowFromShortcut() {
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        if (stripsPerBox <= 0) {
+            return;
+        }
+
+        ProductUnitRow existingBox = packagingRows.stream()
+                .filter(row -> "علبة".equalsIgnoreCase(row.getUnitName()))
+                .findFirst()
+                .orElse(null);
+
+        String barcode = existingBox != null ? existingBox.getBarcode() : "";
+        double salePrice = existingBox != null ? existingBox.getSalePrice() : 0;
+        double salePriceUsd = existingBox != null ? existingBox.getSalePriceUsd() : 0;
+        boolean defaultUnit = existingBox != null && existingBox.isDefaultUnit();
+        boolean activeUnit = existingBox == null || existingBox.isActiveUnit();
+
+        if (packagingUnitComboBox != null && "علبة".equals(packagingUnitComboBox.getValue())) {
+            barcode = safeTrim(packagingBarcodeField);
+            salePrice = parseDouble(packagingPriceField.getText());
+            salePriceUsd = parseDouble(packagingPriceUsdField.getText());
+            defaultUnit = packagingDefaultCheckBox.isSelected();
+            activeUnit = packagingActiveCheckBox == null || packagingActiveCheckBox.isSelected();
+        }
+
+        ProductUnitRow updatedBox = new ProductUnitRow(
+                "علبة",
+                barcode,
+                stripsPerBox,
+                salePrice,
+                salePriceUsd,
+                defaultUnit,
+                activeUnit);
+
+        if (updatedBox.isDefaultUnit()) {
+            packagingRows.forEach(row -> row.setDefaultUnit(false));
+        }
+
+        if (existingBox != null) {
+            packagingRows.set(packagingRows.indexOf(existingBox), updatedBox);
+        } else {
+            packagingRows.add(updatedBox);
+        }
+
+        if (packagingTable != null) {
+            packagingTable.refresh();
+        }
+    }
+
+    private void refreshUnitBreakdownLabels() {
+        updateBreakdownLabel(stockBreakdownLabel, parseDouble(quantityField != null ? quantityField.getText() : null), false);
+        updateBreakdownLabel(openingBatchBreakdownLabel,
+                parseDouble(openingBatchQuantityField != null ? openingBatchQuantityField.getText() : null), true);
+        updatePackagingSummaryLabel();
+    }
+
+    private void updateBreakdownLabel(Label label, double quantity, boolean openingBatch) {
+        if (label == null) {
+            return;
+        }
+        if (quantity <= 0) {
+            label.setText(openingBatch
+                    ? "أدخل كمية ابتدائية ليظهر تحويلها بين الشريط والعلبة."
+                    : "أدخل الكمية الحالية ليظهر مجموعها بالشرائط والعلب.");
+            return;
+        }
+        label.setText(formatUnitBreakdown(quantity));
+    }
+
+    private void updatePackagingSummaryLabel() {
+        if (packagingSummaryLabel == null) {
+            return;
+        }
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
+                ? baseUnitComboBox.getValue()
+                : "شريط";
+
+        if (stripsPerBox <= 0) {
+            packagingSummaryLabel.setText("حدد عدد الشرائط داخل العلبة ليتم تجهيز التحويل تلقائيًا.");
+            return;
+        }
+
+        double stockQuantity = parseDouble(quantityField != null ? quantityField.getText() : null);
+        StringBuilder summary = new StringBuilder();
+        summary.append("سيُحسب المخزون على أساس ").append(baseUnit)
+                .append(". كل 1 علبة = ").append(formatQuantity(stripsPerBox)).append(" شريط.");
+        if (stockQuantity > 0) {
+            summary.append(" المجموع الحالي: ").append(formatUnitBreakdown(stockQuantity));
+        }
+        packagingSummaryLabel.setText(summary.toString());
+    }
+
+    private String formatUnitBreakdown(double baseQuantity) {
+        String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
+                ? baseUnitComboBox.getValue()
+                : "شريط";
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+
+        if (!"شريط".equals(baseUnit) || stripsPerBox <= 0) {
+            return numberFormat.format(baseQuantity) + " " + baseUnit;
+        }
+
+        double boxes = baseQuantity / stripsPerBox;
+        return numberFormat.format(baseQuantity) + " شريط"
+                + " = " + numberFormat.format(boxes) + " علبة";
     }
 
     private String safeTrim(TextField field) {

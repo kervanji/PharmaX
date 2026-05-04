@@ -5,11 +5,13 @@ import com.pharmax.model.Category;
 import com.pharmax.model.InventoryMovement;
 import com.pharmax.model.Product;
 import com.pharmax.model.ProductBatch;
+import com.pharmax.model.ProductUnit;
 import com.pharmax.service.CategoryService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.InventoryMovementService;
 import com.pharmax.service.PrintService;
 import com.pharmax.service.ProductBatchService;
+import com.pharmax.service.ProductUnitService;
 import com.pharmax.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +96,7 @@ public class InventoryListController {
     private final CategoryService categoryService = new CategoryService();
     private final ProductBatchService productBatchService = new ProductBatchService();
     private final InventoryMovementService inventoryMovementService = new InventoryMovementService();
+    private final ProductUnitService productUnitService = new ProductUnitService();
     private ObservableList<Product> productsList;
     private FilteredList<Product> filteredProducts;
     private final DecimalFormat numberFormat;
@@ -149,6 +152,21 @@ public class InventoryListController {
         quantityColumn.setCellValueFactory(cellData -> {
             Double quantity = cellData.getValue().getQuantityInStock();
             return new ReadOnlyObjectWrapper<>(quantity != null ? quantity : 0.0);
+        });
+        quantityColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                Product product = getTableRow() != null ? getTableRow().getItem() : null;
+                setText(formatInventoryQuantity(product, item != null ? item : 0.0));
+                setGraphic(null);
+            }
         });
 
         statusColumn.setCellValueFactory(cellData -> {
@@ -213,6 +231,27 @@ public class InventoryListController {
                 }
             }
         });
+    }
+
+    private String formatInventoryQuantity(Product product, double quantity) {
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        String baseDisplay = numberFormat.format(quantity) + " " + baseUnit;
+        if (product == null || product.getId() == null) {
+            return baseDisplay;
+        }
+
+        ProductUnit largestUnit = productUnitService.getUnitsForProductOrDefault(product).stream()
+                .filter(unit -> Boolean.TRUE.equals(unit.getIsActive()))
+                .filter(unit -> unit.getUnitName() != null)
+                .filter(unit -> unit.getEffectiveConversionFactor() > 1.0)
+                .max(Comparator.comparingDouble(ProductUnit::getEffectiveConversionFactor))
+                .orElse(null);
+        if (largestUnit == null) {
+            return baseDisplay;
+        }
+
+        double convertedQuantity = quantity / largestUnit.getEffectiveConversionFactor();
+        return baseDisplay + " (" + numberFormat.format(convertedQuantity) + " " + largestUnit.getUnitName() + ")";
     }
 
     private void setupFilters() {

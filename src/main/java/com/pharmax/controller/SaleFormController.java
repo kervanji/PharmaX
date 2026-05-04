@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.printing.PDFPrintable;
@@ -902,7 +903,7 @@ public class SaleFormController {
         String baseUnit = productUnitService.resolveBaseUnit(selectedProduct);
         String saleUnit = unit != null && unit.getUnitName() != null ? unit.getUnitName() : baseUnit;
         double factor = unit != null ? unit.getEffectiveConversionFactor() : 1.0;
-        double stock = selectedProduct.getQuantityInStock() != null ? selectedProduct.getQuantityInStock() : 0.0;
+        double stock = getSellableStockQuantity(selectedProduct);
         double availableByUnit = factor > 0 ? stock / factor : stock;
 
         if (stock <= 0) {
@@ -1897,7 +1898,7 @@ public class SaleFormController {
         }
 
         Product product = productRepository.findById(row.getProductId()).orElse(null);
-        double availableStock = product != null && product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
+        double availableStock = getSellableStockQuantity(product);
         return getRequiredQuantityForProduct(row.getProductId()) > availableStock + 1e-9;
     }
 
@@ -1929,7 +1930,7 @@ public class SaleFormController {
     }
 
     private boolean validateStockAvailable(Product product, double requestedQuantity) {
-        double availableStock = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
+        double availableStock = getSellableStockQuantity(product);
         if (requestedQuantity > availableStock + 1e-9) {
             showError("خطأ",
                     "الكمية غير متوفرة للمنتج: " + product.getName()
@@ -1938,6 +1939,23 @@ public class SaleFormController {
             return false;
         }
         return true;
+    }
+
+    private double getSellableStockQuantity(Product product) {
+        if (product == null || product.getId() == null) {
+            return 0.0;
+        }
+
+        try {
+            return productBatchService.getAvailableBatches(product.getId()).stream()
+                    .map(ProductBatch::getQuantity)
+                    .filter(Objects::nonNull)
+                    .mapToDouble(Double::doubleValue)
+                    .sum();
+        } catch (Exception e) {
+            logger.warn("Could not resolve sellable stock for product {}", product.getId(), e);
+            return product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
+        }
     }
 
     @FXML
@@ -2079,14 +2097,20 @@ public class SaleFormController {
 
                 if (!quickSale) {
                     for (Sale sale : sales) {
-                        Receipt receipt = receiptService.generateReceipt(sale.getId(), "DEFAULT", "System");
+                        Receipt receipt = receiptService.generateReceipt(sale.getId(), ReceiptService.TEMPLATE_THERMAL_80MM, "System");
                         if (!printAfterSave || receipt.getFilePath() == null) {
                             continue;
                         }
 
                         File pdfFile = new File(receipt.getFilePath());
                         if (pdfFile.exists()) {
-                            printReceiptPdf(pdfFile);
+                            try {
+                                printReceiptPdf(pdfFile);
+                            } catch (Exception printEx) {
+                                logger.warn("Receipt print failed; opening preview fallback", printEx);
+                                openReceiptPreview(pdfFile);
+                                showWarning("تنبيه", "تم حفظ البيع لكن فشلت الطباعة. تم فتح معاينة الفاتورة.");
+                            }
                         }
                     }
                 }
@@ -2103,6 +2127,12 @@ public class SaleFormController {
             throw new IllegalArgumentException("ملف الفاتورة غير موجود");
         }
 
+        if (PrinterJob.lookupPrintServices().length == 0) {
+            openReceiptPreview(pdfFile);
+            showWarning("تنبيه", "لا توجد طابعة متاحة. تم فتح معاينة الفاتورة بدلاً من الطباعة.");
+            return;
+        }
+
         try (PDDocument document = PDDocument.load(pdfFile)) {
             PrinterJob job = PrinterJob.getPrinterJob();
             job.setPrintable(new PDFPrintable(document, Scaling.SHRINK_TO_FIT));
@@ -2111,6 +2141,15 @@ public class SaleFormController {
             throw new RuntimeException("فشل الاتصال بالطابعة الافتراضية", e);
         } catch (Exception e) {
             throw new RuntimeException("فشل تجهيز ملف الفاتورة للطباعة", e);
+        }
+    }
+
+    private void openReceiptPreview(File pdfFile) {
+        if (pdfFile == null || !pdfFile.exists()) {
+            return;
+        }
+        if (mainApp != null) {
+            mainApp.showPdfPreview(pdfFile, "معاينة فاتورة حرارية");
         }
     }
 
@@ -2151,7 +2190,7 @@ public class SaleFormController {
                 request.setCustomerId(customerComboBox.getValue().getId());
                 request.setProjectLocation("");
                 request.setPaymentMethod(paymentMethod);
-                request.setCurrency(IQD_CURRENCY);
+                request.setCurrency(saleCurrency);
                 request.setNotes(notesArea != null ? notesArea.getText() : "");
                 request.setCreatedBy(creator);
 
@@ -2264,6 +2303,14 @@ public class SaleFormController {
 
     private void showSuccess(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void showWarning(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);

@@ -75,7 +75,7 @@ public class PdfPreviewController {
             pagesContainer.getChildren().clear();
             for (WritableImage image : loadTask.getValue()) {
                 ImageView imageView = new ImageView(image);
-                imageView.setFitWidth(595); // A4 width at roughly 72 DPI (adjust as needed)
+                imageView.setFitWidth(Math.min(595, image.getWidth()));
                 imageView.setPreserveRatio(true);
                 imageView.setStyle("-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 10, 0, 0, 0);");
                 pagesContainer.getChildren().add(imageView);

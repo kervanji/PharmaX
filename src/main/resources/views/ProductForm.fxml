@@ -18,7 +18,6 @@
         <HBox visible="false" managed="false">
             <ComboBox fx:id="unitOfMeasureComboBox"/>
             <DatePicker fx:id="expiryDatePicker"/>
-            <TextField fx:id="stripsPerBoxField"/>
             <TextField fx:id="wholesalePriceField"/>
             <TextField fx:id="wholesalePriceUsdField"/>
             <TextField fx:id="specialPriceField"/>
@@ -151,6 +150,10 @@
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="quantityField" GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="0"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                <Label fx:id="stockBreakdownLabel" text="سيظهر هنا التحويل بين الشريط والعلبة"
+                       GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.columnSpan="2"
+                       wrapText="true"
+                       style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
 
                 <Label text="الحد الأدنى:" GridPane.rowIndex="0" GridPane.columnIndex="2"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
@@ -190,6 +193,10 @@
                 <TextField fx:id="openingBatchQuantityField" GridPane.rowIndex="0" GridPane.columnIndex="3"
                            promptText="0"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                <Label fx:id="openingBatchBreakdownLabel" text="سيظهر هنا تحويل الكمية الافتتاحية"
+                       GridPane.rowIndex="1" GridPane.columnIndex="2" GridPane.columnSpan="2"
+                       wrapText="true"
+                       style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
 
                 <Label text="تاريخ الإنتاج:" GridPane.rowIndex="1" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
@@ -232,24 +239,34 @@
                        wrapText="true"
                        style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
 
-                <Label text="الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
-                <ComboBox fx:id="packagingUnitComboBox" GridPane.rowIndex="1" GridPane.columnIndex="1"
-                          maxWidth="Infinity" promptText="اختر الوحدة"/>
-                <Label text="باركود الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingBarcodeField" GridPane.rowIndex="1" GridPane.columnIndex="3" promptText="اختياري"/>
-                <Label text="عدد وحدات الأساس داخلها:" GridPane.rowIndex="1" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingConversionField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="شريط=10، علبة=100"/>
+                <Label text="العلبة تحتوي على:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="stripsPerBoxField" GridPane.rowIndex="1" GridPane.columnIndex="1" promptText="مثال: 2"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                <Label text="شريط داخل كل علبة" GridPane.rowIndex="1" GridPane.columnIndex="2"
+                       style="-fx-font-size: 13px; -fx-text-fill: -fx-form-label;"/>
+                <Label fx:id="packagingSummaryLabel" text="سيظهر هنا شرح التحويل والمجموع"
+                       GridPane.rowIndex="1" GridPane.columnIndex="3" GridPane.columnSpan="4"
+                       wrapText="true"
+                       style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
 
-                <HBox spacing="12" GridPane.rowIndex="1" GridPane.columnIndex="6" alignment="CENTER_RIGHT">
+                <Label text="الوحدة:" GridPane.rowIndex="2" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="packagingUnitComboBox" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="اختر الوحدة"/>
+                <Label text="باركود الوحدة:" GridPane.rowIndex="2" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingBarcodeField" GridPane.rowIndex="2" GridPane.columnIndex="3" promptText="اختياري"/>
+                <Label text="عدد وحدات الأساس داخلها:" GridPane.rowIndex="2" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingConversionField" GridPane.rowIndex="2" GridPane.columnIndex="5" promptText="شريط=10، علبة=100"/>
+
+                <HBox spacing="12" GridPane.rowIndex="2" GridPane.columnIndex="6" alignment="CENTER_RIGHT">
                     <CheckBox fx:id="packagingDefaultCheckBox" text="وحدة البيع الافتراضية"/>
                     <CheckBox fx:id="packagingActiveCheckBox" text="نشط" selected="true"/>
                 </HBox>
 
-                <Label text="سعر البيع للوحدة:" GridPane.rowIndex="2" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingPriceField" GridPane.rowIndex="2" GridPane.columnIndex="1" promptText="0.00 د.ع"/>
-                <Label text="سعر الوحدة دولار:" GridPane.rowIndex="2" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingPriceUsdField" GridPane.rowIndex="2" GridPane.columnIndex="3" promptText="0.00 $"/>
-                <HBox spacing="8" GridPane.rowIndex="2" GridPane.columnIndex="4" GridPane.columnSpan="3" alignment="CENTER_RIGHT">
+                <Label text="سعر البيع للوحدة:" GridPane.rowIndex="3" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingPriceField" GridPane.rowIndex="3" GridPane.columnIndex="1" promptText="0.00 د.ع"/>
+                <Label text="سعر الوحدة دولار:" GridPane.rowIndex="3" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingPriceUsdField" GridPane.rowIndex="3" GridPane.columnIndex="3" promptText="0.00 $"/>
+                <HBox spacing="8" GridPane.rowIndex="3" GridPane.columnIndex="4" GridPane.columnSpan="3" alignment="CENTER_RIGHT">
                     <Button text="إضافة / تحديث وحدة" onAction="#handleAddPackagingUnit"
                             style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
                     <Button text="حذف الوحدة" onAction="#handleRemovePackagingUnit"

@@ -316,16 +316,16 @@ public class MainController {
                     "linear-gradient(to bottom right, #d97706, #f59e0b)", "handleViewInventory"),
             new TileDef("new-product", "➕", "add_product.png", "إضافة منتج",
                     "linear-gradient(to bottom right, #ea580c, #f97316)", "handleNewProduct"),
-            new TileDef("purchase", "🛍️", "purchases.png", "المشتريات",
-                    "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
-            new TileDef("purchase-return", "↩️", "returns.png", "مرتجع شراء",
-                    "linear-gradient(to bottom right, #a16207, #ca8a04)", "handlePurchaseReturn"),
             new TileDef("product-return", "↩️", "returns.png", "إرجاع مواد",
                     "linear-gradient(to bottom right, #db2777, #ec4899)", "handleProductReturn"),
             new TileDef("low-stock", "⚠️", "low_stock_alert.png", "منخفض المخزون",
                     "linear-gradient(to bottom right, #b91c1c, #dc2626)", "handleLowStock"),
             new TileDef("expiry-alerts", "⏰", "low_stock_alert.png", "تنبيهات الانتهاء",
                     "linear-gradient(to bottom right, #c2410c, #ea580c)", "handleExpiryAlerts"),
+            new TileDef("purchase", "🛍️", "purchases.png", "المشتريات",
+                    "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
+            new TileDef("purchase-return", "↩️", "returns.png", "مرتجع شراء",
+                    "linear-gradient(to bottom right, #a16207, #ca8a04)", "handlePurchaseReturn"),
             new TileDef("pharmacy-reports", "📊", "sales_reports.png", "التقارير",
                     "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handlePharmacyReports",
                     false, true, false),
@@ -1830,10 +1830,11 @@ public class MainController {
                 "PharmaX v1.2.4\n\n" +
                         "من تطوير: KervanjiHolding\n" +
                         "الموقع: Kervanjiholding.com\n\n" +
-                        "نظام متكامل لإدارة المخازن والمبيعات\n\n" +
+                        "نظام متكامل لإدارة الصيدليات\n\n" +
                         "المميزات:\n" +
-                        "• إدارة العملاء والمخزون\n" +
-                        "• نظام المبيعات والفواتير\n" +
+                        "• إدارة الأدوية والمخزون وتاريخ الصلاحية\n" +
+                        "• نظام المبيعات والوصفات الطبية\n" +
+                        "• إدارة العملاء والموردين\n" +
                         "• إصدار الإيصالات الفورية\n" +
                         "• تخزين البيانات محلياً\n" +
                         "• دعم المزامنة السحابية (قريباً)\n\n" +
