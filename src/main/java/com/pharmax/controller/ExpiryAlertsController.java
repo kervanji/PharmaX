@@ -3,7 +3,6 @@ package com.pharmax.controller;
 import com.pharmax.model.Product;
 import com.pharmax.model.ProductBatch;
 import com.pharmax.service.ProductBatchService;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;

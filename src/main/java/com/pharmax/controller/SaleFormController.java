@@ -94,6 +94,10 @@ public class SaleFormController {
     @FXML
     private TableColumn<SaleItemRow, Double> unitPriceColumn;
     @FXML
+    private TableColumn<SaleItemRow, String> stripPriceColumn;
+    @FXML
+    private TableColumn<SaleItemRow, String> boxPriceColumn;
+    @FXML
     private TableColumn<SaleItemRow, Double> discountColumn;
     @FXML
     private TableColumn<SaleItemRow, Double> totalColumn;
@@ -930,6 +934,36 @@ public class SaleFormController {
         }
         unitPriceColumn
                 .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getUnitPrice()).asObject());
+        if (stripPriceColumn != null) {
+            stripPriceColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStripPriceDisplay()));
+            stripPriceColumn.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                        setStyle("-fx-text-fill: #64b5ff; -fx-font-size: 12px;");
+                    }
+                }
+            });
+        }
+        if (boxPriceColumn != null) {
+            boxPriceColumn.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getBoxPriceDisplay()));
+            boxPriceColumn.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                        setStyle("-fx-text-fill: #a78bfa; -fx-font-size: 12px;");
+                    }
+                }
+            });
+        }
         discountColumn
                 .setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getDiscountAmount()).asObject());
         totalColumn.setCellValueFactory(data -> new SimpleDoubleProperty(data.getValue().getTotalPrice()).asObject());
@@ -1521,6 +1555,7 @@ public class SaleFormController {
             newItem.setSavedUnitPriceUsd(getSelectedPrice(product, saleUnit, "دولار"));
             newItem.setBaseQuantity(baseQuantity);
             newItem.setCurrencyAndRate(IQD_CURRENCY, getExchangeRateOrDefault());
+            populateUnitPriceDisplays(newItem, product);
             newItem.recalculate();
             saleItems.add(newItem);
         }
@@ -1543,6 +1578,28 @@ public class SaleFormController {
         stockLabel.setText("المخزون المتاح: -");
         priceLabel.setText("السعر: -");
         clearProductPreviewPanel();
+    }
+
+    private void populateUnitPriceDisplays(SaleItemRow item, Product product) {
+        if (product == null || product.getId() == null) {
+            return;
+        }
+        List<ProductUnit> units = unitsByProduct.getOrDefault(product.getId(), List.of());
+        for (ProductUnit unit : units) {
+            if (unit.getUnitName() == null || !Boolean.TRUE.equals(unit.getIsActive())) {
+                continue;
+            }
+            String name = unit.getUnitName().trim();
+            Double price = unit.getSalePrice();
+            String display = price != null && price > 0
+                    ? numberFormatter.format(price) + " د.ع"
+                    : "-";
+            if ("شريط".equals(name)) {
+                item.setStripPriceDisplay(display);
+            } else if ("علبة".equals(name)) {
+                item.setBoxPriceDisplay(display);
+            }
+        }
     }
 
     private void refreshCartBatchPreviews() {
@@ -2012,6 +2069,8 @@ public class SaleFormController {
         private double conversionFactor = 1.0;
         private double baseQuantity;
         private String batchPreview = "-";
+        private String stripPriceDisplay = "-";
+        private String boxPriceDisplay = "-";
 
         private String currency = "دينار";
         private double exchangeRate = 1500.0;
@@ -2097,6 +2156,22 @@ public class SaleFormController {
 
         public void setBatchPreview(String batchPreview) {
             this.batchPreview = batchPreview;
+        }
+
+        public String getStripPriceDisplay() {
+            return stripPriceDisplay != null ? stripPriceDisplay : "-";
+        }
+
+        public void setStripPriceDisplay(String stripPriceDisplay) {
+            this.stripPriceDisplay = stripPriceDisplay;
+        }
+
+        public String getBoxPriceDisplay() {
+            return boxPriceDisplay != null ? boxPriceDisplay : "-";
+        }
+
+        public void setBoxPriceDisplay(String boxPriceDisplay) {
+            this.boxPriceDisplay = boxPriceDisplay;
         }
 
         public double getUnitPrice() {

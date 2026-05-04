@@ -111,12 +111,14 @@ public class AuthService {
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             session.persist(user);
-            if (!allowBootstrap) {
+            if (!allowBootstrap && user != null) {
                 auditLogService.record(session, "USER_CREATED", "user", user.getId(),
                         "تم إنشاء المستخدم: " + user.getUsername() + " بالدور " + user.getRole().name());
             }
             transaction.commit();
-            logger.info("User saved: {}", user.getUsername());
+            if (user != null) {
+                logger.info("User saved: {}", user.getUsername());
+            }
             return user;
         } catch (Exception e) {
             if (transaction != null) {

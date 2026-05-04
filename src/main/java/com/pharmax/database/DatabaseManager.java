@@ -30,7 +30,8 @@ public class DatabaseManager {
             "db/migrations/20260501_sales_return_batches.sql",
             "db/migrations/20260502_purchase_returns.sql",
             "db/migrations/20260502_cashbox_foundation.sql",
-            "db/migrations/20260502_permissions_audit.sql");
+            "db/migrations/20260502_permissions_audit.sql",
+            "db/migrations/20260503_batch_production_date.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -669,6 +670,7 @@ public class DatabaseManager {
                         product_id INTEGER NOT NULL,
                         batch_number TEXT NOT NULL,
                         expiry_date DATE,
+                        production_date DATE,
                         quantity REAL NOT NULL DEFAULT 0,
                         original_quantity REAL NOT NULL DEFAULT 0,
                         unit_cost REAL,

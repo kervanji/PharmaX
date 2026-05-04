@@ -255,7 +255,9 @@ public class LowStockController {
         TableColumn<InventoryService.DataQualityAlert, String> noteColumn = new TableColumn<>("ملاحظة");
         noteColumn.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getMessage()));
 
-        alertsTable.getColumns().addAll(typeColumn, codeColumn, nameColumn, stockColumn, batchTotalColumn, batchCountColumn, noteColumn);
+        @SuppressWarnings("unchecked")
+        var alertColumns = new TableColumn[]{typeColumn, codeColumn, nameColumn, stockColumn, batchTotalColumn, batchCountColumn, noteColumn};
+        alertsTable.getColumns().addAll(alertColumns);
 
         ObservableList<InventoryService.DataQualityAlert> source = FXCollections.observableArrayList(alerts);
         FilteredList<InventoryService.DataQualityAlert> filteredAlerts = new FilteredList<>(source, alert -> true);

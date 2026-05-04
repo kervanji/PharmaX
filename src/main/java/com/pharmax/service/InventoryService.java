@@ -193,7 +193,7 @@ public class InventoryService {
         accessControlService.requireProductEdit("PRODUCT_DELETE", "product", product != null ? product.getId() : null);
         auditLogService.record("PRODUCT_DELETED", "product", product != null ? product.getId() : null,
                 product != null ? "تم حذف المنتج: " + product.getName() : "تم حذف منتج");
-        logger.info("Deleting product: {}", product.getId());
+        logger.info("Deleting product: {}", product != null ? product.getId() : null);
         productRepository.delete(product);
     }
     

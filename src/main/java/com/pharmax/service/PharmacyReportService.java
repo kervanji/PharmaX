@@ -1,14 +1,12 @@
 package com.pharmax.service;
 
 import com.pharmax.database.DatabaseManager;
-import com.pharmax.model.CashboxLedger;
 import com.pharmax.model.Customer;
 import com.pharmax.model.DailyClosing;
 import com.pharmax.model.InventoryMovement;
 import com.pharmax.model.Product;
 import com.pharmax.model.ProductBatch;
 import com.pharmax.model.SaleItem;
-import com.pharmax.model.SaleItemBatch;
 import com.pharmax.model.Voucher;
 import com.pharmax.model.VoucherItem;
 import com.pharmax.model.VoucherType;

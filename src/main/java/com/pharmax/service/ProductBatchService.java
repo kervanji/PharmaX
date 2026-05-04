@@ -97,6 +97,19 @@ public class ProductBatchService {
                                             String currency,
                                             Customer supplierCustomer,
                                             Boolean isOpeningBatch) {
+        return createOrUpdateBatch(product, batchNumber, expiryDate, null,
+                quantityDelta, unitCost, currency, supplierCustomer, isOpeningBatch);
+    }
+
+    public ProductBatch createOrUpdateBatch(Product product,
+                                            String batchNumber,
+                                            LocalDate expiryDate,
+                                            LocalDate productionDate,
+                                            Double quantityDelta,
+                                            Double unitCost,
+                                            String currency,
+                                            Customer supplierCustomer,
+                                            Boolean isOpeningBatch) {
         accessControlService.requireProductEdit("BATCH_CORRECTION", "product_batch", null);
         if (product == null || product.getId() == null) {
             throw new IllegalArgumentException("المنتج يجب أن يكون محفوظاً قبل إدارة الدفعات");
@@ -122,6 +135,9 @@ public class ProductBatchService {
 
         if (expiryDate != null) {
             batch.setExpiryDate(expiryDate);
+        }
+        if (productionDate != null) {
+            batch.setProductionDate(productionDate);
         }
         if (unitCost != null) {
             batch.setUnitCost(unitCost);

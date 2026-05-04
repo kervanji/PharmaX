@@ -500,7 +500,9 @@ public class InventoryListController {
         TableColumn<BatchRow, String> createdCol = new TableColumn<>("تاريخ الإنشاء");
         createdCol.setCellValueFactory(new PropertyValueFactory<>("createdAt"));
 
-        table.getColumns().addAll(batchNumberCol, expiryCol, qtyCol, costCol, saleCol, statusCol, sourceCol, createdCol);
+        @SuppressWarnings("unchecked")
+        var batchColumns = new TableColumn[]{batchNumberCol, expiryCol, qtyCol, costCol, saleCol, statusCol, sourceCol, createdCol};
+        table.getColumns().addAll(batchColumns);
 
         List<BatchRow> rows = batches.stream()
                 .sorted(Comparator
@@ -563,7 +565,9 @@ public class InventoryListController {
         TableColumn<MovementRow, String> noteCol = new TableColumn<>("ملاحظات");
         noteCol.setCellValueFactory(new PropertyValueFactory<>("note"));
 
-        table.getColumns().addAll(dateCol, typeCol, qtyCol, beforeCol, afterCol, batchCol, refTypeCol, refIdCol, noteCol);
+        @SuppressWarnings("unchecked")
+        var movementColumns = new TableColumn[]{dateCol, typeCol, qtyCol, beforeCol, afterCol, batchCol, refTypeCol, refIdCol, noteCol};
+        table.getColumns().addAll(movementColumns);
         table.setItems(FXCollections.observableArrayList(
                 movements.stream().map(movement -> MovementRow.from(movement, numberFormat)).toList()));
         table.setPrefHeight(Math.max(180, Math.min(460, 120 + movements.size() * 28.0)));

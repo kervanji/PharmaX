@@ -5,6 +5,7 @@ import com.pharmax.model.Product;
 import com.pharmax.model.ProductBatch;
 import com.pharmax.model.ProductUnit;
 import com.pharmax.service.CategoryService;
+import com.pharmax.service.InventoryMovementService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.ProductUnitService;
@@ -16,6 +17,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.text.DecimalFormat;
@@ -60,6 +62,8 @@ public class ProductController {
     @FXML
     private Label profitMarginRetailLabel;
     @FXML
+    private Label calculatedRetailPriceLabel;
+    @FXML
     private Label profitMarginWholesaleLabel;
     @FXML
     private Label profitMarginSpecialLabel;
@@ -94,7 +98,7 @@ public class ProductController {
     @FXML
     private TableColumn<ProductUnitRow, Boolean> packagingActiveColumn;
     @FXML
-    private TextField packagingUnitNameField;
+    private ComboBox<String> packagingUnitComboBox;
     @FXML
     private TextField packagingBarcodeField;
     @FXML
@@ -111,6 +115,22 @@ public class ProductController {
     private CheckBox isActiveCheckBox;
     @FXML
     private Button deleteButton;
+    @FXML
+    private VBox openingBatchSection;
+    @FXML
+    private CheckBox openingBatchCheckBox;
+    @FXML
+    private javafx.scene.layout.GridPane openingBatchGrid;
+    @FXML
+    private TextField openingBatchNumberField;
+    @FXML
+    private TextField openingBatchQuantityField;
+    @FXML
+    private DatePicker openingBatchProductionDatePicker;
+    @FXML
+    private DatePicker openingBatchExpiryDatePicker;
+    @FXML
+    private TextField openingBatchNotesField;
 
     private Stage dialogStage;
     private Product product;
@@ -122,6 +142,7 @@ public class ProductController {
     private final CategoryService categoryService = new CategoryService();
     private final ProductBatchService productBatchService = new ProductBatchService();
     private final ProductUnitService productUnitService = new ProductUnitService();
+    private final InventoryMovementService inventoryMovementService = new InventoryMovementService();
     private final ObservableList<ProductUnitRow> packagingRows = FXCollections.observableArrayList();
     private final DecimalFormat numberFormat;
 
@@ -138,6 +159,7 @@ public class ProductController {
         setupPackagingSection();
         setupPriceListeners();
         setupPricingModeToggle();
+        setupOpeningBatchToggle();
         applyRoleRestrictions();
     }
 
@@ -191,19 +213,26 @@ public class ProductController {
     }
 
     private void loadUnitsOfMeasure() {
-        List<String> units = Arrays.asList(
+        // Full list kept for base unit and legacy compatibility
+        List<String> allUnits = Arrays.asList(
                 "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
                 "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
                 "حقنة", "مل", "جرام", "قطعة");
+        // Only these units are offered as new selectable packaging/sale units
+        List<String> selectablePackagingUnits = Arrays.asList("شريط", "علبة");
+
         if (unitOfMeasureComboBox != null) {
-            unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(units));
+            unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(allUnits));
         }
         if (baseUnitComboBox != null) {
-            baseUnitComboBox.setItems(FXCollections.observableArrayList(units));
+            baseUnitComboBox.setItems(FXCollections.observableArrayList(allUnits));
             baseUnitComboBox.setValue("حبة");
         }
+        if (packagingUnitComboBox != null) {
+            packagingUnitComboBox.setItems(FXCollections.observableArrayList(selectablePackagingUnits));
+        }
         if (unitOfMeasureComboBox != null && unitOfMeasureComboBox.getValue() == null) {
-            unitOfMeasureComboBox.setValue("حبة");
+            unitOfMeasureComboBox.setValue("شريط");
         }
     }
 
@@ -236,7 +265,7 @@ public class ProductController {
             if (row == null) {
                 return;
             }
-            packagingUnitNameField.setText(row.getUnitName());
+            packagingUnitComboBox.setValue(row.getUnitName());
             packagingBarcodeField.setText(row.getBarcode());
             packagingConversionField.setText(String.valueOf(row.getConversionFactor()));
             packagingPriceField.setText(row.getSalePrice() > 0 ? String.valueOf(row.getSalePrice()) : "");
@@ -285,6 +314,8 @@ public class ProductController {
                 unitPriceField.setManaged(true);
                 profitPercentageField.setVisible(false);
                 profitPercentageField.setManaged(false);
+                calculatedRetailPriceLabel.setVisible(false);
+                calculatedRetailPriceLabel.setManaged(false);
             }
         });
 
@@ -294,6 +325,8 @@ public class ProductController {
                 unitPriceField.setManaged(false);
                 profitPercentageField.setVisible(true);
                 profitPercentageField.setManaged(true);
+                calculatedRetailPriceLabel.setVisible(true);
+                calculatedRetailPriceLabel.setManaged(true);
                 calculatePriceFromPercentage();
             }
         });
@@ -306,10 +339,28 @@ public class ProductController {
             if (cost > 0 && percentage >= 0) {
                 double price = cost * (1 + percentage / 100);
                 unitPriceField.setText(String.valueOf(price));
+                updateCalculatedRetailPriceLabel(price);
+            } else {
+                updateCalculatedRetailPriceLabel(0);
             }
         } catch (Exception e) {
             // Ignore parsing errors during input
+            updateCalculatedRetailPriceLabel(0);
         }
+    }
+
+    private void updateCalculatedRetailPriceLabel(double price) {
+        if (calculatedRetailPriceLabel == null) {
+            return;
+        }
+        if (!percentagePriceRadio.isSelected() || price <= 0) {
+            calculatedRetailPriceLabel.setText("سعر البيع المحسوب: --");
+            return;
+        }
+
+        double costIqd = parseDouble(costPriceField.getText());
+        String currency = costIqd > 0 ? "د.ع" : "$";
+        calculatedRetailPriceLabel.setText("سعر البيع المحسوب: " + numberFormat.format(price) + " " + currency);
     }
 
     /**
@@ -463,6 +514,9 @@ public class ProductController {
         isActiveCheckBox.setSelected(product.getIsActive());
         loadPackagingRows(product);
 
+        // Hide opening batch section in edit mode
+        hideOpeningBatchSection();
+
         applySellingPriceEditRestriction();
         updateAllProfitMargins();
     }
@@ -497,10 +551,10 @@ public class ProductController {
 
     @FXML
     private void handleAddPackagingUnit() {
-        String unitName = safeTrim(packagingUnitNameField);
+        String unitName = safeTrim(packagingUnitComboBox);
         if (unitName.isEmpty()) {
-            showError("خطأ", "اسم وحدة التعبئة مطلوب");
-            packagingUnitNameField.requestFocus();
+            showError("خطأ", "اختر وحدة التعبئة");
+            packagingUnitComboBox.requestFocus();
             return;
         }
 
@@ -530,7 +584,7 @@ public class ProductController {
 
         if (selected != null && existing != null) {
             showError("خطأ", "وحدة التعبئة مسجلة مسبقاً: " + unitName);
-            packagingUnitNameField.requestFocus();
+            packagingUnitComboBox.requestFocus();
             return;
         }
 
@@ -562,7 +616,7 @@ public class ProductController {
     }
 
     private void clearPackagingInputs() {
-        packagingUnitNameField.clear();
+        packagingUnitComboBox.setValue(null);
         packagingBarcodeField.clear();
         packagingConversionField.setText("1");
         packagingPriceField.clear();
@@ -690,31 +744,93 @@ public class ProductController {
             return;
         }
 
-        double quantity = parseDouble(quantityField.getText());
-        LocalDate expiryDate = expiryDatePicker != null ? expiryDatePicker.getValue() : null;
-        ProductBatch openingBatch = findPreferredBatch(savedProduct).orElse(null);
-        if (quantity <= 0 && openingBatch == null) {
+        // Only create opening batch if the checkbox is selected (new product flow)
+        if (openingBatchCheckBox == null || !openingBatchCheckBox.isSelected()) {
             return;
         }
 
-        String batchNumber = openingBatch != null ? openingBatch.getBatchNumber() : "OPENING-" + savedProduct.getProductCode();
-        double currentOpeningQuantity = openingBatch != null ? openingBatch.getQuantity() : 0.0;
-        double quantityDelta = quantity - currentOpeningQuantity;
+        double quantity = parseDouble(openingBatchQuantityField.getText());
+        if (quantity <= 0) {
+            return;
+        }
+
+        // Determine batch number: user-provided or auto-generated
+        String batchNumber = safeTrim(openingBatchNumberField);
+        if (batchNumber.isEmpty()) {
+            batchNumber = "OPENING-" + savedProduct.getId();
+        }
+
+        // Duplicate prevention: check if an opening batch with this number already exists
+        java.util.Optional<ProductBatch> existingBatch =
+                productBatchService.findByProductIdAndBatchNumber(savedProduct.getId(), batchNumber);
+        if (existingBatch.isPresent()) {
+            // Already created (retry scenario) - skip to avoid duplication
+            return;
+        }
+
+        LocalDate expiryDate = openingBatchExpiryDatePicker != null ? openingBatchExpiryDatePicker.getValue() : null;
+        LocalDate productionDate = openingBatchProductionDatePicker != null ? openingBatchProductionDatePicker.getValue() : null;
+        String notes = safeTrim(openingBatchNotesField);
+
         Double unitCost = savedProduct.getCostPrice() != null ? savedProduct.getCostPrice() : savedProduct.getCostPriceUsd();
         String currency = savedProduct.getCostPrice() != null ? "دينار" : "دولار";
 
-        if (Math.abs(quantityDelta) > 1e-9) {
-            productBatchService.createOrUpdateBatch(
-                    savedProduct,
-                    batchNumber,
-                    expiryDate,
-                    quantityDelta,
-                    unitCost,
-                    currency,
-                    null,
-                    true);
-        } else if (openingBatch != null && !java.util.Objects.equals(expiryDate, openingBatch.getExpiryDate())) {
-            productBatchService.updateBatchExpiry(openingBatch, expiryDate);
+        // Create the batch
+        ProductBatch batch = productBatchService.createOrUpdateBatch(
+                savedProduct,
+                batchNumber,
+                expiryDate,
+                productionDate,
+                quantity,
+                unitCost,
+                currency,
+                null,
+                true);
+
+        // Record inventory movement for the opening batch
+        if (batch != null && batch.getId() != null) {
+            String actor = SessionManager.getInstance().getCurrentUsername();
+            String movementNote = "دفعة افتتاحية";
+            if (notes != null && !notes.isEmpty()) {
+                movementNote += " - " + notes;
+            }
+
+            // Use existsByReference to prevent duplicate movement
+            boolean alreadyRecorded = inventoryMovementService.existsByReference(
+                    "manual_stock_add", "opening_batch", savedProduct.getId(), batch.getId());
+            if (!alreadyRecorded) {
+                inventoryMovementService.recordMovement(
+                        savedProduct,
+                        batch,
+                        "manual_stock_add",
+                        "opening_batch",
+                        savedProduct.getId(),
+                        batch.getId(),
+                        quantity,
+                        unitCost,
+                        movementNote,
+                        actor);
+            }
+        }
+
+        // Sync product quantity from batch totals
+        productBatchService.syncProductSummaryQuantity(savedProduct.getId());
+    }
+
+    private void setupOpeningBatchToggle() {
+        if (openingBatchCheckBox == null || openingBatchGrid == null) {
+            return;
+        }
+        openingBatchCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            openingBatchGrid.setDisable(!newVal);
+            openingBatchGrid.setOpacity(newVal ? 1.0 : 0.5);
+        });
+    }
+
+    private void hideOpeningBatchSection() {
+        if (openingBatchSection != null) {
+            openingBatchSection.setVisible(false);
+            openingBatchSection.setManaged(false);
         }
     }
 
@@ -766,6 +882,24 @@ public class ProductController {
             showError("خطأ", "تاريخ الانتهاء يحتاج كمية افتتاحية أكبر من صفر");
             quantityField.requestFocus();
             return false;
+        }
+
+        // Validate opening batch fields if enabled
+        if (openingBatchCheckBox != null && openingBatchCheckBox.isSelected()) {
+            double openingQty = parseDouble(openingBatchQuantityField.getText());
+            if (openingQty <= 0) {
+                showError("خطأ", "الكمية الأولية للدفعة الافتتاحية يجب أن تكون أكبر من صفر");
+                openingBatchQuantityField.requestFocus();
+                return false;
+            }
+
+            LocalDate prodDate = openingBatchProductionDatePicker != null ? openingBatchProductionDatePicker.getValue() : null;
+            LocalDate expDate = openingBatchExpiryDatePicker != null ? openingBatchExpiryDatePicker.getValue() : null;
+            if (prodDate != null && expDate != null && !expDate.isAfter(prodDate)) {
+                showError("خطأ", "تاريخ الانتهاء يجب أن يكون بعد تاريخ الإنتاج");
+                openingBatchExpiryDatePicker.requestFocus();
+                return false;
+            }
         }
 
         return true;
@@ -824,6 +958,11 @@ public class ProductController {
 
     private String safeTrim(TextField field) {
         return field != null && field.getText() != null ? field.getText().trim() : "";
+    }
+
+    private String safeTrim(ComboBox<String> comboBox) {
+        String value = comboBox != null ? comboBox.getValue() : null;
+        return value != null ? value.trim() : "";
     }
 
     private double parseDouble(String value) {

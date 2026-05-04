@@ -119,6 +119,9 @@
                         <TextField fx:id="unitPriceUsdField" HBox.hgrow="ALWAYS" promptText="0.00 $"
                                    style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
                     </HBox>
+                    <Label fx:id="calculatedRetailPriceLabel" text="سعر البيع المحسوب: --"
+                           visible="false" managed="false"
+                           style="-fx-font-size: 12px; -fx-text-fill: -fx-accent-color; -fx-font-weight: bold;"/>
                     <Label fx:id="profitMarginRetailLabel" text="هامش: 0.00 د.ع (0%)"
                            style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
                 </VBox>
@@ -156,6 +159,51 @@
             </GridPane>
         </VBox>
 
+        <VBox fx:id="openingBatchSection" spacing="10" nodeOrientation="RIGHT_TO_LEFT"
+              style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
+            <Label text="دفعة افتتاحية / كمية أولية"
+                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+            <CheckBox fx:id="openingBatchCheckBox" text="إضافة دفعة افتتاحية"
+                      style="-fx-font-size: 14px;"/>
+            <GridPane fx:id="openingBatchGrid" hgap="12" vgap="10" nodeOrientation="RIGHT_TO_LEFT"
+                      disable="true" opacity="0.5">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="34"/>
+                    <ColumnConstraints percentWidth="16"/>
+                    <ColumnConstraints percentWidth="34"/>
+                </columnConstraints>
+
+                <Label text="رقم الدفعة:" GridPane.rowIndex="0" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="openingBatchNumberField" GridPane.rowIndex="0" GridPane.columnIndex="1"
+                           promptText="اختياري - سيتم توليده تلقائياً"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+                <Label text="الكمية الأولية:*" GridPane.rowIndex="0" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="openingBatchQuantityField" GridPane.rowIndex="0" GridPane.columnIndex="3"
+                           promptText="0"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+                <Label text="تاريخ الإنتاج:" GridPane.rowIndex="1" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <DatePicker fx:id="openingBatchProductionDatePicker" GridPane.rowIndex="1" GridPane.columnIndex="1"
+                            promptText="اختياري" maxWidth="Infinity"/>
+
+                <Label text="تاريخ الانتهاء:" GridPane.rowIndex="1" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <DatePicker fx:id="openingBatchExpiryDatePicker" GridPane.rowIndex="1" GridPane.columnIndex="3"
+                            promptText="اختياري" maxWidth="Infinity"/>
+
+                <Label text="ملاحظات الدفعة:" GridPane.rowIndex="2" GridPane.columnIndex="0"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="openingBatchNotesField" GridPane.rowIndex="2" GridPane.columnIndex="1"
+                           GridPane.columnSpan="3" promptText="اختياري"
+                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+            </GridPane>
+        </VBox>
+
         <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
               style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
             <Label text="وحدات التعبئة والباركود"
@@ -174,17 +222,21 @@
 
                 <Label text="وحدة الأساس:" GridPane.rowIndex="0" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
                 <ComboBox fx:id="baseUnitComboBox" GridPane.rowIndex="0" GridPane.columnIndex="1" prefWidth="180" promptText="وحدة الأساس"/>
+                <Label text="وحدة الأساس هي أصغر وحدة يتم حساب المخزون بها. معامل التحويل يعني كم وحدة أساس داخل الوحدة المختارة."
+                       GridPane.rowIndex="0" GridPane.columnIndex="2" GridPane.columnSpan="5"
+                       wrapText="true"
+                       style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
 
-                <Label text="اسم الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingUnitNameField" GridPane.rowIndex="1" GridPane.columnIndex="1"
-                           promptText="حبة / شريط / علبة / كرتون"/>
+                <Label text="الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="packagingUnitComboBox" GridPane.rowIndex="1" GridPane.columnIndex="1"
+                          maxWidth="Infinity" promptText="اختر الوحدة"/>
                 <Label text="باركود الوحدة:" GridPane.rowIndex="1" GridPane.columnIndex="2" style="-fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="packagingBarcodeField" GridPane.rowIndex="1" GridPane.columnIndex="3" promptText="اختياري"/>
-                <Label text="معامل التحويل لوحدة الأساس:" GridPane.rowIndex="1" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="packagingConversionField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="مثال: 10 أو 100"/>
+                <Label text="عدد وحدات الأساس داخلها:" GridPane.rowIndex="1" GridPane.columnIndex="4" style="-fx-text-fill: -fx-form-label;"/>
+                <TextField fx:id="packagingConversionField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="شريط=10، علبة=100"/>
 
                 <HBox spacing="12" GridPane.rowIndex="1" GridPane.columnIndex="6" alignment="CENTER_RIGHT">
-                    <CheckBox fx:id="packagingDefaultCheckBox" text="افتراضي"/>
+                    <CheckBox fx:id="packagingDefaultCheckBox" text="وحدة البيع الافتراضية"/>
                     <CheckBox fx:id="packagingActiveCheckBox" text="نشط" selected="true"/>
                 </HBox>
 
@@ -204,7 +256,7 @@
                 <columns>
                     <TableColumn fx:id="packagingUnitColumn" text="الوحدة" prefWidth="130"/>
                     <TableColumn fx:id="packagingBarcodeColumn" text="الباركود" prefWidth="150"/>
-                    <TableColumn fx:id="packagingConversionColumn" text="معامل التحويل لوحدة الأساس" prefWidth="180"/>
+                    <TableColumn fx:id="packagingConversionColumn" text="عدد وحدات الأساس" prefWidth="180"/>
                     <TableColumn fx:id="packagingPriceColumn" text="سعر البيع دينار" prefWidth="130"/>
                     <TableColumn fx:id="packagingPriceUsdColumn" text="سعر البيع دولار" prefWidth="130"/>
                     <TableColumn fx:id="packagingDefaultColumn" text="افتراضي" prefWidth="90"/>

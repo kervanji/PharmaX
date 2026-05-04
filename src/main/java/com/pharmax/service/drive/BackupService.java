@@ -1,7 +1,6 @@
 package com.pharmax.service.drive;
 
 import com.pharmax.service.AccessControlService;
-import com.pharmax.service.AuditLogService;
 import com.pharmax.service.BackupRestoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +35,6 @@ public class BackupService {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean isBackupRunning = new AtomicBoolean(false);
     private final AccessControlService accessControlService;
-    private final AuditLogService auditLogService;
     private final BackupRestoreService backupRestoreService;
 
     public BackupService(GoogleDriveService driveService) {
@@ -47,7 +45,6 @@ public class BackupService {
             return t;
         });
         this.accessControlService = new AccessControlService();
-        this.auditLogService = new AuditLogService();
         this.backupRestoreService = new BackupRestoreService();
     }
 

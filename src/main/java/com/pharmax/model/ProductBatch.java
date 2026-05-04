@@ -22,6 +22,9 @@ public class ProductBatch {
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
+    @Column(name = "production_date")
+    private LocalDate productionDate;
+
     @Column(name = "quantity", nullable = false)
     private Double quantity;
 
@@ -90,6 +93,14 @@ public class ProductBatch {
 
     public void setExpiryDate(LocalDate expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public LocalDate getProductionDate() {
+        return productionDate;
+    }
+
+    public void setProductionDate(LocalDate productionDate) {
+        this.productionDate = productionDate;
     }
 
     public Double getQuantity() {
