@@ -3,6 +3,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -53,14 +54,6 @@
         <TextField fx:id="addressField" GridPane.columnIndex="0" GridPane.rowIndex="3"
                    promptText="عنوان العميل"
                    style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-prompt-text-fill: -fx-text-hint; -fx-padding: 10; -fx-background-radius: 8; -fx-pref-width: 250;"/>
-        
-        <!-- Project Location -->
-        <Label text="مواقع المشاريع: *" GridPane.columnIndex="1" GridPane.rowIndex="4"
-               style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label; -fx-font-weight: bold;"/>
-        <TextArea fx:id="projectLocationsArea" GridPane.columnIndex="0" GridPane.rowIndex="4"
-                  promptText="اكتب كل موقع في سطر منفصل"
-                  prefRowCount="3"
-                  style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-prompt-text-fill: -fx-text-hint; -fx-padding: 10; -fx-background-radius: 8; -fx-pref-width: 250;"/>
         
         <columnConstraints>
             <javafx.scene.layout.ColumnConstraints hgrow="ALWAYS"/>
