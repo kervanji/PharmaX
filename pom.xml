@@ -7,7 +7,7 @@
 
     <groupId>com.pharmax</groupId>
     <artifactId>inventory-management</artifactId>
-    <version>1.2.4</version>
+    <version>1.2.5</version>
     <packaging>jar</packaging>
 
     <name>PharmaX Inventory Management</name>

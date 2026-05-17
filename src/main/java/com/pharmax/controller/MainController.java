@@ -161,7 +161,8 @@ public class MainController {
     private Set<String> sellerHiddenTileIds = new HashSet<>(); // hidden from sellers only
 
     private MainApp mainApp;
-    @SuppressWarnings("unused") private final CustomerService customerService = new CustomerService();
+    @SuppressWarnings("unused")
+    private final CustomerService customerService = new CustomerService();
     private final InventoryService inventoryService = new InventoryService();
     private final ProductBatchService productBatchService = new ProductBatchService();
     private final SalesService salesService = new SalesService();
@@ -1827,7 +1828,7 @@ public class MainController {
     @FXML
     private void handleAbout() {
         showInfo("عن البرنامج",
-                "PharmaX v1.2.4\n\n" +
+                "PharmaX v1.2.5\n\n" +
                         "من تطوير: KervanjiHolding\n" +
                         "الموقع: Kervanjiholding.com\n\n" +
                         "نظام متكامل لإدارة الصيدليات\n\n" +

@@ -54,7 +54,7 @@
 بعد اكتمال البناء، ستجد الـ installer في:
 
 ```
-installer-output\PharmaX-Setup-1.2.4.exe
+installer-output\PharmaX-Setup-1.2.5.exe
 ```
 
 ## مميزات الـ Installer
@@ -91,7 +91,7 @@ installer-output\PharmaX-Setup-1.2.4.exe
 
 ```pascal
 #define MyAppName "PharmaX"
-#define MyAppVersion "1.2.4"
+#define MyAppVersion "1.2.5"
 #define MyAppPublisher "PharmaX"
 ```
 
@@ -124,7 +124,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 ### طريقة التثبيت للعميل
 
-1. تحميل ملف `PharmaX-Setup-1.2.4.exe`
+1. تحميل ملف `PharmaX-Setup-1.2.5.exe`
 2. النقر مرتين على الملف
 3. اتباع خطوات التثبيت
 4. تشغيل البرنامج من قائمة ابدأ أو سطح المكتب

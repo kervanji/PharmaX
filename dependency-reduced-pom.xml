@@ -4,7 +4,7 @@
   <groupId>com.pharmax</groupId>
   <artifactId>inventory-management</artifactId>
   <name>PharmaX Inventory Management</name>
-  <version>1.2.4</version>
+  <version>1.2.5</version>
   <description>برنامج محاسبة لادارة المخازن والمبيعات مع إصدار الوصولات</description>
   <build>
     <plugins>

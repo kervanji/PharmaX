@@ -3,7 +3,7 @@
 
 #define MyAppName "PharmaX"
 #define MyAppNameArabic "حساب إكس - نظام إدارة المخازن والمبيعات"
-#define MyAppVersion "1.2.4"
+#define MyAppVersion "1.2.5"
 #define MyAppPublisher "PharmaX"
 #define MyAppExeName "PharmaX.exe"
 #define MyAppIcon "src\main\resources\templates\PharmaX.ico"
