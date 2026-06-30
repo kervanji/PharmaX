@@ -5,6 +5,8 @@ import javafx.stage.Stage;
 import javafx.scene.Scene;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -218,10 +220,24 @@ public class MainApp extends Application {
         Scene scene = new Scene(mainLayout);
         themeManager.applyTheme(scene);
         applyUiFontSizeToScene(scene, SessionManager.getInstance().getUiFontSize());
+        installGlobalRefreshShortcut(scene);
         primaryStage.setScene(scene);
         primaryStage.setResizable(true);
         primaryStage.setMaximized(true);
         primaryStage.show();
+    }
+
+    private void installGlobalRefreshShortcut(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.F5) {
+                TabManager.getInstance().refreshAllOpenTabs();
+                event.consume();
+            }
+        });
     }
 
     public void logout() {

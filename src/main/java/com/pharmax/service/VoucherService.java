@@ -122,7 +122,7 @@ public class VoucherService {
         boolean isReceipt = voucher.getVoucherType() == VoucherType.RECEIPT;
         boolean isPurchase = voucher.getVoucherType() == VoucherType.PURCHASE;
         String voucherTitle = isReceipt ? "سند قبض" : isPurchase ? "فاتورة مشتريات" : "سند دفع";
-        String personLabel = isReceipt ? "استلمنا من السيد" : isPurchase ? "مشتريات من" : "دفعنا إلى السيد";
+        String personLabel = isReceipt ? "استلمنا من السيد" : isPurchase ? "مشتريات من مذخر" : "دفعنا إلى المذخر";
         BaseColor metaBgColor = isReceipt ? new BaseColor(232, 245, 233) : isPurchase ? new BaseColor(254, 243, 199) : new BaseColor(254, 226, 226);
 
         PdfPTable titleTable = new PdfPTable(1);
@@ -159,9 +159,7 @@ public class VoucherService {
         account.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
         account.setPadding(3f);
         String accountName = voucher.getCustomer() != null && voucher.getCustomer().getName() != null ? voucher.getCustomer().getName() : "نقدي";
-        String projectName = voucher.getProjectName();
-        String accountWithProject = accountName + ((projectName != null && !projectName.trim().isEmpty()) ? " / " + projectName.trim() : "");
-        account.addElement(new Phrase("الحساب: " + accountWithProject, arabicFont));
+        account.addElement(new Phrase((isReceipt ? "العميل: " : "المذخر: ") + accountName, arabicFont));
         account.addElement(new Phrase("العملة: " + safe(voucher.getCurrency()), arabicFont));
         info.addCell(account);
 
@@ -184,7 +182,7 @@ public class VoucherService {
         body.setSpacingBefore(2f);
 
         double paidAmount = voucher.getAmount() != null ? voucher.getAmount() : 0.0;
-        addLabeledRow(body, personLabel, accountWithProject, arabicFont, arabicBoldFont);
+        addLabeledRow(body, personLabel, accountName, arabicFont, arabicBoldFont);
         addLabeledRow(body, "المدفوع", formatCurrency(paidAmount, voucher.getCurrency()), arabicFont, arabicBoldFont);
         addLabeledRow(body, "المبلغ كتابةً", safe(voucher.getAmountInWords()), arabicFont, arabicBoldFont);
         addLabeledRow(body, "البيان", safe(voucher.getDescription()), arabicFont, arabicBoldFont);
@@ -616,19 +614,6 @@ public class VoucherService {
         }
     }
 
-    // الحصول على أسماء المشاريع المميزة
-    public List<String> getDistinctProjectNames() {
-        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
-            Query<String> query = session.createQuery(
-                "SELECT DISTINCT v.projectName FROM Voucher v WHERE v.projectName IS NOT NULL AND v.projectName <> '' ORDER BY v.projectName",
-                String.class);
-            return query.list();
-        } catch (Exception e) {
-            logger.error("Failed to get distinct project names", e);
-            return Collections.emptyList();
-        }
-    }
-    
     // الحصول على سند بالرقم
     public Optional<Voucher> getVoucherByNumber(String voucherNumber) {
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
@@ -753,11 +738,11 @@ public class VoucherService {
     
     // البحث في السندات
     public List<Voucher> searchVouchers(String searchTerm, VoucherType type, LocalDateTime from, LocalDateTime to) {
-        return searchVouchers(searchTerm, type, from, to, null, null);
+        return searchVouchers(searchTerm, type, from, to, null);
     }
 
     public List<Voucher> searchVouchers(String searchTerm, VoucherType type, LocalDateTime from, LocalDateTime to,
-                                        String projectName, Long customerId) {
+                                        Long customerId) {
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             StringBuilder hql = new StringBuilder("FROM Voucher v WHERE v.isCancelled = false ");
             
@@ -769,9 +754,6 @@ public class VoucherService {
             }
             if (searchTerm != null && !searchTerm.isEmpty()) {
                 hql.append("AND (v.voucherNumber LIKE :search OR v.description LIKE :search OR v.customer.name LIKE :search) ");
-            }
-            if (projectName != null && !projectName.isBlank()) {
-                hql.append("AND v.projectName LIKE :projectName ");
             }
             if (customerId != null) {
                 hql.append("AND v.customer.id = :customerId ");
@@ -789,9 +771,6 @@ public class VoucherService {
             }
             if (searchTerm != null && !searchTerm.isEmpty()) {
                 query.setParameter("search", "%" + searchTerm + "%");
-            }
-            if (projectName != null && !projectName.isBlank()) {
-                query.setParameter("projectName", "%" + projectName.trim() + "%");
             }
             if (customerId != null) {
                 query.setParameter("customerId", customerId);

@@ -7,6 +7,10 @@ import java.util.List;
 @Entity
 @Table(name = "customers")
 public class Customer {
+    public static final String TYPE_CUSTOMER = "CUSTOMER";
+    public static final String TYPE_SUPPLIER = "SUPPLIER";
+    public static final String TYPE_BOTH = "BOTH";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,9 +26,9 @@ public class Customer {
     
     @Column
     private String address;
-    
-    @Column(name = "project_location")
-    private String projectLocation;
+
+    @Column(name = "account_type")
+    private String accountType;
     
     @Deprecated
     @Column(name = "email")
@@ -63,6 +67,7 @@ public class Customer {
         this.currentBalance = 0.0;
         this.balanceIqd = 0.0;
         this.balanceUsd = 0.0;
+        this.accountType = TYPE_CUSTOMER;
     }
 
     // Getters and Setters
@@ -80,9 +85,29 @@ public class Customer {
     
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-    
-    public String getProjectLocation() { return projectLocation; }
-    public void setProjectLocation(String projectLocation) { this.projectLocation = projectLocation; }
+
+    public String getAccountType() { return normalizeAccountType(accountType); }
+    public void setAccountType(String accountType) { this.accountType = normalizeAccountType(accountType); }
+
+    public boolean isSaleCustomer() {
+        String type = getAccountType();
+        return TYPE_CUSTOMER.equals(type) || TYPE_BOTH.equals(type);
+    }
+
+    public boolean isSupplier() {
+        String type = getAccountType();
+        return TYPE_SUPPLIER.equals(type) || TYPE_BOTH.equals(type);
+    }
+
+    private String normalizeAccountType(String type) {
+        if (TYPE_SUPPLIER.equalsIgnoreCase(type)) {
+            return TYPE_SUPPLIER;
+        }
+        if (TYPE_BOTH.equalsIgnoreCase(type)) {
+            return TYPE_BOTH;
+        }
+        return TYPE_CUSTOMER;
+    }
     
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }

@@ -100,13 +100,6 @@ public class DatabaseManager {
     }
 
     private static void applyMigrations(Statement stmt) {
-        // Add project_location to sales table if missing
-        try {
-            stmt.execute("ALTER TABLE sales ADD COLUMN project_location TEXT");
-        } catch (SQLException ignored) {
-            // Column already exists or table missing; ignore
-        }
-
         // Add paid_amount to sales table if missing
         try {
             stmt.execute("ALTER TABLE sales ADD COLUMN paid_amount REAL DEFAULT 0");
@@ -114,11 +107,29 @@ public class DatabaseManager {
             // Column already exists or table missing; ignore
         }
 
-        // Add project_name to vouchers table if missing
+        boolean customerAccountTypeAdded = false;
         try {
-            stmt.execute("ALTER TABLE vouchers ADD COLUMN project_name TEXT");
+            stmt.execute("ALTER TABLE customers ADD COLUMN account_type TEXT DEFAULT 'CUSTOMER'");
+            customerAccountTypeAdded = true;
         } catch (SQLException ignored) {
-            // Column already exists or table missing; ignore
+        }
+
+        if (customerAccountTypeAdded) {
+            try {
+                stmt.execute("""
+                        UPDATE customers
+                        SET account_type = CASE
+                            WHEN id IN (SELECT DISTINCT customer_id FROM vouchers WHERE voucher_type = 'PURCHASE' AND customer_id IS NOT NULL)
+                             AND id IN (SELECT DISTINCT customer_id FROM sales WHERE customer_id IS NOT NULL)
+                            THEN 'BOTH'
+                            WHEN id IN (SELECT DISTINCT customer_id FROM vouchers WHERE voucher_type = 'PURCHASE' AND customer_id IS NOT NULL)
+                            THEN 'SUPPLIER'
+                            ELSE COALESCE(account_type, 'CUSTOMER')
+                        END
+                        WHERE account_type IS NULL OR account_type = 'CUSTOMER'
+                        """);
+            } catch (SQLException ignored) {
+            }
         }
 
         // Add USD price columns to products table
@@ -359,7 +370,7 @@ public class DatabaseManager {
                         name TEXT NOT NULL,
                         phone_number TEXT,
                         address TEXT,
-                        project_location TEXT,
+                        account_type TEXT DEFAULT 'CUSTOMER',
                         email TEXT,
                         tax_id TEXT,
                         credit_limit REAL,
@@ -398,7 +409,6 @@ public class DatabaseManager {
                         sale_code TEXT UNIQUE NOT NULL,
                         customer_id INTEGER NOT NULL,
                         sale_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        project_location TEXT,
                         total_amount REAL NOT NULL,
                         discount_amount REAL DEFAULT 0,
                         tax_amount REAL DEFAULT 0,

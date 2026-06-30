@@ -28,28 +28,28 @@
     <GridPane hgap="16" vgap="14" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 24; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 6);">
         
         <!-- Customer Code -->
-        <Label text="كود العميل:" GridPane.columnIndex="1" GridPane.rowIndex="0"
+        <Label fx:id="customerCodeLabel" text="كود العميل:" GridPane.columnIndex="1" GridPane.rowIndex="0"
                style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label; -fx-font-weight: bold;"/>
         <TextField fx:id="customerCodeField" GridPane.columnIndex="0" GridPane.rowIndex="0"
                    promptText="سيتم توليده تلقائياً" editable="false"
                    style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-prompt-text-fill: -fx-text-hint; -fx-padding: 10; -fx-background-radius: 8; -fx-pref-width: 250;"/>
         
         <!-- Customer Name -->
-        <Label text="اسم العميل: *" GridPane.columnIndex="1" GridPane.rowIndex="1"
+        <Label fx:id="customerNameLabel" text="اسم العميل: *" GridPane.columnIndex="1" GridPane.rowIndex="1"
                style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label; -fx-font-weight: bold;"/>
         <TextField fx:id="customerNameField" GridPane.columnIndex="0" GridPane.rowIndex="1"
                    promptText="أدخل اسم العميل"
                    style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-prompt-text-fill: -fx-text-hint; -fx-padding: 10; -fx-background-radius: 8; -fx-pref-width: 250;"/>
         
         <!-- Phone Number -->
-        <Label text="رقم الهاتف (07...): *" GridPane.columnIndex="1" GridPane.rowIndex="2"
+        <Label fx:id="phoneNumberLabel" text="رقم الهاتف (07...): *" GridPane.columnIndex="1" GridPane.rowIndex="2"
                style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label; -fx-font-weight: bold;"/>
         <TextField fx:id="phoneNumberField" GridPane.columnIndex="0" GridPane.rowIndex="2"
                    promptText="07xxxxxxxx"
                    style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-prompt-text-fill: -fx-text-hint; -fx-padding: 10; -fx-background-radius: 8; -fx-pref-width: 250;"/>
         
         <!-- Address -->
-        <Label text="العنوان:" GridPane.columnIndex="1" GridPane.rowIndex="3"
+        <Label fx:id="addressLabel" text="العنوان:" GridPane.columnIndex="1" GridPane.rowIndex="3"
                style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label; -fx-font-weight: bold;"/>
         <TextField fx:id="addressField" GridPane.columnIndex="0" GridPane.rowIndex="3"
                    promptText="عنوان العميل"

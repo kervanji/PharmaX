@@ -41,8 +41,6 @@ public class AccountsController {
     @FXML
     private ComboBox<Customer> customerCombo;
     @FXML
-    private ComboBox<String> projectCombo;
-    @FXML
     private ComboBox<String> currencyCombo;
     @FXML
     private DatePicker fromDate;
@@ -124,7 +122,7 @@ public class AccountsController {
         });
     }
 
-    public void applyInitialFilters(Customer customer, String currency, String projectName) {
+    public void applyInitialFilters(Customer customer, String currency) {
         if (customer == null) {
             return;
         }
@@ -140,17 +138,6 @@ public class AccountsController {
         String normalizedCurrency = normalizeCurrency(currency);
         if (normalizedCurrency != null) {
             currencyCombo.setValue(normalizedCurrency);
-        }
-
-        String normalizedProject = projectName != null ? projectName.trim() : "";
-        if (!normalizedProject.isEmpty()) {
-            if (!projectCombo.getItems().contains(normalizedProject)) {
-                projectCombo.getItems().add(normalizedProject);
-            }
-            projectCombo.setValue(normalizedProject);
-            if (projectCombo.getEditor() != null) {
-                projectCombo.getEditor().setText(normalizedProject);
-            }
         }
 
         generateStatement();
@@ -249,8 +236,6 @@ public class AccountsController {
         details.append("الهاتف: ").append(customer.getPhoneNumber() != null ? customer.getPhoneNumber() : "-")
                 .append("\n");
         details.append("العنوان: ").append(customer.getAddress() != null ? customer.getAddress() : "-").append("\n");
-        details.append("مواقع المشاريع:\n")
-                .append(customer.getProjectLocation() != null ? customer.getProjectLocation() : "-").append("\n\n");
         details.append("رصيد الدينار: ").append(currencyFormat.format(customer.getBalanceIqd())).append(" د.ع\n");
         details.append("رصيد الدولار: ").append(currencyFormat.format(customer.getBalanceUsd())).append(" $");
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -418,35 +403,9 @@ public class AccountsController {
             });
         }
 
-        customerCombo.valueProperty().addListener((obs, oldVal, newVal) -> updateProjectLocations(newVal));
-
         // Currencies
         currencyCombo.setItems(FXCollections.observableArrayList("دينار", "دولار", "الكل"));
         currencyCombo.getSelectionModel().selectFirst();
-
-        // Projects
-        projectCombo.setEditable(true);
-        projectCombo.setDisable(true);
-    }
-
-    private void updateProjectLocations(Customer customer) {
-        projectCombo.getItems().clear();
-        projectCombo.setValue(null);
-        if (customer == null) {
-            projectCombo.setDisable(true);
-            return;
-        }
-        projectCombo.setDisable(false);
-        String locationsText = customer.getProjectLocation();
-        if (locationsText == null || locationsText.trim().isEmpty())
-            return;
-        List<String> locations = locationsText.lines()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        projectCombo.setItems(FXCollections.observableArrayList(locations));
-        if (locations.size() == 1)
-            projectCombo.setValue(locations.get(0));
     }
 
     private void setupTable() {
@@ -772,19 +731,15 @@ public class AccountsController {
             return;
         }
 
-        String project = projectCombo.getValue();
-        if (project != null && project.isBlank())
-            project = null;
-
         LocalDateTime from = fromDate.getValue() != null ? fromDate.getValue().atStartOfDay() : null;
         LocalDateTime to = toDate.getValue() != null ? toDate.getValue().atTime(23, 59, 59) : null;
 
         try {
             List<StatementItem> items;
             if (showDetailsCheck != null && showDetailsCheck.isSelected()) {
-                items = statementService.getStatementWithDetails(customer.getId(), project, currency, from, to);
+                items = statementService.getStatementWithDetails(customer.getId(), currency, from, to);
             } else {
-                items = statementService.getStatement(customer.getId(), project, currency, from, to);
+                items = statementService.getStatement(customer.getId(), currency, from, to);
             }
             statementTable.setItems(FXCollections.observableArrayList(items));
             updateSummary(items);
@@ -895,8 +850,6 @@ public class AccountsController {
                     .append("\n");
             details.append("العميل: ").append(sale.getCustomer() != null ? sale.getCustomer().getName() : "-")
                     .append("\n");
-            details.append("المشروع: ").append(sale.getProjectLocation() != null ? sale.getProjectLocation() : "-")
-                    .append("\n");
             details.append("المبلغ: ").append(currencyFormat.format(sale.getFinalAmount())).append(" ")
                     .append(sale.getCurrency()).append("\n");
             details.append("حالة الدفع: ").append("PAID".equals(sale.getPaymentStatus()) ? "مدفوع" : "معلق")
@@ -907,8 +860,6 @@ public class AccountsController {
             details.append("رقم السند: ").append(voucher.getVoucherNumber()).append("\n");
             details.append("التاريخ: ").append(voucher.getVoucherDate().toLocalDate()).append("\n");
             details.append("الحساب: ").append(voucher.getCustomer() != null ? voucher.getCustomer().getName() : "نقدي")
-                    .append("\n");
-            details.append("المشروع: ").append(voucher.getProjectName() != null ? voucher.getProjectName() : "-")
                     .append("\n");
             details.append("المبلغ: ").append(currencyFormat.format(voucher.getAmount())).append(" ")
                     .append(voucher.getCurrency()).append("\n");
@@ -1174,10 +1125,6 @@ public class AccountsController {
         }
 
         String currency = currencyCombo.getValue();
-        String project = projectCombo.getValue();
-        if (project != null && project.isBlank())
-            project = null;
-
         LocalDate fromDt = fromDate.getValue();
         LocalDate toDt = toDate.getValue();
 
@@ -1200,9 +1147,9 @@ public class AccountsController {
                 // table items)
                 List<StatementItem> currentItems = new java.util.ArrayList<>(statementTable.getItems());
                 pdfFile = receiptService.generateDetailedStatementPdf(customer, currentItems, currency,
-                        fromDt, toDt, selectedFile, project);
+                        fromDt, toDt, selectedFile);
             } else {
-                pdfFile = receiptService.generateAccountStatementPdf(customer, project, fromDt, toDt, false, currency,
+                pdfFile = receiptService.generateAccountStatementPdf(customer, fromDt, toDt, false, currency,
                         selectedFile);
             }
 

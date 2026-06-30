@@ -41,7 +41,6 @@ public class ReceiptVoucherController implements Initializable {
     @FXML private TextField discountAmountField;
     @FXML private Label amountInWordsLabel;
     @FXML private TextField descriptionField;
-    @FXML private ComboBox<String> projectNameField;
     @FXML private TextArea notesArea;
     @FXML private Label previousBalanceLabel;
     @FXML private Label currentBalanceLabel;
@@ -54,7 +53,6 @@ public class ReceiptVoucherController implements Initializable {
     @FXML private TableColumn<PreviousVoucherRow, String> pvNumberColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvDateColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvAmountColumn;
-    @FXML private TableColumn<PreviousVoucherRow, String> pvProjectColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvRemainingColumn;
     
     private final VoucherService voucherService = new VoucherService();
@@ -98,15 +96,6 @@ public class ReceiptVoucherController implements Initializable {
                 .filter(v -> v != null && currency.equals(v.getCurrency()))
                 .toList();
 
-        String selectedProject = null;
-        if (projectNameField != null) {
-            selectedProject = projectNameField.getValue();
-            if ((selectedProject == null || selectedProject.isBlank()) && projectNameField.getEditor() != null) {
-                selectedProject = projectNameField.getEditor().getText();
-            }
-        }
-        final String projectFilter = (selectedProject != null && !selectedProject.isBlank()) ? selectedProject.trim() : null;
-
         double running = currentBalance;
         int displayCount = 0;
         
@@ -114,16 +103,12 @@ public class ReceiptVoucherController implements Initializable {
             String dateText = v.getVoucherDate() != null ? v.getVoucherDate().toLocalDate().toString() : "-";
             String amountText = numberFormat.format(v.getNetAmount() != null ? v.getNetAmount() : 0.0) + (isUsd ? " $" : " د.ع");
             String remainingText = numberFormat.format(running) + (isUsd ? " $" : " د.ع");
-            String projectText = v.getProjectName() != null ? v.getProjectName() : "";
 
-            boolean matchesProject = (projectFilter == null) || projectText.trim().equals(projectFilter);
-
-            if (matchesProject && displayCount < 50) {
+            if (displayCount < 50) {
                 previousVoucherSource.add(new PreviousVoucherRow(
                         v.getVoucherNumber() != null ? v.getVoucherNumber() : "-",
                         dateText,
                         amountText,
-                        projectText,
                         remainingText
                 ));
                 displayCount++;
@@ -155,7 +140,6 @@ public class ReceiptVoucherController implements Initializable {
         pvNumberColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().voucherNumber));
         pvDateColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().dateText));
         pvAmountColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().amountText));
-        pvProjectColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().projectText));
         pvRemainingColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().remainingText));
 
         previousVoucherSource = FXCollections.observableArrayList();
@@ -189,7 +173,7 @@ public class ReceiptVoucherController implements Initializable {
     }
     
     private void loadCustomers() {
-        customers = FXCollections.observableArrayList(customerService.getAllCustomers());
+        customers = FXCollections.observableArrayList(customerService.getSaleCustomers());
         customerCombo.setItems(customers);
     }
     
@@ -198,23 +182,9 @@ public class ReceiptVoucherController implements Initializable {
         customerCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             selectedCustomer = newVal;
             updateCustomerBalanceDisplay();
-            updateProjectDropdown();
             updateDescription();
             loadPreviousVouchers();
         });
-
-        if (projectNameField != null) {
-            projectNameField.valueProperty().addListener((obs, o, n) -> {
-                updateDescription();
-                loadPreviousVouchers();
-            });
-            if (projectNameField.getEditor() != null) {
-                projectNameField.getEditor().textProperty().addListener((obs, o, n) -> {
-                    updateDescription();
-                    loadPreviousVouchers();
-                });
-            }
-        }
 
         
         // Amount change listener
@@ -281,44 +251,9 @@ public class ReceiptVoucherController implements Initializable {
     
     private void updateDescription() {
         if (selectedCustomer != null) {
-            String project = null;
-            if (projectNameField != null) {
-                project = projectNameField.getValue();
-                if ((project == null || project.isBlank()) && projectNameField.getEditor() != null) {
-                    project = projectNameField.getEditor().getText();
-                }
-            }
-            String projectPart = project != null && !project.trim().isEmpty() ? " / " + project.trim() : "";
-            descriptionField.setText("قبض من حساب .. " + selectedCustomer.getName() + projectPart);
+            descriptionField.setText("قبض من حساب .. " + selectedCustomer.getName());
         } else {
             descriptionField.setText("");
-        }
-    }
-
-    private void updateProjectDropdown() {
-        if (projectNameField == null) {
-            return;
-        }
-        projectNameField.getItems().clear();
-
-        if (selectedCustomer == null) {
-            projectNameField.setValue(null);
-            return;
-        }
-
-        String locationsText = selectedCustomer.getProjectLocation();
-        if (locationsText == null || locationsText.trim().isEmpty()) {
-            projectNameField.setValue(null);
-            return;
-        }
-
-        List<String> locations = locationsText.lines()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        projectNameField.setItems(FXCollections.observableArrayList(locations));
-        if (locations.size() == 1) {
-            projectNameField.setValue(locations.get(0));
         }
     }
     
@@ -439,14 +374,6 @@ public class ReceiptVoucherController implements Initializable {
             voucher.setNetAmount(amount - parseAmount(discountAmountField.getText()));
             voucher.setAmountInWords(amountInWordsLabel.getText());
             voucher.setDescription(descriptionField.getText());
-            String projectName = null;
-            if (projectNameField != null) {
-                projectName = projectNameField.getValue();
-                if ((projectName == null || projectName.isBlank()) && projectNameField.getEditor() != null) {
-                    projectName = projectNameField.getEditor().getText();
-                }
-            }
-            voucher.setProjectName(projectName);
             voucher.setNotes(notesArea != null ? notesArea.getText() : null);
             voucher.setCreatedBy(SessionManager.getInstance().getCurrentUser() != null ? 
                 SessionManager.getInstance().getCurrentUser().getDisplayName() : "System");
@@ -509,12 +436,6 @@ public class ReceiptVoucherController implements Initializable {
         discountPercentField.setText("0");
         discountAmountField.setText("0");
         descriptionField.setText("");
-        if (projectNameField != null) {
-            projectNameField.setValue(null);
-            if (projectNameField.getEditor() != null) {
-                projectNameField.getEditor().setText("");
-            }
-        }
         if (notesArea != null) {
             notesArea.setText("");
         }
@@ -589,18 +510,15 @@ public class ReceiptVoucherController implements Initializable {
         final String voucherNumber;
         final String dateText;
         final String amountText;
-        final String projectText;
         final String remainingText;
 
         private PreviousVoucherRow(String voucherNumber,
                                    String dateText,
                                    String amountText,
-                                   String projectText,
                                    String remainingText) {
             this.voucherNumber = voucherNumber;
             this.dateText = dateText;
             this.amountText = amountText;
-            this.projectText = projectText;
             this.remainingText = remainingText;
         }
     }

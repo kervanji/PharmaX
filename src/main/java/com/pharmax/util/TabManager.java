@@ -13,8 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -29,7 +32,24 @@ public class TabManager {
     private Tab dashboardTab;
     private MainApp mainApp;
     private final Map<String, Tab> openTabs = new HashMap<>();
+    private final Map<String, Object> openTabControllers = new HashMap<>();
     private Runnable dashboardRefreshCallback;
+    private static final List<String> REFRESH_METHOD_NAMES = List.of(
+            "refreshData",
+            "refreshView",
+            "loadData",
+            "loadProducts",
+            "loadCustomers",
+            "loadSuppliers",
+            "loadSales",
+            "loadReturns",
+            "loadVouchers",
+            "loadCategories",
+            "loadUsers",
+            "loadAlerts",
+            "loadLowStockProducts",
+            "loadPreviousVouchers",
+            "loadSaleOptions");
 
     private TabManager() {
     }
@@ -47,10 +67,12 @@ public class TabManager {
         this.mainApp = mainApp;
         // Ensure we don't keep stale tabs between sessions / layouts
         this.openTabs.clear();
+        this.openTabControllers.clear();
     }
 
     public void reset() {
         this.openTabs.clear();
+        this.openTabControllers.clear();
         this.tabPane = null;
         this.dashboardTab = null;
         this.mainApp = null;
@@ -125,6 +147,10 @@ public class TabManager {
             tabPane.getTabs().add(tab);
             tabPane.getSelectionModel().select(tab);
             openTabs.put(tabId, tab);
+            if (controller != null) {
+                openTabControllers.put(tabId, controller);
+                tab.getProperties().put("controller", controller);
+            }
 
             return controller;
 
@@ -198,6 +224,7 @@ public class TabManager {
         // عند إغلاق التبويب
         tab.setOnClosed(e -> {
             openTabs.remove(tabId);
+            openTabControllers.remove(tabId);
             refreshDashboard();
         });
 
@@ -212,6 +239,7 @@ public class TabManager {
         if (tab != null) {
             tabPane.getTabs().remove(tab);
             openTabs.remove(tabId);
+            openTabControllers.remove(tabId);
             refreshDashboard();
         }
     }
@@ -222,6 +250,7 @@ public class TabManager {
     public void closeAllTabs() {
         openTabs.values().forEach(tab -> tabPane.getTabs().remove(tab));
         openTabs.clear();
+        openTabControllers.clear();
         tabPane.getSelectionModel().select(dashboardTab);
         refreshDashboard();
     }
@@ -240,6 +269,42 @@ public class TabManager {
         if (dashboardRefreshCallback != null) {
             dashboardRefreshCallback.run();
         }
+    }
+
+    public void refreshAllOpenTabs() {
+        refreshDashboard();
+
+        List<Map.Entry<String, Object>> controllers = new ArrayList<>(openTabControllers.entrySet());
+        for (Map.Entry<String, Object> entry : controllers) {
+            refreshController(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void refreshController(String tabId, Object controller) {
+        if (controller == null) {
+            return;
+        }
+
+        for (String methodName : REFRESH_METHOD_NAMES) {
+            try {
+                Method method = controller.getClass().getDeclaredMethod(methodName);
+                if (method.getParameterCount() != 0) {
+                    continue;
+                }
+                method.setAccessible(true);
+                method.invoke(controller);
+                logger.debug("Refreshed tab {} using {}", tabId, methodName);
+                return;
+            } catch (NoSuchMethodException ignored) {
+                // Try next known refresh/load method.
+            } catch (Exception e) {
+                logger.warn("Failed to refresh tab {} using controller {}", tabId,
+                        controller.getClass().getSimpleName(), e);
+                return;
+            }
+        }
+
+        logger.debug("No refresh method found for tab {} ({})", tabId, controller.getClass().getSimpleName());
     }
 
     /**

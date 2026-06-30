@@ -78,15 +78,11 @@
                 <DatePicker fx:id="voucherDatePicker" prefWidth="180" GridPane.columnIndex="3" GridPane.rowIndex="1" GridPane.valignment="CENTER"/>
 
                 <!-- Row 0-1: customer -->
-                <Label text="الحساب/المورد" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.valignment="CENTER"/>
+                <Label text="المذخر" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.valignment="CENTER"/>
                 <HBox spacing="8" alignment="CENTER_LEFT" GridPane.columnIndex="1" GridPane.rowIndex="0" GridPane.valignment="CENTER" GridPane.hgrow="ALWAYS">
                     <Button text="+" onAction="#addNewCustomer" styleClass="button-danger"/>
-                    <ComboBox fx:id="customerCombo" prefWidth="240" maxWidth="Infinity" promptText="اختر الحساب/المورد" editable="true" HBox.hgrow="ALWAYS"/>
+                    <ComboBox fx:id="customerCombo" prefWidth="240" maxWidth="Infinity" promptText="اختر المذخر" editable="true" HBox.hgrow="ALWAYS"/>
                 </HBox>
-
-                <!-- Row 1 Left: project -->
-                <Label text="المشروع" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="1" GridPane.valignment="CENTER"/>
-                <ComboBox fx:id="projectNameField" promptText="اسم المشروع" prefWidth="240" maxWidth="Infinity" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.valignment="CENTER" />
 
                 <!-- Row 2: Amount and discount -->
                 <Label text="المبلغ" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.valignment="CENTER"/>
@@ -139,7 +135,6 @@
                         <TableColumn fx:id="pvNumberColumn" text="رقم" prefWidth="150" />
                         <TableColumn fx:id="pvDateColumn" text="التاريخ" prefWidth="180" />
                         <TableColumn fx:id="pvAmountColumn" text="المبلغ" prefWidth="180" />
-                        <TableColumn fx:id="pvProjectColumn" text="المشروع" prefWidth="200" />
                         <TableColumn fx:id="pvRemainingColumn" text="المتبقي بعده" prefWidth="180" />
                     </columns>
                 </TableView>

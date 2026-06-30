@@ -149,6 +149,28 @@ public class Repository<T> {
                 throw new RuntimeException("Failed to find customers by name", e);
             }
         }
+
+        public List<Customer> findSaleCustomers() {
+            return findByAccountTypes(List.of(Customer.TYPE_CUSTOMER, Customer.TYPE_BOTH));
+        }
+
+        public List<Customer> findSuppliers() {
+            return findByAccountTypes(List.of(Customer.TYPE_SUPPLIER, Customer.TYPE_BOTH));
+        }
+
+        private List<Customer> findByAccountTypes(List<String> accountTypes) {
+            try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+                Query<Customer> query = session.createQuery(
+                    "FROM Customer WHERE COALESCE(accountType, :defaultType) IN (:accountTypes) ORDER BY name ASC",
+                    Customer.class);
+                query.setParameter("defaultType", Customer.TYPE_CUSTOMER);
+                query.setParameterList("accountTypes", accountTypes);
+                return query.list();
+            } catch (Exception e) {
+                logger.error("Failed to find customers by account type", e);
+                throw new RuntimeException("Failed to find customers by account type", e);
+            }
+        }
     }
 
     public static class SaleItemRepository extends Repository<SaleItem> {
@@ -494,7 +516,6 @@ public class Repository<T> {
         }
 
         public List<Sale> findForAccountStatement(Long customerId,
-                                                  String projectLocation,
                                                   LocalDateTime from,
                                                   LocalDateTime to,
                                                   boolean includeItems) {
@@ -508,9 +529,6 @@ public class Repository<T> {
                 }
                 hql.append("WHERE s.customer.id = :customerId ");
 
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    hql.append("AND s.projectLocation = :projectLocation ");
-                }
                 if (from != null) {
                     hql.append("AND s.saleDate >= :from ");
                 }
@@ -521,9 +539,6 @@ public class Repository<T> {
 
                 Query<Sale> query = session.createQuery(hql.toString(), Sale.class);
                 query.setParameter("customerId", customerId);
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    query.setParameter("projectLocation", projectLocation);
-                }
                 if (from != null) {
                     query.setParameter("from", from);
                 }
@@ -832,18 +847,12 @@ public class Repository<T> {
             }
         }
 
-        public Double getTotalReturnsByCustomerAndProject(Long customerId, String projectLocation) {
+        public Double getTotalReturnsByCustomer(Long customerId) {
             try (Session session = DatabaseManager.getSessionFactory().openSession()) {
                 String hql = "SELECT COALESCE(SUM(r.totalReturnAmount), 0) FROM SaleReturn r " +
                              "WHERE r.customer.id = :customerId AND r.returnStatus = 'COMPLETED'";
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    hql += " AND r.sale.projectLocation = :projectLocation";
-                }
                 Query<Double> query = session.createQuery(hql, Double.class);
                 query.setParameter("customerId", customerId);
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    query.setParameter("projectLocation", projectLocation);
-                }
                 return query.uniqueResult();
             } catch (Exception e) {
                 logger.error("Failed to get total returns", e);
@@ -852,7 +861,6 @@ public class Repository<T> {
         }
 
         public List<SaleReturn> findForAccountStatement(Long customerId,
-                                                        String projectLocation,
                                                         LocalDateTime from,
                                                         LocalDateTime to) {
             try (Session session = DatabaseManager.getSessionFactory().openSession()) {
@@ -865,9 +873,6 @@ public class Repository<T> {
                 hql.append("WHERE r.customer.id = :customerId ");
                 hql.append("AND r.returnStatus = 'COMPLETED' ");
 
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    hql.append("AND r.sale.projectLocation = :projectLocation ");
-                }
                 if (from != null) {
                     hql.append("AND r.returnDate >= :from ");
                 }
@@ -878,9 +883,6 @@ public class Repository<T> {
 
                 Query<SaleReturn> query = session.createQuery(hql.toString(), SaleReturn.class);
                 query.setParameter("customerId", customerId);
-                if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-                    query.setParameter("projectLocation", projectLocation);
-                }
                 if (from != null) {
                     query.setParameter("from", from);
                 }

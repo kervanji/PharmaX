@@ -428,8 +428,8 @@ public class ReturnService {
         return returnRepository.findByCustomerId(customerId);
     }
 
-    public Double getTotalReturnsByCustomerAndProject(Long customerId, String projectLocation) {
-        return returnRepository.getTotalReturnsByCustomerAndProject(customerId, projectLocation);
+    public Double getTotalReturnsByCustomer(Long customerId) {
+        return returnRepository.getTotalReturnsByCustomer(customerId);
     }
 
     public SaleReturn getReturnById(Long id) {
@@ -598,9 +598,6 @@ public class ReturnService {
                         arabicBoldFont));
         if (customer != null && customer.getPhoneNumber() != null && !customer.getPhoneNumber().trim().isEmpty()) {
             rightInfo.addElement(new Phrase("الهاتف: " + customer.getPhoneNumber(), arabicFont));
-        }
-        if (sale != null && sale.getProjectLocation() != null && !sale.getProjectLocation().trim().isEmpty()) {
-            rightInfo.addElement(new Phrase("المشروع: " + sale.getProjectLocation(), arabicFont));
         }
         info.addCell(rightInfo);
 
@@ -847,9 +844,6 @@ public class ReturnService {
                         arabicBoldFont));
         if (customer != null && customer.getPhoneNumber() != null && !customer.getPhoneNumber().trim().isEmpty()) {
             rightInfo.addElement(new Phrase("الهاتف: " + customer.getPhoneNumber(), arabicFont));
-        }
-        if (sale.getProjectLocation() != null && !sale.getProjectLocation().trim().isEmpty()) {
-            rightInfo.addElement(new Phrase("المشروع: " + sale.getProjectLocation(), arabicFont));
         }
         info.addCell(rightInfo);
 

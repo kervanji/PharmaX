@@ -38,9 +38,6 @@ public class Voucher {
     @Column(name = "cash_account")
     private String cashAccount; // حساب الصندوق
 
-    @Column(name = "project_name")
-    private String projectName; // اسم المشروع (اختياري)
-    
     @Column(name = "amount", nullable = false)
     private Double amount;
     
@@ -144,9 +141,6 @@ public class Voucher {
     public String getCashAccount() { return cashAccount; }
     public void setCashAccount(String cashAccount) { this.cashAccount = cashAccount; }
 
-    public String getProjectName() { return projectName; }
-    public void setProjectName(String projectName) { this.projectName = projectName; }
-    
     public Double getAmount() { return amount; }
     public void setAmount(Double amount) { this.amount = amount; }
     

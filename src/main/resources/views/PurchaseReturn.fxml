@@ -19,14 +19,14 @@
     </HBox>
 
     <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
-        <Label text="المورد/الحساب:" style="-fx-font-weight: bold;"/>
+        <Label text="المذخر:" style="-fx-font-weight: bold;"/>
         <ComboBox fx:id="supplierComboBox" prefWidth="220" onAction="#handleSupplierChange"/>
 
         <Label text="فاتورة الشراء:" style="-fx-font-weight: bold;"/>
         <ComboBox fx:id="purchaseVoucherComboBox" prefWidth="220" onAction="#handleVoucherChange"/>
 
         <Region HBox.hgrow="ALWAYS"/>
-        <Label fx:id="statusLabel" text="اختر المورد/الحساب لبدء مرتجع الشراء" style="-fx-text-fill: -fx-form-sublabel; -fx-font-size: 12px;"/>
+        <Label fx:id="statusLabel" text="اختر المذخر لبدء مرتجع الشراء" style="-fx-text-fill: -fx-form-sublabel; -fx-font-size: 12px;"/>
     </HBox>
 
     <VBox spacing="10" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
@@ -52,7 +52,7 @@
     <HBox spacing="20" style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 8; -fx-padding: 15;">
         <VBox spacing="10" HBox.hgrow="ALWAYS">
             <Label text="سبب المرتجع:" style="-fx-font-weight: bold;"/>
-            <TextArea fx:id="reasonArea" prefRowCount="2" promptText="سبب المرتجع إلى المورد..."/>
+            <TextArea fx:id="reasonArea" prefRowCount="2" promptText="سبب المرتجع إلى المذخر..."/>
         </VBox>
 
         <VBox spacing="10" HBox.hgrow="ALWAYS">

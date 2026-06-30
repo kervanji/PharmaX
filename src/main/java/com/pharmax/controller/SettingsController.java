@@ -830,13 +830,12 @@ public class SettingsController {
         exportToCSV("customers", () -> {
             List<Customer> customers = customerService.getAllCustomers();
             StringBuilder sb = new StringBuilder();
-            sb.append("الكود,الاسم,الهاتف,العنوان,موقع المشروع,الرصيد\n");
+            sb.append("الكود,الاسم,الهاتف,العنوان,الرصيد\n");
             for (Customer c : customers) {
                 sb.append(escape(c.getCustomerCode())).append(",");
                 sb.append(escape(c.getName())).append(",");
                 sb.append(escape(c.getPhoneNumber())).append(",");
                 sb.append(escape(c.getAddress())).append(",");
-                sb.append(escape(c.getProjectLocation())).append(",");
                 sb.append(c.getCurrentBalance() != null ? c.getCurrentBalance() : 0).append("\n");
             }
             return sb.toString();

@@ -30,7 +30,17 @@
             </padding>
 
             <!-- Top Controls Section -->
-            <HBox spacing="20">
+            <VBox spacing="12">
+                <!-- Customer Selection -->
+                <VBox fx:id="customerSelectionBox" spacing="8" visible="false" managed="false" nodeOrientation="RIGHT_TO_LEFT"
+                      style="-fx-background-color: rgba(59, 130, 246, 0.08); -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10;">
+                    <Label text="اختر العميل: (البحث بالاسم أو الكود أو رقم الهاتف)" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                    <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                        <ComboBox fx:id="customerComboBox" promptText="ابحث عن العميل..." minWidth="320" maxWidth="Infinity" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT"/>
+                        <Button text="+ عميل جديد" onAction="#handleNewCustomer" minWidth="120" style="-fx-background-color: -fx-success; -fx-text-fill: white;"/>
+                    </HBox>
+                </VBox>
+
                 <!-- Product Selection -->
                 <VBox spacing="8" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT">
                     <Label text="إضافة منتج: (ابحث بالاسم أو الكود أو الباركود)" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
@@ -71,27 +81,17 @@
                     </VBox>
                 </VBox>
 
-                <!-- Customer Selection -->
-                <VBox spacing="8" HBox.hgrow="ALWAYS" visible="false" managed="false" nodeOrientation="RIGHT_TO_LEFT">
-                    <Label text="اختر العميل: (ابحث بالاسم أو الكود أو رقم الهاتف)" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
-                    <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
-                        <ComboBox fx:id="customerComboBox" promptText="ابحث عن العميل..." maxWidth="Infinity" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT"/>
-                        <Button text="+ عميل جديد" onAction="#handleNewCustomer" style="-fx-background-color: -fx-success; -fx-text-fill: white;"/>
-                    </HBox>
-                    <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
-                        <Label text="موقع المشروع:" textAlignment="RIGHT" style="-fx-font-size: 13px; -fx-font-weight: bold;"/>
-                        <ComboBox fx:id="projectLocationComboBox" promptText="اختر موقع المشروع..." maxWidth="Infinity" HBox.hgrow="ALWAYS" nodeOrientation="RIGHT_TO_LEFT"/>
-                        <TextField fx:id="newProjectLocationField" promptText="أو أضف موقع جديد..." prefWidth="150" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT"/>
-                        <Button fx:id="addProjectLocationBtn" text="+ إضافة موقع" onAction="#handleAddProjectLocation" style="-fx-background-color: #9b59b6; -fx-text-fill: white;"/>
-                    </HBox>
-                </VBox>
-            </HBox>
+            </VBox>
 
             <Separator/>
 
             <!-- Items Table -->
             <VBox spacing="8" VBox.vgrow="ALWAYS">
-                <Label text="المنتجات المضافة:" textAlignment="RIGHT" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <HBox alignment="CENTER_RIGHT" spacing="12" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="المنتجات المضافة:" textAlignment="RIGHT" HBox.hgrow="ALWAYS" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                    <Label fx:id="selectedItemsTotalLabel" text="المحدد: 0 د.ع" textAlignment="RIGHT"
+                           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;"/>
+                </HBox>
                 <TableView fx:id="itemsTable" VBox.vgrow="ALWAYS" minHeight="0" editable="true" nodeOrientation="RIGHT_TO_LEFT">
                     <columns>
                         <TableColumn fx:id="productNameColumn" text="المنتج" prefWidth="180"/>
@@ -209,7 +209,7 @@
             <Separator visible="false" managed="false"/>
 
             <!-- Notes -->
-            <TitledPane text="اكتب ملاحظة" expanded="false" collapsible="true" visible="false" managed="false" nodeOrientation="RIGHT_TO_LEFT">
+            <TitledPane text="ملاحظة البيع (اختياري)" expanded="false" collapsible="true" nodeOrientation="RIGHT_TO_LEFT">
                 <content>
                     <TextArea fx:id="notesArea" promptText="أدخل أي ملاحظات..." prefRowCount="3" nodeOrientation="RIGHT_TO_LEFT"/>
                 </content>

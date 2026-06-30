@@ -131,7 +131,7 @@ public class PurchaseReturnController {
     }
 
     private void loadSuppliers() {
-        supplierComboBox.setItems(FXCollections.observableArrayList(customerService.getAllCustomers()));
+        supplierComboBox.setItems(FXCollections.observableArrayList(customerService.getSuppliers()));
     }
 
     @FXML
@@ -141,13 +141,13 @@ public class PurchaseReturnController {
         Customer supplier = supplierComboBox.getValue();
         if (supplier == null) {
             purchaseVoucherComboBox.setItems(FXCollections.emptyObservableList());
-            statusLabel.setText("اختر المورد/الحساب لعرض فواتير المشتريات");
+            statusLabel.setText("اختر المذخر لعرض فواتير المشتريات");
             return;
         }
         List<Voucher> vouchers = purchaseReturnService.getPurchaseVouchersBySupplier(supplier.getId());
         purchaseVoucherComboBox.setItems(FXCollections.observableArrayList(vouchers));
         purchaseVoucherComboBox.setValue(null);
-        statusLabel.setText(vouchers.isEmpty() ? "لا توجد فواتير مشتريات لهذا المورد" : "اختر فاتورة مشتريات");
+        statusLabel.setText(vouchers.isEmpty() ? "لا توجد فواتير مشتريات لهذا المذخر" : "اختر فاتورة مشتريات");
     }
 
     @FXML
@@ -176,7 +176,7 @@ public class PurchaseReturnController {
             ReturnablePurchaseRow row = purchaseItemsTable.getSelectionModel().getSelectedItem();
 
             if (supplier == null) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المورد/الحساب");
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المذخر");
                 return;
             }
             if (voucher == null) {

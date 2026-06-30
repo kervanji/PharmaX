@@ -180,22 +180,14 @@ public class PharmacyReportService {
 
     public List<Customer> getPurchaseSuppliers() {
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
-            Query<Voucher> query = session.createQuery(
-                    "FROM Voucher v " +
-                            "LEFT JOIN FETCH v.customer c " +
-                            "WHERE v.voucherType = :voucherType " +
-                            "AND v.customer IS NOT NULL " +
-                            "ORDER BY v.customer.name ASC",
-                    Voucher.class);
-            query.setParameter("voucherType", VoucherType.PURCHASE);
-            Map<Long, Customer> unique = new LinkedHashMap<>();
-            for (Voucher voucher : query.list()) {
-                Customer customer = voucher.getCustomer();
-                if (customer != null) {
-                    unique.putIfAbsent(customer.getId(), customer);
-                }
-            }
-            return new ArrayList<>(unique.values());
+            Query<Customer> query = session.createQuery(
+                    "FROM Customer c " +
+                            "WHERE COALESCE(c.accountType, :defaultType) IN (:supplierTypes) " +
+                            "ORDER BY c.name ASC",
+                    Customer.class);
+            query.setParameter("defaultType", Customer.TYPE_CUSTOMER);
+            query.setParameterList("supplierTypes", List.of(Customer.TYPE_SUPPLIER, Customer.TYPE_BOTH));
+            return query.list();
         }
     }
 

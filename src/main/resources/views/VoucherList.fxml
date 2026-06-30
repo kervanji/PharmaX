@@ -17,8 +17,6 @@
         <!-- Search & Filter -->
         <ComboBox fx:id="customerFilterCombo" promptText="اختر العميل" editable="true" prefWidth="220"
                   style="-fx-padding: 6; -fx-background-radius: 8;"/>
-        <ComboBox fx:id="projectFilterCombo" promptText="المشروع" editable="true" prefWidth="160"
-                  style="-fx-padding: 6; -fx-background-radius: 8;"/>
         <DatePicker fx:id="fromDatePicker" promptText="من تاريخ" prefWidth="140"/>
         <DatePicker fx:id="toDatePicker" promptText="إلى تاريخ" prefWidth="140"/>
         <Button text="بحث" onAction="#handleSearch"

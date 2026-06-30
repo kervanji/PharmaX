@@ -70,24 +70,21 @@ public class ReceiptService {
     }
 
     public File generateAccountStatementPdf(Customer customer,
-            String projectLocation,
             LocalDate from,
             LocalDate to,
             boolean includeItems) {
-        return generateAccountStatementPdf(customer, projectLocation, from, to, includeItems, null);
+        return generateAccountStatementPdf(customer, from, to, includeItems, null);
     }
 
     public File generateAccountStatementPdf(Customer customer,
-            String projectLocation,
             LocalDate from,
             LocalDate to,
             boolean includeItems,
             String currency) {
-        return generateAccountStatementPdf(customer, projectLocation, from, to, includeItems, currency, null);
+        return generateAccountStatementPdf(customer, from, to, includeItems, currency, null);
     }
 
     public File generateAccountStatementPdf(Customer customer,
-            String projectLocation,
             LocalDate from,
             LocalDate to,
             boolean includeItems,
@@ -103,9 +100,8 @@ public class ReceiptService {
         List<SaleReturn> returns;
         List<Voucher> vouchers;
         try {
-            sales = saleRepository.findForAccountStatement(customer.getId(), projectLocation, fromDt, toDt,
-                    includeItems);
-            returns = returnRepository.findForAccountStatement(customer.getId(), projectLocation, fromDt, toDt);
+            sales = saleRepository.findForAccountStatement(customer.getId(), fromDt, toDt, includeItems);
+            returns = returnRepository.findForAccountStatement(customer.getId(), fromDt, toDt);
             VoucherService voucherService = new VoucherService();
             vouchers = voucherService.getVouchersByCustomer(customer.getId());
             if (currency != null && !currency.isEmpty() && !"الكل".equals(currency)) {
@@ -129,8 +125,8 @@ public class ReceiptService {
         }
 
         try {
-            byte[] pdfData = generateAccountStatementPDF(customer, projectLocation, from, to, sales, returns, vouchers,
-                    includeItems, currency);
+            byte[] pdfData = generateAccountStatementPDF(customer, from, to, sales, returns, vouchers, includeItems,
+                    currency);
 
             File out = outputFile;
             if (out == null) {
@@ -168,14 +164,13 @@ public class ReceiptService {
             String currency,
             LocalDate from,
             LocalDate to,
-            File outputFile,
-            String projectLocation) {
+            File outputFile) {
         if (customer == null || customer.getId() == null) {
             throw new IllegalArgumentException("العميل غير موجود");
         }
 
         try {
-            byte[] pdfData = generateDetailedStatementPDFBytes(customer, items, currency, from, to, projectLocation);
+            byte[] pdfData = generateDetailedStatementPDFBytes(customer, items, currency, from, to);
 
             File out = outputFile;
             if (out == null) {
@@ -211,8 +206,7 @@ public class ReceiptService {
             List<StatementItem> items,
             String currency,
             LocalDate from,
-            LocalDate to,
-            String projectLocation) throws DocumentException, IOException {
+            LocalDate to) throws DocumentException, IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         final float bannerTargetHeight = 120f;
@@ -278,11 +272,6 @@ public class ReceiptService {
         }
         if (customer.getAddress() != null && !customer.getAddress().trim().isEmpty()) {
             leftCell.addElement(new Phrase("العنوان: " + customer.getAddress(), arabicFont));
-        }
-        if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-            leftCell.addElement(new Phrase("المشروع: " + projectLocation, arabicFont));
-        } else {
-            leftCell.addElement(new Phrase("المشروع: كل المشاريع", arabicFont));
         }
         info.addCell(leftCell);
 
@@ -771,9 +760,6 @@ public class ReceiptService {
         }
         if (customerAddress != null && !customerAddress.trim().isEmpty()) {
             customerCell.addElement(new Phrase("العنوان: " + customerAddress, arabicFont));
-        }
-        if (sale.getProjectLocation() != null && !sale.getProjectLocation().trim().isEmpty()) {
-            customerCell.addElement(new Phrase("موقع المشروع: " + sale.getProjectLocation(), arabicFont));
         }
         infoTable.addCell(customerCell);
 
@@ -1382,7 +1368,6 @@ public class ReceiptService {
     }
 
     private byte[] generateAccountStatementPDF(Customer customer,
-            String projectLocation,
             LocalDate from,
             LocalDate to,
             List<Sale> sales,
@@ -1443,9 +1428,6 @@ public class ReceiptService {
                 new Phrase("اسم العميل: " + (customer.getName() != null ? customer.getName() : "-"), arabicFont));
         if (customer.getPhoneNumber() != null && !customer.getPhoneNumber().trim().isEmpty()) {
             left.addElement(new Phrase("الهاتف: " + customer.getPhoneNumber(), arabicFont));
-        }
-        if (projectLocation != null && !projectLocation.trim().isEmpty()) {
-            left.addElement(new Phrase("المشروع: " + projectLocation, arabicFont));
         }
         info.addCell(left);
 
@@ -1569,7 +1551,7 @@ public class ReceiptService {
         String s3Text = (currency == null || currency.isEmpty() || "الكل".equals(currency))
                 ? formatDualCurrencyStr(totalRemainingIqd, totalRemainingUsd)
                 : formatCurrency(totalRemaining, currency);
-        PdfPCell s3 = new PdfPCell(new Phrase("المطلوب للدفع لهذا المشروع\n" + s3Text, arabicBoldFont));
+        PdfPCell s3 = new PdfPCell(new Phrase("المطلوب للدفع\n" + s3Text, arabicBoldFont));
         s3.setHorizontalAlignment(Element.ALIGN_CENTER);
         s3.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
         s3.setPadding(8f);
@@ -1578,17 +1560,16 @@ public class ReceiptService {
         document.add(summary);
 
         // ===== Sales Table =====
-        PdfPTable salesTable = new PdfPTable(6);
+        PdfPTable salesTable = new PdfPTable(5);
         salesTable.setWidthPercentage(100);
         salesTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
         salesTable.setSpacingBefore(5f);
         salesTable.setSpacingAfter(10f);
-        salesTable.setWidths(new float[] { 1f, 1f, 1.2f, 1f, 1f, 0.2f });
+        salesTable.setWidths(new float[] { 0.4f, 1.1f, 1.2f, 1f, 1.2f });
 
         addTableHeader(salesTable, "ت", arabicBoldFont);
         addTableHeader(salesTable, "رقم الفاتورة", arabicBoldFont);
         addTableHeader(salesTable, "التاريخ", arabicBoldFont);
-        addTableHeader(salesTable, "المشروع", arabicBoldFont);
         addTableHeader(salesTable, "الإجمالي", arabicBoldFont);
         addTableHeader(salesTable, "المدفوع/الدين", arabicBoldFont);
 
@@ -1601,7 +1582,6 @@ public class ReceiptService {
             String date = s.getSaleDate() != null
                     ? s.getSaleDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                     : "-";
-            String proj = s.getProjectLocation() != null ? s.getProjectLocation() : "-";
             double fin = s.getFinalAmount() != null ? s.getFinalAmount() : 0.0;
             double paid = s.getPaidAmount() != null ? s.getPaidAmount() : 0.0;
             double returnsForSale = returnsBySaleId.getOrDefault(s.getId(), 0.0);
@@ -1616,7 +1596,6 @@ public class ReceiptService {
             salesTable.addCell(createBodyCell(String.valueOf(row), arabicFont, Element.ALIGN_CENTER));
             salesTable.addCell(createBodyCell(code, arabicFont, Element.ALIGN_CENTER));
             salesTable.addCell(createBodyCell(date, arabicFont, Element.ALIGN_CENTER));
-            salesTable.addCell(createBodyCell(proj, arabicFont, Element.ALIGN_CENTER));
             salesTable.addCell(createBodyCell(formatCurrency(fin, rowCurrency), arabicFont, Element.ALIGN_CENTER));
             salesTable.addCell(createBodyCell(paidDebtDisplay, arabicFont, Element.ALIGN_CENTER));
 
@@ -1678,7 +1657,7 @@ public class ReceiptService {
                 }
 
                 PdfPCell detailCell = new PdfPCell(new Phrase(detailText.toString().trim(), detailFont));
-                detailCell.setColspan(6);
+                detailCell.setColspan(5);
                 detailCell.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
                 detailCell.setPadding(6f);
                 detailCell.setBackgroundColor(detailBg);
@@ -1707,17 +1686,16 @@ public class ReceiptService {
             returnsHeader.addCell(returnsTitleCell);
             document.add(returnsHeader);
 
-            PdfPTable returnsTable = new PdfPTable(6);
+            PdfPTable returnsTable = new PdfPTable(5);
             returnsTable.setWidthPercentage(100);
             returnsTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
             returnsTable.setSpacingBefore(5f);
             returnsTable.setSpacingAfter(10f);
-            returnsTable.setWidths(new float[] { 1f, 1f, 1.2f, 1f, 1f, 0.2f });
+            returnsTable.setWidths(new float[] { 0.4f, 1.1f, 1.2f, 1f, 1.2f });
 
             addTableHeader(returnsTable, "ت", arabicBoldFont);
             addTableHeader(returnsTable, "رقم الفاتورة", arabicBoldFont);
             addTableHeader(returnsTable, "التاريخ", arabicBoldFont);
-            addTableHeader(returnsTable, "المشروع", arabicBoldFont);
             addTableHeader(returnsTable, "الإجمالي", arabicBoldFont);
             addTableHeader(returnsTable, "السبب", arabicBoldFont);
 
@@ -1728,9 +1706,6 @@ public class ReceiptService {
                 String retDate = r.getReturnDate() != null
                         ? r.getReturnDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                         : "-";
-                String projectName = r.getSale() != null && r.getSale().getProjectLocation() != null
-                        ? r.getSale().getProjectLocation()
-                        : "-";
                 double retAmount = r.getTotalReturnAmount() != null ? r.getTotalReturnAmount() : 0.0;
                 String returnCurrency = (currency == null || currency.isEmpty() || "الكل".equals(currency))
                         ? ("دولار".equals(r.getSale() != null ? r.getSale().getCurrency() : null) ? "دولار" : "دينار")
@@ -1740,7 +1715,6 @@ public class ReceiptService {
                 returnsTable.addCell(createBodyCell(String.valueOf(retRow), arabicFont, Element.ALIGN_CENTER));
                 returnsTable.addCell(createBodyCell(saleCode, arabicFont, Element.ALIGN_CENTER));
                 returnsTable.addCell(createBodyCell(retDate, arabicFont, Element.ALIGN_CENTER));
-                returnsTable.addCell(createBodyCell(projectName, arabicFont, Element.ALIGN_CENTER));
                 returnsTable.addCell(
                         createBodyCell(formatCurrency(retAmount, returnCurrency), arabicFont, Element.ALIGN_CENTER));
                 returnsTable.addCell(createBodyCell(reason, arabicFont, Element.ALIGN_CENTER));
@@ -1768,17 +1742,16 @@ public class ReceiptService {
             receiptsHeader.addCell(receiptsTitleCell);
             document.add(receiptsHeader);
 
-            PdfPTable receiptsTable = new PdfPTable(6);
+            PdfPTable receiptsTable = new PdfPTable(5);
             receiptsTable.setWidthPercentage(100);
             receiptsTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
             receiptsTable.setSpacingBefore(5f);
             receiptsTable.setSpacingAfter(10f);
-            receiptsTable.setWidths(new float[] { 1f, 1f, 1.2f, 1f, 1f, 0.2f });
+            receiptsTable.setWidths(new float[] { 0.4f, 1.1f, 1.2f, 1f, 1.2f });
 
             addTableHeader(receiptsTable, "ت", arabicBoldFont);
             addTableHeader(receiptsTable, "رقم السند", arabicBoldFont);
             addTableHeader(receiptsTable, "التاريخ", arabicBoldFont);
-            addTableHeader(receiptsTable, "المشروع", arabicBoldFont);
             addTableHeader(receiptsTable, "المبلغ", arabicBoldFont);
             addTableHeader(receiptsTable, "البيان", arabicBoldFont);
 
@@ -1788,7 +1761,6 @@ public class ReceiptService {
                 String vDate = v.getVoucherDate() != null
                         ? v.getVoucherDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                         : "-";
-                String vProject = v.getProjectName() != null ? v.getProjectName() : "-";
                 double vAmount = v.getAmount() != null ? v.getAmount() : 0.0;
                 String vCurrency = (currency == null || currency.isEmpty() || "الكل".equals(currency))
                         ? ("دولار".equals(v.getCurrency()) ? "دولار" : "دينار")
@@ -1798,7 +1770,6 @@ public class ReceiptService {
                 receiptsTable.addCell(createBodyCell(String.valueOf(rcptRow), arabicFont, Element.ALIGN_CENTER));
                 receiptsTable.addCell(createBodyCell(vNumber, arabicFont, Element.ALIGN_CENTER));
                 receiptsTable.addCell(createBodyCell(vDate, arabicFont, Element.ALIGN_CENTER));
-                receiptsTable.addCell(createBodyCell(vProject, arabicFont, Element.ALIGN_CENTER));
                 receiptsTable
                         .addCell(createBodyCell(formatCurrency(vAmount, vCurrency), arabicFont, Element.ALIGN_CENTER));
                 receiptsTable.addCell(createBodyCell(vDesc, arabicFont, Element.ALIGN_CENTER));
@@ -1826,17 +1797,16 @@ public class ReceiptService {
             paymentsHeader.addCell(paymentsTitleCell);
             document.add(paymentsHeader);
 
-            PdfPTable paymentsTable = new PdfPTable(6);
+            PdfPTable paymentsTable = new PdfPTable(5);
             paymentsTable.setWidthPercentage(100);
             paymentsTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
             paymentsTable.setSpacingBefore(5f);
             paymentsTable.setSpacingAfter(10f);
-            paymentsTable.setWidths(new float[] { 1f, 1f, 1.2f, 1f, 1f, 0.2f });
+            paymentsTable.setWidths(new float[] { 0.4f, 1.1f, 1.2f, 1f, 1.2f });
 
             addTableHeader(paymentsTable, "ت", arabicBoldFont);
             addTableHeader(paymentsTable, "رقم السند", arabicBoldFont);
             addTableHeader(paymentsTable, "التاريخ", arabicBoldFont);
-            addTableHeader(paymentsTable, "المشروع", arabicBoldFont);
             addTableHeader(paymentsTable, "المبلغ", arabicBoldFont);
             addTableHeader(paymentsTable, "البيان", arabicBoldFont);
 
@@ -1846,7 +1816,6 @@ public class ReceiptService {
                 String vDate = v.getVoucherDate() != null
                         ? v.getVoucherDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                         : "-";
-                String vProject = v.getProjectName() != null ? v.getProjectName() : "-";
                 double vAmount = v.getAmount() != null ? v.getAmount() : 0.0;
                 String vCurrency = (currency == null || currency.isEmpty() || "الكل".equals(currency))
                         ? ("دولار".equals(v.getCurrency()) ? "دولار" : "دينار")
@@ -1856,7 +1825,6 @@ public class ReceiptService {
                 paymentsTable.addCell(createBodyCell(String.valueOf(payRow), arabicFont, Element.ALIGN_CENTER));
                 paymentsTable.addCell(createBodyCell(vNumber, arabicFont, Element.ALIGN_CENTER));
                 paymentsTable.addCell(createBodyCell(vDate, arabicFont, Element.ALIGN_CENTER));
-                paymentsTable.addCell(createBodyCell(vProject, arabicFont, Element.ALIGN_CENTER));
                 paymentsTable
                         .addCell(createBodyCell(formatCurrency(vAmount, vCurrency), arabicFont, Element.ALIGN_CENTER));
                 paymentsTable.addCell(createBodyCell(vDesc, arabicFont, Element.ALIGN_CENTER));

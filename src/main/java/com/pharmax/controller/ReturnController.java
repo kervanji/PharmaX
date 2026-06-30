@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public class ReturnController {
@@ -34,8 +35,6 @@ public class ReturnController {
     private ComboBox<String> saleComboBox;
     @FXML
     private ComboBox<String> currencyComboBox;
-    @FXML
-    private ComboBox<String> projectComboBox;
     @FXML
     private TableView<ReturnableItem> saleItemsTable;
     @FXML
@@ -69,7 +68,9 @@ public class ReturnController {
     private boolean tabMode = false;
     private ObservableList<ReturnableItem> returnableItems = FXCollections.observableArrayList();
     private ObservableList<Sale> customerSalesList = FXCollections.observableArrayList();
+    private ObservableList<String> saleInvoiceList = FXCollections.observableArrayList("الكل");
     private Map<Long, Double> previousReturns = new HashMap<>();
+    private boolean updatingFilters = false;
 
     public void setDialogStage(Stage dialogStage) {
         this.dialogStage = dialogStage;
@@ -88,7 +89,7 @@ public class ReturnController {
     }
 
     private void setupCustomerComboBox() {
-        customerComboBox.setItems(FXCollections.observableArrayList(customerService.getAllCustomers()));
+        customerComboBox.setItems(FXCollections.observableArrayList(customerService.getSaleCustomers()));
         customerComboBox.setCellFactory(lv -> new ListCell<>() {
             @Override
             protected void updateItem(Customer item, boolean empty) {
@@ -108,9 +109,7 @@ public class ReturnController {
     private void setupFilters() {
         currencyComboBox.setItems(FXCollections.observableArrayList("الكل", "دينار", "دولار"));
         currencyComboBox.setValue("الكل");
-        projectComboBox.setItems(FXCollections.observableArrayList("الكل"));
-        projectComboBox.setValue("الكل");
-        saleComboBox.setItems(FXCollections.observableArrayList("الكل"));
+        saleComboBox.setItems(saleInvoiceList);
         saleComboBox.setValue("الكل");
     }
 
@@ -188,17 +187,17 @@ public class ReturnController {
             List<Sale> customerSales = salesService.getSalesByCustomerId(selected.getId());
             customerSalesList.setAll(customerSales);
 
-            List<String> projects = customerSalesList.stream()
-                    .map(Sale::getProjectLocation)
-                    .filter(p -> p != null && !p.isBlank())
-                    .distinct()
-                    .collect(Collectors.toList());
-            projects.add(0, "الكل");
-            projectComboBox.setItems(FXCollections.observableArrayList(projects));
-            projectComboBox.setValue("الكل");
-
-            currencyComboBox.setValue("الكل");
-            saleComboBox.setValue("الكل");
+            updatingFilters = true;
+            try {
+                if (!Objects.equals(currencyComboBox.getValue(), "الكل")) {
+                    currencyComboBox.setValue("الكل");
+                }
+                if (!Objects.equals(saleComboBox.getValue(), "الكل")) {
+                    saleComboBox.setValue("الكل");
+                }
+            } finally {
+                updatingFilters = false;
+            }
 
             handleFilterChange();
         }
@@ -206,41 +205,46 @@ public class ReturnController {
 
     @FXML
     private void handleFilterChange() {
-        if (customerComboBox.getValue() == null)
+        if (updatingFilters || customerComboBox.getValue() == null) {
             return;
-
-        String selectedCurrency = currencyComboBox.getValue();
-        String selectedProject = projectComboBox.getValue();
-
-        List<Sale> filteredSales = customerSalesList.stream()
-                .filter(sale -> "الكل".equals(selectedCurrency) || selectedCurrency == null
-                        || selectedCurrency.equals(sale.getCurrency() != null ? sale.getCurrency() : "دينار"))
-                .filter(sale -> "الكل".equals(selectedProject) || selectedProject == null
-                        || selectedProject.equals(sale.getProjectLocation()))
-                .collect(Collectors.toList());
-
-        List<String> invoices = filteredSales.stream()
-                .map(Sale::getSaleCode)
-                .distinct()
-                .collect(Collectors.toList());
-        invoices.add(0, "الكل");
-
-        String currentInvoice = saleComboBox.getValue();
-        saleComboBox.setItems(FXCollections.observableArrayList(invoices));
-        if (currentInvoice != null && invoices.contains(currentInvoice)) {
-            saleComboBox.setValue(currentInvoice);
-        } else {
-            saleComboBox.setValue("الكل");
         }
 
-        String finalInvoice = saleComboBox.getValue();
-        if (!"الكل".equals(finalInvoice) && finalInvoice != null) {
-            filteredSales = filteredSales.stream()
-                    .filter(s -> finalInvoice.equals(s.getSaleCode()))
+        updatingFilters = true;
+        try {
+            String selectedCurrency = currencyComboBox.getValue();
+
+            List<Sale> filteredSales = customerSalesList.stream()
+                    .filter(sale -> "الكل".equals(selectedCurrency) || selectedCurrency == null
+                            || selectedCurrency.equals(sale.getCurrency() != null ? sale.getCurrency() : "دينار"))
                     .collect(Collectors.toList());
-        }
 
-        loadSaleItemsForSales(filteredSales);
+            List<String> invoices = filteredSales.stream()
+                    .map(Sale::getSaleCode)
+                    .distinct()
+                    .collect(Collectors.toList());
+            invoices.add(0, "الكل");
+
+            String currentInvoice = saleComboBox.getValue();
+            saleInvoiceList.setAll(invoices);
+
+            String targetInvoice = currentInvoice != null && invoices.contains(currentInvoice)
+                    ? currentInvoice
+                    : "الكل";
+            if (!Objects.equals(saleComboBox.getValue(), targetInvoice)) {
+                saleComboBox.setValue(targetInvoice);
+            }
+
+            String finalInvoice = saleComboBox.getValue();
+            if (!"الكل".equals(finalInvoice) && finalInvoice != null) {
+                filteredSales = filteredSales.stream()
+                        .filter(s -> finalInvoice.equals(s.getSaleCode()))
+                        .collect(Collectors.toList());
+            }
+
+            loadSaleItemsForSales(filteredSales);
+        } finally {
+            updatingFilters = false;
+        }
     }
 
     private void loadSaleItemsForSales(List<Sale> sales) {

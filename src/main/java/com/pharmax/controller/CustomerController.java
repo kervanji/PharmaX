@@ -12,6 +12,10 @@ public class CustomerController {
     private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
     
     @FXML private Label formTitleLabel;
+    @FXML private Label customerCodeLabel;
+    @FXML private Label customerNameLabel;
+    @FXML private Label phoneNumberLabel;
+    @FXML private Label addressLabel;
     @FXML private TextField customerCodeField;
     @FXML private TextField customerNameField;
     @FXML private TextField phoneNumberField;
@@ -23,6 +27,7 @@ public class CustomerController {
     private Customer editingCustomer = null;
     private boolean saved = false;
     private boolean tabMode = false;
+    private String accountType = Customer.TYPE_CUSTOMER;
     
     @FXML
     private void initialize() {
@@ -39,6 +44,7 @@ public class CustomerController {
         } catch (Exception e) {
             logger.warn("Failed to preview next customer code", e);
         }
+        applyAccountTypeLabels();
     }
 
     public void setDialogStage(Stage stage) {
@@ -48,11 +54,24 @@ public class CustomerController {
     public void setTabMode(boolean tabMode) {
         this.tabMode = tabMode;
     }
+
+    public void setSupplierMode() {
+        setAccountType(Customer.TYPE_SUPPLIER);
+    }
+
+    public void setAccountType(String accountType) {
+        this.accountType = Customer.TYPE_SUPPLIER.equals(accountType)
+                ? Customer.TYPE_SUPPLIER
+                : Customer.TYPE_CUSTOMER;
+        applyAccountTypeLabels();
+    }
     
     public void setCustomer(Customer customer) {
         this.editingCustomer = customer;
         if (customer != null) {
-            formTitleLabel.setText("تعديل بيانات العميل");
+            this.accountType = customer.getAccountType();
+            applyAccountTypeLabels();
+            formTitleLabel.setText(isSupplierMode() ? "تعديل بيانات المذخر" : "تعديل بيانات العميل");
             saveButton.setText("تحديث");
             
             customerCodeField.setText(customer.getCustomerCode());
@@ -72,18 +91,18 @@ public class CustomerController {
         String phone = phoneNumberField.getText().trim();
         
         if (name.isEmpty()) {
-            showError("خطأ", "اسم العميل مطلوب");
+            showError("خطأ", isSupplierMode() ? "اسم المذخر مطلوب" : "اسم العميل مطلوب");
             customerNameField.requestFocus();
             return;
         }
 
-        if (phone.isEmpty()) {
+        if (!isSupplierMode() && phone.isEmpty()) {
             showError("خطأ", "رقم الهاتف مطلوب");
             phoneNumberField.requestFocus();
             return;
         }
 
-        if (!phone.matches("^07\\d{9}$")) {
+        if (!phone.isEmpty() && !phone.matches("^07\\d{9}$")) {
             showError("خطأ", "رقم الهاتف غير صالح (يجب أن يبدأ بـ 07 ويكون 11 رقم)");
             phoneNumberField.requestFocus();
             return;
@@ -93,8 +112,9 @@ public class CustomerController {
             Customer customer = editingCustomer != null ? editingCustomer : new Customer();
             
             customer.setName(name);
-            customer.setPhoneNumber(phone);
+            customer.setPhoneNumber(phone.isEmpty() ? null : phone);
             customer.setAddress(addressField.getText().trim().isEmpty() ? null : addressField.getText().trim());
+            customer.setAccountType(accountType);
 
             // Ensure customer code is set for new customers
             if (editingCustomer == null) {
@@ -103,11 +123,16 @@ public class CustomerController {
             
             if (editingCustomer != null) {
                 customerService.updateCustomer(customer);
-                showInfo("تم", "تم تحديث بيانات العميل بنجاح");
+                showInfo("تم", isSupplierMode() ? "تم تحديث بيانات المذخر بنجاح" : "تم تحديث بيانات العميل بنجاح");
                 logger.info("Customer updated: {}", customer.getCustomerCode());
             } else {
-                customerService.createCustomer(customer);
-                showInfo("تم", "تم إضافة العميل بنجاح\nكود العميل: " + customer.getCustomerCode());
+                if (isSupplierMode()) {
+                    customerService.createSupplier(customer);
+                } else {
+                    customerService.createCustomer(customer);
+                }
+                showInfo("تم", (isSupplierMode() ? "تم إضافة المذخر بنجاح\nكود المذخر: " : "تم إضافة العميل بنجاح\nكود العميل: ")
+                        + customer.getCustomerCode());
                 logger.info("New customer created: {}", customer.getCustomerCode());
             }
             
@@ -118,7 +143,36 @@ public class CustomerController {
             showError("خطأ في البيانات", e.getMessage());
         } catch (Exception e) {
             logger.error("Failed to save customer", e);
-            showError("خطأ", "فشل في حفظ بيانات العميل: " + e.getMessage());
+            showError("خطأ", (isSupplierMode() ? "فشل في حفظ بيانات المذخر: " : "فشل في حفظ بيانات العميل: ") + e.getMessage());
+        }
+    }
+
+    private boolean isSupplierMode() {
+        return Customer.TYPE_SUPPLIER.equals(accountType);
+    }
+
+    private void applyAccountTypeLabels() {
+        boolean supplier = isSupplierMode();
+        if (formTitleLabel != null) {
+            formTitleLabel.setText(supplier ? "إضافة مذخر جديد" : "إضافة عميل جديد");
+        }
+        if (customerCodeLabel != null) {
+            customerCodeLabel.setText(supplier ? "كود المذخر:" : "كود العميل:");
+        }
+        if (customerNameLabel != null) {
+            customerNameLabel.setText(supplier ? "اسم المذخر: *" : "اسم العميل: *");
+        }
+        if (customerNameField != null) {
+            customerNameField.setPromptText(supplier ? "أدخل اسم المذخر" : "أدخل اسم العميل");
+        }
+        if (phoneNumberLabel != null) {
+            phoneNumberLabel.setText(supplier ? "رقم الهاتف (اختياري):" : "رقم الهاتف (07...): *");
+        }
+        if (addressLabel != null) {
+            addressLabel.setText(supplier ? "عنوان المذخر:" : "العنوان:");
+        }
+        if (addressField != null) {
+            addressField.setPromptText(supplier ? "عنوان المذخر" : "عنوان العميل");
         }
     }
     

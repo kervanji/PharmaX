@@ -19,6 +19,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.VBox;
+import javafx.scene.Node;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
@@ -39,11 +40,30 @@ import javafx.stage.Popup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.GridPane;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
 public class PurchaseController implements Initializable {
 
+    @FXML
+    private VBox rootContainer;
+    @FXML
+    private HBox pageHeader;
+    @FXML
+    private HBox mainContentBox;
+    @FXML
+    private VBox balancePanel;
+    @FXML
+    private VBox formPanel;
+    @FXML
+    private GridPane formGrid;
+    @FXML
+    private VBox itemsSection;
+    @FXML
+    private HBox actionButtonsBox;
+    @FXML
+    private Button toggleTableSizeBtn;
     @FXML
     private TextField voucherNumberField;
     @FXML
@@ -108,6 +128,10 @@ public class PurchaseController implements Initializable {
     private boolean tabMode = false;
     private String tabId;
     private Popup historyPopup;
+    private boolean tableExpanded = false;
+    private double normalRootSpacing = 15;
+    private double normalMainContentSpacing = 20;
+    private double normalFormPanelSpacing = 15;
 
     public void setTabMode(boolean tabMode) {
         this.tabMode = tabMode;
@@ -124,7 +148,65 @@ public class PurchaseController implements Initializable {
         loadProducts();
         setupItemsTable();
         setupListeners();
+        rememberNormalLayoutSpacing();
         handleNew();
+    }
+
+    private void rememberNormalLayoutSpacing() {
+        if (rootContainer != null) {
+            normalRootSpacing = rootContainer.getSpacing();
+        }
+        if (mainContentBox != null) {
+            normalMainContentSpacing = mainContentBox.getSpacing();
+        }
+        if (formPanel != null) {
+            normalFormPanelSpacing = formPanel.getSpacing();
+        }
+    }
+
+    @FXML
+    private void handleToggleItemsTableSize() {
+        setItemsTableExpanded(!tableExpanded);
+    }
+
+    private void setItemsTableExpanded(boolean expanded) {
+        tableExpanded = expanded;
+
+        setVisibleManaged(pageHeader, !expanded);
+        setVisibleManaged(balancePanel, !expanded);
+        setVisibleManaged(formGrid, !expanded);
+        setVisibleManaged(actionButtonsBox, !expanded);
+
+        if (rootContainer != null) {
+            rootContainer.setSpacing(expanded ? 0 : normalRootSpacing);
+        }
+        if (mainContentBox != null) {
+            mainContentBox.setSpacing(expanded ? 0 : normalMainContentSpacing);
+        }
+        if (formPanel != null) {
+            formPanel.setSpacing(expanded ? 0 : normalFormPanelSpacing);
+            VBox.setVgrow(formPanel, Priority.ALWAYS);
+            HBox.setHgrow(formPanel, Priority.ALWAYS);
+        }
+        if (itemsSection != null) {
+            VBox.setVgrow(itemsSection, Priority.ALWAYS);
+        }
+        if (itemsTable != null) {
+            VBox.setVgrow(itemsTable, Priority.ALWAYS);
+            itemsTable.setMinHeight(expanded ? 0 : Region.USE_COMPUTED_SIZE);
+            itemsTable.refresh();
+        }
+        if (toggleTableSizeBtn != null) {
+            toggleTableSizeBtn.setText(expanded ? "تصغير الجدول" : "تكبير الجدول");
+        }
+    }
+
+    private void setVisibleManaged(Node node, boolean visible) {
+        if (node == null) {
+            return;
+        }
+        node.setVisible(visible);
+        node.setManaged(visible);
     }
 
     private void setupForm() {
@@ -150,7 +232,7 @@ public class PurchaseController implements Initializable {
     }
 
     private void loadCustomers() {
-        customers = FXCollections.observableArrayList(customerService.getAllCustomers());
+        customers = FXCollections.observableArrayList(customerService.getSuppliers());
         customerCombo.setItems(customers);
     }
 
@@ -304,7 +386,7 @@ public class PurchaseController implements Initializable {
 
     private void updateDescription() {
         if (selectedCustomer != null) {
-            descriptionField.setText("مشتريات من .. " + selectedCustomer.getName());
+            descriptionField.setText("مشتريات من مذخر .. " + selectedCustomer.getName());
         } else {
             descriptionField.setText("");
         }
@@ -359,7 +441,7 @@ public class PurchaseController implements Initializable {
         root.setMaxHeight(300);
         root.setNodeOrientation(javafx.geometry.NodeOrientation.RIGHT_TO_LEFT);
 
-        Label titleLbl = new Label("آخر مواد مشتراة من " + selectedCustomer.getName());
+        Label titleLbl = new Label("آخر مواد مشتراة من مذخر " + selectedCustomer.getName());
         titleLbl.setStyle("-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #1e293b;");
 
         VBox itemsBox = new VBox(8);
@@ -1076,7 +1158,7 @@ public class PurchaseController implements Initializable {
     private void handleSave() {
         try {
             if (selectedCustomer == null) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المورد/الحساب");
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار اسم المذخر");
                 return;
             }
 
@@ -1295,9 +1377,11 @@ public class PurchaseController implements Initializable {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/CustomerForm.fxml"));
             Parent root = loader.load();
+            CustomerController controller = loader.getController();
+            controller.setSupplierMode();
 
             Stage stage = new Stage();
-            stage.setTitle("إضافة مورد/حساب جديد");
+            stage.setTitle("إضافة مذخر جديد");
             Scene scene = new Scene(root);
             com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
             com.pharmax.MainApp.applyCurrentFontSize(scene);
@@ -1309,7 +1393,7 @@ public class PurchaseController implements Initializable {
             loadCustomers();
 
         } catch (Exception e) {
-            showAlert(Alert.AlertType.ERROR, "خطأ", "فشل في فتح نافذة إضافة الحساب");
+            showAlert(Alert.AlertType.ERROR, "خطأ", "فشل في فتح نافذة إضافة المذخر");
         }
     }
 

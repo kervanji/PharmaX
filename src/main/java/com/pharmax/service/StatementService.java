@@ -30,7 +30,6 @@ public class StatementService {
      * Generate statement of account for a specific customer.
      * 
      * @param customerId      Customer ID
-     * @param projectLocation Optional filter by project location
      * @param from            Start date (inclusive)
      * @param to              End date (inclusive)
      * @return List of sorted statement items with calculated balance
@@ -39,13 +38,12 @@ public class StatementService {
      * Generate statement of account for a specific customer.
      * 
      * @param customerId      Customer ID
-     * @param projectLocation Optional filter by project location
      * @param currency        Filter by currency (required)
      * @param from            Start date (inclusive)
      * @param to              End date (inclusive)
      * @return List of sorted statement items with calculated balance
      */
-    public List<StatementItem> getStatement(Long customerId, String projectLocation, String currency,
+    public List<StatementItem> getStatement(Long customerId, String currency,
             LocalDateTime from, LocalDateTime to) {
         List<StatementItem> items = new ArrayList<>();
 
@@ -56,10 +54,6 @@ public class StatementService {
         // Fetch Sales
         List<Sale> sales = salesService.getSalesByCustomerId(customerId);
         for (Sale sale : sales) {
-            if (projectLocation != null && !projectLocation.isEmpty()
-                    && !projectLocation.equals(sale.getProjectLocation())) {
-                continue;
-            }
             if (!"الكل".equals(currency) && !currency.equals(sale.getCurrency())) {
                 continue;
             }
@@ -92,10 +86,6 @@ public class StatementService {
         // Fetch Vouchers (Receipts & Payments)
         List<Voucher> vouchers = voucherService.getVouchersByCustomer(customerId);
         for (Voucher voucher : vouchers) {
-            if (projectLocation != null && !projectLocation.isEmpty()
-                    && !projectLocation.equals(voucher.getProjectName())) {
-                continue;
-            }
             if (!"الكل".equals(currency) && !currency.equals(voucher.getCurrency())) {
                 continue;
             }
@@ -138,12 +128,6 @@ public class StatementService {
         // Fetch Returns
         List<SaleReturn> returns = returnService.getReturnsByCustomer(customerId);
         for (SaleReturn ret : returns) {
-            if (projectLocation != null && !projectLocation.isEmpty()) {
-                if (ret.getSale() == null || !projectLocation.equals(ret.getSale().getProjectLocation())) {
-                    continue;
-                }
-            }
-
             String retCurrency = ret.getSale() != null && ret.getSale().getCurrency() != null
                     ? ret.getSale().getCurrency()
                     : "دينار";
@@ -259,9 +243,9 @@ public class StatementService {
      * For each Sale/SaleReturn row, inserts sub-rows showing the individual
      * products sold/returned.
      */
-    public List<StatementItem> getStatementWithDetails(Long customerId, String projectLocation, String currency,
+    public List<StatementItem> getStatementWithDetails(Long customerId, String currency,
             LocalDateTime from, LocalDateTime to) {
-        List<StatementItem> baseItems = getStatement(customerId, projectLocation, currency, from, to);
+        List<StatementItem> baseItems = getStatement(customerId, currency, from, to);
         List<StatementItem> result = new ArrayList<>();
 
         for (StatementItem item : baseItems) {

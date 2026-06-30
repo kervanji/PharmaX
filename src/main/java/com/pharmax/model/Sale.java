@@ -24,9 +24,6 @@ public class Sale {
     @Column(name = "currency")
     private String currency;
     
-    @Column(name = "project_location")
-    private String projectLocation;
-    
     @Column(name = "total_amount", nullable = false)
     private Double totalAmount;
     
@@ -92,9 +89,6 @@ public class Sale {
 
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
-    
-    public String getProjectLocation() { return projectLocation; }
-    public void setProjectLocation(String projectLocation) { this.projectLocation = projectLocation; }
     
     public Double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }

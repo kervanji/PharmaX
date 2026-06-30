@@ -15,7 +15,6 @@
         <Label text="� حسابات" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
         <Separator orientation="VERTICAL"/>
         <ComboBox fx:id="customerCombo" prefWidth="200" promptText="اختر العميل"/>
-        <ComboBox fx:id="projectCombo" prefWidth="120" promptText="المشروع"/>
         <ComboBox fx:id="currencyCombo" prefWidth="80"/>
         <DatePicker fx:id="fromDate" prefWidth="110" promptText="من"/>
         <DatePicker fx:id="toDate" prefWidth="110" promptText="إلى"/>

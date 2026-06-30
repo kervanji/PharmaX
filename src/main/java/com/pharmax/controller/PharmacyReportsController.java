@@ -451,7 +451,7 @@ public class PharmacyReportsController {
                 new PharmacyReportExportService.ReportColumn<>("الفاتورة", PharmacyReportService.PurchaseReportRow::voucherNumber),
                 new PharmacyReportExportService.ReportColumn<>("رقم الفاتورة", PharmacyReportService.PurchaseReportRow::voucherId),
                 new PharmacyReportExportService.ReportColumn<>("التاريخ", PharmacyReportService.PurchaseReportRow::voucherDate),
-                new PharmacyReportExportService.ReportColumn<>("المورد", PharmacyReportService.PurchaseReportRow::supplierName),
+                new PharmacyReportExportService.ReportColumn<>("المذخر", PharmacyReportService.PurchaseReportRow::supplierName),
                 new PharmacyReportExportService.ReportColumn<>("المنتج", PharmacyReportService.PurchaseReportRow::productName),
                 new PharmacyReportExportService.ReportColumn<>("الكمية", PharmacyReportService.PurchaseReportRow::quantity),
                 new PharmacyReportExportService.ReportColumn<>("المبلغ", PharmacyReportService.PurchaseReportRow::amount),

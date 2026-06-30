@@ -29,9 +29,6 @@
         <Label text="العملة:" style="-fx-font-weight: bold;"/>
         <ComboBox fx:id="currencyComboBox" prefWidth="100" onAction="#handleFilterChange"/>
         
-        <Label text="المشروع:" style="-fx-font-weight: bold;"/>
-        <ComboBox fx:id="projectComboBox" prefWidth="150" onAction="#handleFilterChange"/>
-        
         <Label text="رقم الفاتورة:" style="-fx-font-weight: bold;"/>
         <ComboBox fx:id="saleComboBox" prefWidth="120" onAction="#handleFilterChange"/>
     </HBox>

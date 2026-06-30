@@ -60,7 +60,6 @@ public class SalesService {
             Sale sale = new Sale();
             sale.setSaleCode(generateSaleCode());
             sale.setCustomer(customer);
-            sale.setProjectLocation(saleRequest.getProjectLocation());
             sale.setPaymentMethod(saleRequest.getPaymentMethod());
             sale.setCurrency(saleRequest.getCurrency() != null ? saleRequest.getCurrency() : "دينار");
             sale.setNotes(saleRequest.getNotes());
@@ -191,14 +190,13 @@ public class SalesService {
     }
 
     public List<Sale> getSalesForAccountStatement(Long customerId,
-                                                  String projectLocation,
                                                   LocalDateTime from,
                                                   LocalDateTime to,
                                                   boolean includeItems) {
         if (customerId == null) {
             throw new IllegalArgumentException("العميل غير موجود");
         }
-        return saleRepository.findForAccountStatement(customerId, projectLocation, from, to, includeItems);
+        return saleRepository.findForAccountStatement(customerId, from, to, includeItems);
     }
     
     public void deleteSale(Long id) {
@@ -435,7 +433,6 @@ public class SalesService {
     // Request DTOs
     public static class SaleRequest {
         private Long customerId;
-        private String projectLocation;
         private String paymentMethod;
         private String currency;
         private String notes;
@@ -447,9 +444,6 @@ public class SalesService {
         // Getters and Setters
         public Long getCustomerId() { return customerId; }
         public void setCustomerId(Long customerId) { this.customerId = customerId; }
-
-        public String getProjectLocation() { return projectLocation; }
-        public void setProjectLocation(String projectLocation) { this.projectLocation = projectLocation; }
         
         public String getPaymentMethod() { return paymentMethod; }
         public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

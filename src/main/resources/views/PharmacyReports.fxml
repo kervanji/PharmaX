@@ -137,7 +137,7 @@
                             <DatePicker fx:id="purchaseFromDatePicker"/>
                             <Label text="إلى:"/>
                             <DatePicker fx:id="purchaseToDatePicker"/>
-                            <Label text="المورد:"/>
+                            <Label text="المذخر:"/>
                             <ComboBox fx:id="purchaseSupplierComboBox" promptText="الكل" prefWidth="220"/>
                             <Label text="بحث:"/>
                             <TextField fx:id="purchaseSearchField" promptText="منتج أو فاتورة أو دفعة" prefWidth="220"/>
@@ -153,7 +153,7 @@
                             <columns>
                                 <TableColumn fx:id="purchaseVoucherColumn" text="الفاتورة" prefWidth="140"/>
                                 <TableColumn fx:id="purchaseDateColumn" text="التاريخ" prefWidth="140"/>
-                                <TableColumn fx:id="purchaseSupplierColumn" text="المورد/الحساب" prefWidth="160"/>
+                                <TableColumn fx:id="purchaseSupplierColumn" text="المذخر" prefWidth="160"/>
                                 <TableColumn fx:id="purchaseProductColumn" text="المنتج" prefWidth="170"/>
                                 <TableColumn fx:id="purchaseQtyColumn" text="الكمية" prefWidth="90"/>
                                 <TableColumn fx:id="purchaseAmountColumn" text="المبلغ" prefWidth="100"/>

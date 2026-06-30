@@ -11,8 +11,11 @@ import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -53,13 +56,9 @@ public class SaleFormController {
     @FXML
     private VBox root;
     @FXML
+    private VBox customerSelectionBox;
+    @FXML
     private ComboBox<Customer> customerComboBox;
-    @FXML
-    private ComboBox<String> projectLocationComboBox;
-    @FXML
-    private TextField newProjectLocationField;
-    @FXML
-    private Button addProjectLocationBtn;
     private FilteredList<Customer> filteredCustomers;
     private String customerSearchQuery = "";
     @FXML
@@ -84,6 +83,8 @@ public class SaleFormController {
     private FlowPane quickSaleButtonsPane;
     @FXML
     private TableView<SaleItemRow> itemsTable;
+    @FXML
+    private Label selectedItemsTotalLabel;
     @FXML
     private TableColumn<SaleItemRow, String> productNameColumn;
     @FXML
@@ -169,6 +170,10 @@ public class SaleFormController {
     private final ObservableList<SaleItemRow> saleItems = FXCollections.observableArrayList();
     private FilteredList<Product> filteredProducts;
     private String productSearchQuery = "";
+    private Customer lastSelectedDebtCustomer;
+    private boolean globalProductSearchInstalled = false;
+    private boolean suppressProductAutoAdd = false;
+    private boolean categoryFilterListenerInstalled = false;
     private Product selectedProduct = null;
     private ProductUnit selectedUnit = null;
     private ProductUnit pendingBarcodeUnit = null;
@@ -209,11 +214,13 @@ public class SaleFormController {
         setupSaleOptions();
         selectDefaultSaleCustomer();
         applyRoleRestrictions();
+        updateCustomerSelectionVisibility();
 
         Platform.runLater(() -> {
             if (root != null && root.getScene() != null && root.getScene().getWindow() instanceof Stage s) {
                 dialogStage = s;
             }
+            installGlobalProductSearch();
         });
     }
 
@@ -241,6 +248,120 @@ public class SaleFormController {
             updateSelectedProductPriceLabel();
             updateTotals();
         });
+    }
+
+    private void installGlobalProductSearch() {
+        if (globalProductSearchInstalled || root == null || productComboBox == null || productComboBox.getEditor() == null) {
+            return;
+        }
+        if (root.getScene() == null) {
+            root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    installGlobalProductSearch();
+                }
+            });
+            return;
+        }
+
+        Scene scene = root.getScene();
+        scene.addEventFilter(KeyEvent.KEY_TYPED, this::handleGlobalProductSearchTyped);
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleGlobalProductSearchPressed);
+        globalProductSearchInstalled = true;
+    }
+
+    private void handleGlobalProductSearchTyped(KeyEvent event) {
+        if (shouldIgnoreGlobalProductKey(event)) {
+            return;
+        }
+
+        String character = event.getCharacter();
+        if (character == null || character.isEmpty() || character.chars().allMatch(Character::isISOControl)) {
+            return;
+        }
+
+        TextField editor = productComboBox.getEditor();
+        if (editor == null) {
+            return;
+        }
+        if (character.isBlank() && (editor.getText() == null || editor.getText().isBlank())) {
+            return;
+        }
+
+        focusProductSearchEditor();
+        editor.appendText(character);
+        if (!productComboBox.isShowing()) {
+            productComboBox.show();
+        }
+        event.consume();
+    }
+
+    private void handleGlobalProductSearchPressed(KeyEvent event) {
+        if (event.getCode() != KeyCode.BACK_SPACE || shouldIgnoreGlobalProductKey(event)) {
+            return;
+        }
+
+        TextField editor = productComboBox.getEditor();
+        if (editor == null || editor.getText() == null || editor.getText().isEmpty()) {
+            return;
+        }
+
+        focusProductSearchEditor();
+        int caret = editor.getCaretPosition();
+        if (caret > 0) {
+            editor.deleteText(caret - 1, caret);
+        }
+        if (!productComboBox.isShowing()) {
+            productComboBox.show();
+        }
+        event.consume();
+    }
+
+    private void focusProductSearchEditor() {
+        productComboBox.requestFocus();
+        TextField editor = productComboBox.getEditor();
+        if (editor != null) {
+            editor.requestFocus();
+            editor.positionCaret(editor.getText() != null ? editor.getText().length() : 0);
+        }
+    }
+
+    private boolean shouldIgnoreGlobalProductKey(KeyEvent event) {
+        if (root == null || root.getScene() == null) {
+            return true;
+        }
+
+        if (!isEventInsideSaleForm(event)) {
+            return true;
+        }
+
+        Node focusOwner = root.getScene().getFocusOwner();
+        if (focusOwner == null) {
+            return false;
+        }
+        if (isDescendantOf(focusOwner, productComboBox)) {
+            return true;
+        }
+        return focusOwner instanceof TextInputControl || isDescendantOf(focusOwner, customerComboBox);
+    }
+
+    private boolean isEventInsideSaleForm(KeyEvent event) {
+        if (event != null && event.getTarget() instanceof Node targetNode) {
+            return isDescendantOf(targetNode, root);
+        }
+
+        Node focusOwner = root != null && root.getScene() != null ? root.getScene().getFocusOwner() : null;
+        return focusOwner != null && isDescendantOf(focusOwner, root);
+    }
+
+    private boolean isDescendantOf(Node node, Node parent) {
+        Node current = node;
+        while (current != null) {
+            if (current == parent) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
     }
 
     @FXML
@@ -397,6 +518,7 @@ public class SaleFormController {
                 return;
             }
 
+            updateCustomerSelectionVisibility();
             syncPaidAmountWithPayment(calculateFinalTotal());
             handlePaidAmountChange();
         });
@@ -453,7 +575,44 @@ public class SaleFormController {
                 quickSaleCheckbox.setSelected(false);
             }
         }
+        updateCustomerSelectionVisibility();
         updateQuickSaleState();
+    }
+
+    private void updateCustomerSelectionVisibility() {
+        boolean debtSale = !SessionManager.getInstance().isSeller()
+                && creditRadio != null
+                && creditRadio.isSelected();
+
+        if (customerSelectionBox != null) {
+            customerSelectionBox.setVisible(debtSale);
+            customerSelectionBox.setManaged(debtSale);
+        }
+
+        if (debtSale) {
+            if (isDefaultSaleCustomer(customerComboBox != null ? customerComboBox.getValue() : null)) {
+                clearSelectedCustomer();
+            }
+            if (customerComboBox != null) {
+                customerComboBox.setDisable(false);
+                Platform.runLater(() -> customerComboBox.requestFocus());
+            }
+            return;
+        }
+
+        if (customerComboBox != null) {
+            customerComboBox.hide();
+            customerComboBox.setDisable(true);
+        }
+        selectDefaultSaleCustomer();
+    }
+
+    private boolean isDebtCustomerSelectionVisible() {
+        return customerSelectionBox != null
+                && customerSelectionBox.isVisible()
+                && !SessionManager.getInstance().isSeller()
+                && creditRadio != null
+                && creditRadio.isSelected();
     }
 
     private void setupCategoryFilter(List<Product> products) {
@@ -474,12 +633,15 @@ public class SaleFormController {
         categoryFilterComboBox.setItems(items);
         categoryFilterComboBox.setValue("كل الفئات");
 
-        categoryFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
-            applyProductFilters();
-            if (!productComboBox.isShowing()) {
-                productComboBox.show();
-            }
-        });
+        if (!categoryFilterListenerInstalled) {
+            categoryFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+                applyProductFilters();
+                if (productSearchQuery != null && !productSearchQuery.isBlank() && !productComboBox.isShowing()) {
+                    productComboBox.show();
+                }
+            });
+            categoryFilterListenerInstalled = true;
+        }
     }
 
     private void applyProductFilters() {
@@ -513,7 +675,7 @@ public class SaleFormController {
     }
 
     private void setupCustomerComboBox() {
-        List<Customer> customers = customerRepository.findAll();
+        List<Customer> customers = customerRepository.findSaleCustomers();
         filteredCustomers = new FilteredList<>(FXCollections.observableArrayList(customers), c -> true);
         customerComboBox.setItems(filteredCustomers);
         customerComboBox.setEditable(true);
@@ -535,9 +697,19 @@ public class SaleFormController {
             }
         });
 
+        customerComboBox.valueProperty().addListener((obs, oldCustomer, newCustomer) -> {
+            if (newCustomer != null && !isDefaultSaleCustomer(newCustomer)) {
+                lastSelectedDebtCustomer = newCustomer;
+            }
+        });
+
         // Enable search in customer ComboBox
         if (customerComboBox.getEditor() != null) {
             customerComboBox.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                if (!isDebtCustomerSelectionVisible()) {
+                    return;
+                }
+
                 if (customerComboBox.getValue() != null) {
                     String rendered = customerComboBox.getConverter().toString(customerComboBox.getValue());
                     if (rendered.equals(newText)) {
@@ -558,6 +730,10 @@ public class SaleFormController {
                 }
 
                 customerSearchQuery = newText == null ? "" : newText.trim().toLowerCase();
+                Customer exactCustomer = findCustomerByText(newText);
+                if (exactCustomer != null && !isDefaultSaleCustomer(exactCustomer)) {
+                    lastSelectedDebtCustomer = exactCustomer;
+                }
                 filteredCustomers.setPredicate(c -> {
                     if (customerSearchQuery.isEmpty())
                         return true;
@@ -579,11 +755,6 @@ public class SaleFormController {
             });
         }
 
-        customerComboBox.valueProperty().addListener((obs, oldCustomer, newCustomer) -> {
-            updateProjectLocations(newCustomer);
-        });
-
-        updateProjectLocations(customerComboBox.getValue());
     }
 
     private void selectDefaultSaleCustomer() {
@@ -593,7 +764,6 @@ public class SaleFormController {
         }
 
         customerComboBox.setValue(defaultCustomer);
-        updateProjectLocations(defaultCustomer);
     }
 
     private Customer getOrCreateDefaultSaleCustomer() {
@@ -602,42 +772,96 @@ public class SaleFormController {
                     Customer customer = new Customer();
                     customer.setCustomerCode(DEFAULT_SALE_CUSTOMER_CODE);
                     customer.setName(DEFAULT_SALE_CUSTOMER_NAME);
-                    customer.setProjectLocation("");
                     return customerRepository.save(customer);
                 });
     }
 
-    private void updateProjectLocations(Customer customer) {
-        if (projectLocationComboBox == null) {
+    private Customer resolveSelectedCustomer() {
+        if (customerComboBox == null) {
+            return null;
+        }
+
+        Customer selectedCustomer = customerComboBox.getValue();
+        if (selectedCustomer != null && !isDefaultSaleCustomer(selectedCustomer)) {
+            return selectedCustomer;
+        }
+
+        if (customerComboBox.getEditor() == null || filteredCustomers == null) {
+            return null;
+        }
+
+        String typedText = customerComboBox.getEditor().getText();
+        if (typedText == null || typedText.trim().isEmpty()) {
+            return null;
+        }
+
+        String normalizedText = typedText.trim();
+        Customer typedCustomer = findCustomerByText(normalizedText);
+        if (typedCustomer != null && !isDefaultSaleCustomer(typedCustomer)) {
+            return typedCustomer;
+        }
+
+        if (filteredCustomers.size() == 1 && !isDefaultSaleCustomer(filteredCustomers.get(0))) {
+            return filteredCustomers.get(0);
+        }
+
+        if (lastSelectedDebtCustomer != null && customerMatchesText(lastSelectedDebtCustomer, normalizedText)) {
+            return lastSelectedDebtCustomer;
+        }
+
+        return null;
+    }
+
+    private Customer findCustomerByText(String text) {
+        if (text == null || filteredCustomers == null) {
+            return null;
+        }
+
+        String normalizedText = text.trim();
+        if (normalizedText.isEmpty()) {
+            return null;
+        }
+
+        return filteredCustomers.getSource().stream()
+                .filter(customer -> customerMatchesText(customer, normalizedText))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean customerMatchesText(Customer customer, String text) {
+        if (customer == null || text == null) {
+            return false;
+        }
+
+        String normalizedText = text.trim();
+        String rendered = customerComboBox != null && customerComboBox.getConverter() != null
+                ? customerComboBox.getConverter().toString(customer)
+                : "";
+        String name = customer.getName() != null ? customer.getName().trim() : "";
+        String code = customer.getCustomerCode() != null ? customer.getCustomerCode().trim() : "";
+        String phone = customer.getPhoneNumber() != null ? customer.getPhoneNumber().trim() : "";
+
+        return normalizedText.equalsIgnoreCase(rendered)
+                || normalizedText.equalsIgnoreCase(name)
+                || normalizedText.equalsIgnoreCase(code)
+                || normalizedText.equalsIgnoreCase(phone);
+    }
+
+    private boolean isDefaultSaleCustomer(Customer customer) {
+        return customer != null
+                && customer.getCustomerCode() != null
+                && DEFAULT_SALE_CUSTOMER_CODE.equalsIgnoreCase(customer.getCustomerCode().trim());
+    }
+
+    private void clearSelectedCustomer() {
+        if (customerComboBox == null) {
             return;
         }
 
-        projectLocationComboBox.getItems().clear();
-        projectLocationComboBox.setValue(null);
-
-        if (customer == null) {
-            projectLocationComboBox.setDisable(true);
-            return;
-        }
-
-        // Enable ComboBox when customer is selected
-        projectLocationComboBox.setDisable(false);
-
-        String locationsText = customer.getProjectLocation();
-        if (locationsText == null || locationsText.trim().isEmpty()) {
-            // No locations yet, but keep enabled so user can add new ones
-            return;
-        }
-
-        List<String> locations = locationsText.lines()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-
-        projectLocationComboBox.setItems(FXCollections.observableArrayList(locations));
-
-        if (locations.size() == 1) {
-            projectLocationComboBox.setValue(locations.get(0));
+        customerComboBox.hide();
+        customerComboBox.setValue(null);
+        if (customerComboBox.getEditor() != null) {
+            customerComboBox.getEditor().clear();
         }
     }
 
@@ -682,6 +906,11 @@ public class SaleFormController {
                 productSearchQuery = newText == null ? "" : newText.trim().toLowerCase();
                 applyProductFilters();
 
+                if (productSearchQuery.isEmpty()) {
+                    productComboBox.hide();
+                    return;
+                }
+
                 if (!productComboBox.isShowing()) {
                     productComboBox.show();
                 }
@@ -693,8 +922,70 @@ public class SaleFormController {
             Product selected = productComboBox.getValue();
             if (selected != null) {
                 handleProductSelection(selected);
+                if (!suppressProductAutoAdd) {
+                    addSelectedProductWithSingleQuantity(selected);
+                }
             }
         });
+    }
+
+    private void refreshData() {
+        Customer selectedCustomer = lastSelectedDebtCustomer != null ? lastSelectedDebtCustomer : customerComboBox.getValue();
+        Product selectedProductBeforeRefresh = selectedProduct != null ? selectedProduct : productComboBox.getValue();
+
+        List<Customer> customers = customerRepository.findSaleCustomers();
+        filteredCustomers = new FilteredList<>(FXCollections.observableArrayList(customers), c -> true);
+        customerComboBox.setItems(filteredCustomers);
+        if (selectedCustomer != null && selectedCustomer.getId() != null && !isDefaultSaleCustomer(selectedCustomer)) {
+            customers.stream()
+                    .filter(customer -> selectedCustomer.getId().equals(customer.getId()))
+                    .findFirst()
+                    .ifPresent(customer -> {
+                        lastSelectedDebtCustomer = customer;
+                        if (isDebtCustomerSelectionVisible()) {
+                            customerComboBox.setValue(customer);
+                        }
+                    });
+        } else if (!isDebtCustomerSelectionVisible()) {
+            selectDefaultSaleCustomer();
+        }
+
+        List<Product> products = productRepository.findAll().stream()
+                .filter(Product::getIsActive)
+                .toList();
+        unitsByProduct.clear();
+        for (Product product : products) {
+            unitsByProduct.put(product.getId(), productUnitService.getUnitsForProductOrDefault(product));
+        }
+
+        filteredProducts = new FilteredList<>(FXCollections.observableArrayList(products), p -> true);
+        productComboBox.setItems(filteredProducts);
+        setupCategoryFilter(products);
+        if (selectedProductBeforeRefresh != null && selectedProductBeforeRefresh.getId() != null) {
+            products.stream()
+                    .filter(product -> selectedProductBeforeRefresh.getId().equals(product.getId()))
+                    .findFirst()
+                    .ifPresent(product -> {
+                        suppressProductAutoAdd = true;
+                        try {
+                            selectedProduct = product;
+                            productComboBox.setValue(product);
+                            handleProductSelection(product);
+                        } finally {
+                            suppressProductAutoAdd = false;
+                        }
+                    });
+        }
+
+        refreshCartBatchPreviews();
+        updateTotals();
+    }
+
+    private void addSelectedProductWithSingleQuantity(Product product) {
+        if (product == null) {
+            return;
+        }
+        addProductToSale(product, 1.0, getSelectedSaleUnit());
     }
 
     private void setupQuickSaleButtons() {
@@ -771,9 +1062,15 @@ public class SaleFormController {
         productUnitService.findProductOrUnitByBarcode(barcodeText.trim()).ifPresent(result -> {
             pendingBarcodeUnit = result.getProductUnit();
             Product product = result.getProduct();
-            selectedProduct = product;
-            productComboBox.setValue(product);
+            suppressProductAutoAdd = true;
+            try {
+                selectedProduct = product;
+                productComboBox.setValue(product);
+            } finally {
+                suppressProductAutoAdd = false;
+            }
             handleProductSelection(product);
+            addSelectedProductWithSingleQuantity(product);
             productComboBox.hide();
         });
     }
@@ -1535,7 +1832,33 @@ public class SaleFormController {
         });
 
         itemsTable.setItems(saleItems);
+        itemsTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        itemsTable.getSelectionModel().getSelectedItems()
+                .addListener((javafx.collections.ListChangeListener<SaleItemRow>) change -> updateSelectedItemsTotal());
         itemsTable.setEditable(true);
+        updateSelectedItemsTotal();
+    }
+
+    private void updateSelectedItemsTotal() {
+        if (selectedItemsTotalLabel == null || itemsTable == null) {
+            return;
+        }
+
+        ObservableList<SaleItemRow> selectedRows = itemsTable.getSelectionModel().getSelectedItems();
+        if (selectedRows == null || selectedRows.isEmpty()) {
+            selectedItemsTotalLabel.setText("المحدد: 0 د.ع");
+            return;
+        }
+
+        Map<String, CurrencyTotals> selectedTotals = new LinkedHashMap<>();
+        for (SaleItemRow row : selectedRows) {
+            String currency = row.getCurrency();
+            CurrencyTotals summary = selectedTotals.computeIfAbsent(currency, c -> new CurrencyTotals());
+            summary.netAmount += row.getTotalPrice();
+        }
+
+        selectedItemsTotalLabel.setText("المحدد: " + selectedRows.size() + " | "
+                + formatCurrencyTotals(selectedTotals, (currency, summary) -> summary.netAmount));
     }
 
     private void openProductEditForm(SaleItemRow row) {
@@ -1599,46 +1922,6 @@ public class SaleFormController {
         }
     }
 
-    @FXML
-    private void handleAddProjectLocation() {
-        if (newProjectLocationField == null)
-            return;
-
-        String newLocation = newProjectLocationField.getText().trim();
-        if (newLocation.isEmpty()) {
-            showError("خطأ", "الرجاء إدخال اسم موقع المشروع");
-            return;
-        }
-
-        Customer customer = customerComboBox.getValue();
-        if (customer == null) {
-            showError("خطأ", "الرجاء اختيار العميل أولاً");
-            return;
-        }
-
-        // Add new location to customer's project locations
-        String existingLocations = customer.getProjectLocation();
-        String updatedLocations;
-        if (existingLocations == null || existingLocations.trim().isEmpty()) {
-            updatedLocations = newLocation;
-        } else {
-            updatedLocations = existingLocations + "\n" + newLocation;
-        }
-        customer.setProjectLocation(updatedLocations);
-
-        // Save customer with new location
-        try {
-            customerRepository.save(customer);
-            updateProjectLocations(customer);
-            projectLocationComboBox.setValue(newLocation);
-            newProjectLocationField.clear();
-            showSuccess("تم", "تمت إضافة موقع المشروع بنجاح");
-        } catch (Exception e) {
-            logger.error("Failed to save project location", e);
-            showError("خطأ", "فشل في حفظ موقع المشروع");
-        }
-    }
-
     private void setupDefaults() {
         cashRadio.setSelected(true);
         quantityField.setText("1");
@@ -1660,7 +1943,9 @@ public class SaleFormController {
     public void setSelectedCustomer(Customer customer) {
         if (customer != null) {
             customerComboBox.setValue(customer);
-            updateProjectLocations(customer);
+            if (!isDefaultSaleCustomer(customer)) {
+                lastSelectedDebtCustomer = customer;
+            }
         }
     }
 
@@ -1700,8 +1985,9 @@ public class SaleFormController {
     }
 
     private void refreshCustomersAndSelectLast() {
-        List<Customer> customers = customerRepository.findAll();
-        customerComboBox.setItems(FXCollections.observableArrayList(customers));
+        List<Customer> customers = customerRepository.findSaleCustomers();
+        filteredCustomers = new FilteredList<>(FXCollections.observableArrayList(customers), c -> true);
+        customerComboBox.setItems(filteredCustomers);
 
         Customer last = customers.stream()
                 .max((a, b) -> Long.compare(a.getId() != null ? a.getId() : 0L, b.getId() != null ? b.getId() : 0L))
@@ -1709,7 +1995,9 @@ public class SaleFormController {
 
         if (last != null) {
             customerComboBox.setValue(last);
-            updateProjectLocations(last);
+            if (!isDefaultSaleCustomer(last)) {
+                lastSelectedDebtCustomer = last;
+            }
         }
     }
 
@@ -1995,6 +2283,7 @@ public class SaleFormController {
         syncPaidAmountWithPayment(finalTotal);
 
         updateBalance(finalTotal, paymentCurrency, totals.size() > 1);
+        updateSelectedItemsTotal();
     }
 
     private double getAllowedAdditionalDiscount() {
@@ -2154,18 +2443,8 @@ public class SaleFormController {
     }
 
     private List<Sale> createSales() {
-        selectDefaultSaleCustomer();
-        if (customerComboBox.getValue() == null) {
-            showError("خطأ", "تعذر تجهيز عميل البيع الافتراضي");
-            return List.of();
-        }
-
         if (saleItems.isEmpty()) {
             showError("خطأ", "الرجاء إضافة منتج واحد على الأقل");
-            return List.of();
-        }
-
-        if (!validateAllStockAvailable()) {
             return List.of();
         }
 
@@ -2174,6 +2453,28 @@ public class SaleFormController {
             cashRadio.setSelected(true);
         } else if (creditRadio.isSelected()) {
             paymentMethod = "DEBT";
+        }
+
+        Customer selectedCustomer;
+        if ("DEBT".equals(paymentMethod)) {
+            selectedCustomer = resolveSelectedCustomer();
+            if (selectedCustomer == null || selectedCustomer.getId() == null || isDefaultSaleCustomer(selectedCustomer)) {
+                updateCustomerSelectionVisibility();
+                showError("خطأ", "الرجاء اختيار اسم العميل قبل حفظ بيع الدين");
+                return List.of();
+            }
+            customerComboBox.setValue(selectedCustomer);
+        } else {
+            selectDefaultSaleCustomer();
+            selectedCustomer = customerComboBox.getValue();
+            if (selectedCustomer == null || selectedCustomer.getId() == null) {
+                showError("خطأ", "تعذر تجهيز عميل البيع الافتراضي");
+                return List.of();
+            }
+        }
+
+        if (!validateAllStockAvailable()) {
+            return List.of();
         }
 
         try {
@@ -2187,8 +2488,7 @@ public class SaleFormController {
             for (Map.Entry<String, List<SaleItemRow>> entry : rowsByCurrency.entrySet()) {
                 String saleCurrency = entry.getKey();
                 SalesService.SaleRequest request = new SalesService.SaleRequest();
-                request.setCustomerId(customerComboBox.getValue().getId());
-                request.setProjectLocation("");
+                request.setCustomerId(selectedCustomer.getId());
                 request.setPaymentMethod(paymentMethod);
                 request.setCurrency(saleCurrency);
                 request.setNotes(notesArea != null ? notesArea.getText() : "");
@@ -2215,7 +2515,7 @@ public class SaleFormController {
                 request.setItems(items);
 
                 double finalTotal = groupTotal - saleAdditionalDiscount;
-                if (cashRadio.isSelected()) {
+                if ("CASH".equals(paymentMethod)) {
                     request.setPaidAmount(finalTotal);
                 } else {
                     request.setPaidAmount(0.0);
@@ -2254,8 +2554,6 @@ public class SaleFormController {
 
     private void resetSaleForm() {
         customerComboBox.setValue(null);
-        projectLocationComboBox.getSelectionModel().clearSelection();
-        newProjectLocationField.clear();
         categoryFilterComboBox.getSelectionModel().clearSelection();
         productComboBox.getSelectionModel().clearSelection();
         quantityField.clear();
@@ -2263,6 +2561,7 @@ public class SaleFormController {
         priceLabel.setText("");
         saleItems.clear();
         itemsTable.refresh();
+        updateSelectedItemsTotal();
         additionalDiscountField.setText("0");
         additionalDiscountCurrencyLabel.setText(IQD_CURRENCY);
         subtotalLabel.setText("0");

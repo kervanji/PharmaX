@@ -40,7 +40,6 @@ public class PaymentVoucherController implements Initializable {
     @FXML private TextField discountAmountField;
     @FXML private Label amountInWordsLabel;
     @FXML private TextField descriptionField;
-    @FXML private ComboBox<String> projectNameField;
     @FXML private TextArea notesArea;
     @FXML private Label previousBalanceLabel;
     @FXML private Label currentBalanceLabel;
@@ -60,7 +59,6 @@ public class PaymentVoucherController implements Initializable {
     @FXML private TableColumn<PreviousVoucherRow, String> pvNumberColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvDateColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvAmountColumn;
-    @FXML private TableColumn<PreviousVoucherRow, String> pvProjectColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvRemainingColumn;
     
     private final VoucherService voucherService = new VoucherService();
@@ -98,7 +96,6 @@ public class PaymentVoucherController implements Initializable {
         pvNumberColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().voucherNumber));
         pvDateColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().dateText));
         pvAmountColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().amountText));
-        pvProjectColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().projectText));
         pvRemainingColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().remainingText));
         previousVoucherSource = FXCollections.observableArrayList();
         previousVoucherRows = new FilteredList<>(previousVoucherSource, r -> true);
@@ -121,15 +118,6 @@ public class PaymentVoucherController implements Initializable {
                 .filter(v -> v != null && currency.equals(v.getCurrency()))
                 .toList();
 
-        String selectedProject = null;
-        if (projectNameField != null) {
-            selectedProject = projectNameField.getValue();
-            if ((selectedProject == null || selectedProject.isBlank()) && projectNameField.getEditor() != null) {
-                selectedProject = projectNameField.getEditor().getText();
-            }
-        }
-        final String projectFilter = (selectedProject != null && !selectedProject.isBlank()) ? selectedProject.trim() : null;
-
         double running = currentBalance;
         int displayCount = 0;
         
@@ -137,14 +125,11 @@ public class PaymentVoucherController implements Initializable {
             String dateText = v.getVoucherDate() != null ? v.getVoucherDate().toLocalDate().toString() : "-";
             String amountText = numberFormat.format(v.getNetAmount() != null ? v.getNetAmount() : 0.0) + (isUsd ? " $" : " د.ع");
             String remainingText = numberFormat.format(running) + (isUsd ? " $" : " د.ع");
-            String projectText = v.getProjectName() != null ? v.getProjectName() : "";
 
-            boolean matchesProject = (projectFilter == null) || projectText.trim().equals(projectFilter);
-
-            if (matchesProject && displayCount < 50) {
+            if (displayCount < 50) {
                 previousVoucherSource.add(new PreviousVoucherRow(
                         v.getVoucherNumber() != null ? v.getVoucherNumber() : "-",
-                        dateText, amountText, projectText, remainingText));
+                        dateText, amountText, remainingText));
                 displayCount++;
             }
 
@@ -179,7 +164,7 @@ public class PaymentVoucherController implements Initializable {
     }
     
     private void loadCustomers() {
-        customers = FXCollections.observableArrayList(customerService.getAllCustomers());
+        customers = FXCollections.observableArrayList(customerService.getSuppliers());
         customerCombo.setItems(customers);
     }
     
@@ -187,23 +172,9 @@ public class PaymentVoucherController implements Initializable {
         customerCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             selectedCustomer = newVal;
             updateCustomerBalanceDisplay();
-            updateProjectDropdown();
             updateDescription();
             loadPreviousVouchers();
         });
-
-        if (projectNameField != null) {
-            projectNameField.valueProperty().addListener((obs, o, n) -> {
-                updateDescription();
-                loadPreviousVouchers();
-            });
-            if (projectNameField.getEditor() != null) {
-                projectNameField.getEditor().textProperty().addListener((obs, o, n) -> {
-                    updateDescription();
-                    loadPreviousVouchers();
-                });
-            }
-        }
         
         amountField.textProperty().addListener((obs, oldVal, newVal) -> {
             calculateNetAmount();
@@ -253,44 +224,9 @@ public class PaymentVoucherController implements Initializable {
     
     private void updateDescription() {
         if (selectedCustomer != null) {
-            String project = null;
-            if (projectNameField != null) {
-                project = projectNameField.getValue();
-                if ((project == null || project.isBlank()) && projectNameField.getEditor() != null) {
-                    project = projectNameField.getEditor().getText();
-                }
-            }
-            String projectPart = project != null && !project.trim().isEmpty() ? " / " + project.trim() : "";
-            descriptionField.setText("دفع لحساب .. " + selectedCustomer.getName() + projectPart);
+            descriptionField.setText("دفع إلى مذخر .. " + selectedCustomer.getName());
         } else {
             descriptionField.setText("");
-        }
-    }
-
-    private void updateProjectDropdown() {
-        if (projectNameField == null) {
-            return;
-        }
-        projectNameField.getItems().clear();
-
-        if (selectedCustomer == null) {
-            projectNameField.setValue(null);
-            return;
-        }
-
-        String locationsText = selectedCustomer.getProjectLocation();
-        if (locationsText == null || locationsText.trim().isEmpty()) {
-            projectNameField.setValue(null);
-            return;
-        }
-
-        List<String> locations = locationsText.lines()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        projectNameField.setItems(FXCollections.observableArrayList(locations));
-        if (locations.size() == 1) {
-            projectNameField.setValue(locations.get(0));
         }
     }
     
@@ -391,7 +327,7 @@ public class PaymentVoucherController implements Initializable {
     private void handleSave() {
         try {
             if (selectedCustomer == null) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار الحساب/المورد");
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المذخر");
                 return;
             }
             
@@ -416,15 +352,6 @@ public class PaymentVoucherController implements Initializable {
             voucher.setNetAmount(amount - parseAmount(discountAmountField.getText()));
             voucher.setAmountInWords(amountInWordsLabel.getText());
             voucher.setDescription(descriptionField.getText());
-
-            String projectName = null;
-            if (projectNameField != null) {
-                projectName = projectNameField.getValue();
-                if ((projectName == null || projectName.isBlank()) && projectNameField.getEditor() != null) {
-                    projectName = projectNameField.getEditor().getText();
-                }
-            }
-            voucher.setProjectName(projectName);
 
             if (notesArea != null && notesArea.getText() != null && !notesArea.getText().isEmpty()) {
                 voucher.setNotes(notesArea.getText());
@@ -494,12 +421,6 @@ public class PaymentVoucherController implements Initializable {
         discountPercentField.setText("0");
         discountAmountField.setText("0");
         descriptionField.setText("");
-        if (projectNameField != null) {
-            projectNameField.setValue(null);
-            if (projectNameField.getEditor() != null) {
-                projectNameField.getEditor().setText("");
-            }
-        }
         if (notesArea != null) {
             notesArea.setText("");
         }
@@ -530,9 +451,11 @@ public class PaymentVoucherController implements Initializable {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/CustomerForm.fxml"));
             Parent root = loader.load();
+            CustomerController controller = loader.getController();
+            controller.setSupplierMode();
             
             Stage stage = new Stage();
-            stage.setTitle("إضافة حساب/مورد جديد");
+            stage.setTitle("إضافة مذخر جديد");
             Scene scene = new Scene(root);
             com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
             com.pharmax.MainApp.applyCurrentFontSize(scene);
@@ -544,7 +467,7 @@ public class PaymentVoucherController implements Initializable {
             loadCustomers();
             
         } catch (Exception e) {
-            showAlert(Alert.AlertType.ERROR, "خطأ", "فشل في فتح نافذة إضافة الحساب");
+            showAlert(Alert.AlertType.ERROR, "خطأ", "فشل في فتح نافذة إضافة المذخر");
         }
     }
     
@@ -584,11 +507,10 @@ public class PaymentVoucherController implements Initializable {
 
     private void openCustomerStatement(String currency) {
         if (selectedCustomer == null) {
-            showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار الحساب أولاً");
+            showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المذخر أولاً");
             return;
         }
 
-        String projectName = getSelectedProjectName();
         try {
             String tabId = "accounts-payment-statement-" + System.nanoTime();
             String title = "كشف حساب " + currency + " - " + selectedCustomer.getName();
@@ -600,7 +522,7 @@ public class PaymentVoucherController implements Initializable {
                     (AccountsController accountsController) -> {
                         accountsController.setTabMode(true);
                         accountsController.setTabId(tabId);
-                        accountsController.applyInitialFilters(selectedCustomer, currency, projectName);
+                        accountsController.applyInitialFilters(selectedCustomer, currency);
                     });
 
             if (controller == null) {
@@ -609,17 +531,6 @@ public class PaymentVoucherController implements Initializable {
         } catch (Exception e) {
             showCustomerStatementFallback(currency);
         }
-    }
-
-    private String getSelectedProjectName() {
-        if (projectNameField == null) {
-            return null;
-        }
-        String projectName = projectNameField.getValue();
-        if ((projectName == null || projectName.isBlank()) && projectNameField.getEditor() != null) {
-            projectName = projectNameField.getEditor().getText();
-        }
-        return projectName != null && !projectName.isBlank() ? projectName.trim() : null;
     }
 
     private void showCustomerStatementFallback(String currency) {
@@ -636,15 +547,12 @@ public class PaymentVoucherController implements Initializable {
         final String voucherNumber;
         final String dateText;
         final String amountText;
-        final String projectText;
         final String remainingText;
 
-        private PreviousVoucherRow(String voucherNumber, String dateText, String amountText,
-                                   String projectText, String remainingText) {
+        private PreviousVoucherRow(String voucherNumber, String dateText, String amountText, String remainingText) {
             this.voucherNumber = voucherNumber;
             this.dateText = dateText;
             this.amountText = amountText;
-            this.projectText = projectText;
             this.remainingText = remainingText;
         }
     }

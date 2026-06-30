@@ -32,7 +32,6 @@ public class VoucherListController implements Initializable {
     
     @FXML private Label titleLabel;
     @FXML private ComboBox<Customer> customerFilterCombo;
-    @FXML private ComboBox<String> projectFilterCombo;
     @FXML private DatePicker fromDatePicker;
     @FXML private DatePicker toDatePicker;
     @FXML private TableView<Voucher> vouchersTable;
@@ -65,13 +64,13 @@ public class VoucherListController implements Initializable {
         setupTable();
         setupDatePickers();
         setupCustomerFilter();
-        setupProjectFilter();
         loadCustomers();
     }
     
     public void setVoucherType(VoucherType type) {
         this.voucherType = type;
         updateTitle();
+        loadCustomers();
         loadVouchers();
     }
 
@@ -148,20 +147,13 @@ public class VoucherListController implements Initializable {
 
         customerFilterCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             selectedCustomer = newVal;
-            updateProjectLocations(newVal);
         });
     }
 
-    private void setupProjectFilter() {
-        if (projectFilterCombo == null) {
-            return;
-        }
-        projectFilterCombo.setEditable(true);
-        projectFilterCombo.setDisable(true);
-    }
-
     private void loadCustomers() {
-        customers.setAll(customerService.getAllCustomers());
+        customers.setAll(voucherType == VoucherType.RECEIPT
+                ? customerService.getSaleCustomers()
+                : customerService.getSuppliers());
         if (filteredCustomers != null) {
             filteredCustomers.setPredicate(c -> true);
         }
@@ -183,35 +175,6 @@ public class VoucherListController implements Initializable {
         }
     }
 
-    private void updateProjectLocations(Customer customer) {
-        if (projectFilterCombo == null) {
-            return;
-        }
-
-        projectFilterCombo.getItems().clear();
-        projectFilterCombo.setValue(null);
-
-        if (customer == null) {
-            projectFilterCombo.setDisable(true);
-            return;
-        }
-
-        projectFilterCombo.setDisable(false);
-        String locationsText = customer.getProjectLocation();
-        if (locationsText == null || locationsText.trim().isEmpty()) {
-            return;
-        }
-
-        List<String> locations = locationsText.lines()
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        projectFilterCombo.setItems(FXCollections.observableArrayList(locations));
-        if (locations.size() == 1) {
-            projectFilterCombo.setValue(locations.get(0));
-        }
-    }
-    
     private void setupTable() {
         voucherNumberCol.setCellValueFactory(data -> 
             new SimpleStringProperty(data.getValue().getVoucherNumber()));
@@ -262,13 +225,25 @@ public class VoucherListController implements Initializable {
     private void updateTitle() {
         if (voucherType == VoucherType.RECEIPT) {
             titleLabel.setText("سندات القبض");
+            updateAccountLabels("اختر العميل", "العميل");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;");
         } else if (voucherType == VoucherType.PURCHASE) {
             titleLabel.setText("المشتريات");
+            updateAccountLabels("اختر المذخر", "المذخر");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-text;");
         } else {
             titleLabel.setText("سندات الدفع");
+            updateAccountLabels("اختر المذخر", "المذخر");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;");
+        }
+    }
+
+    private void updateAccountLabels(String promptText, String columnText) {
+        if (customerFilterCombo != null) {
+            customerFilterCombo.setPromptText(promptText);
+        }
+        if (customerCol != null) {
+            customerCol.setText(columnText);
         }
     }
     
@@ -281,17 +256,13 @@ public class VoucherListController implements Initializable {
     @FXML
     private void handleSearch() {
         String searchTerm = null;
-        String projectName = projectFilterCombo != null ? projectFilterCombo.getValue() : null;
-        if ((projectName == null || projectName.isBlank()) && projectFilterCombo != null && projectFilterCombo.getEditor() != null) {
-            projectName = projectFilterCombo.getEditor().getText();
-        }
         Long customerId = selectedCustomer != null ? selectedCustomer.getId() : null;
         LocalDateTime from = fromDatePicker.getValue() != null ? 
             fromDatePicker.getValue().atStartOfDay() : null;
         LocalDateTime to = toDatePicker.getValue() != null ? 
             toDatePicker.getValue().atTime(23, 59, 59) : null;
         
-        List<Voucher> results = voucherService.searchVouchers(searchTerm, voucherType, from, to, projectName, customerId);
+        List<Voucher> results = voucherService.searchVouchers(searchTerm, voucherType, from, to, customerId);
         vouchers.setAll(results);
         updateSummary();
     }
@@ -323,7 +294,8 @@ public class VoucherListController implements Initializable {
         StringBuilder details = new StringBuilder();
         details.append("رقم السند: ").append(selected.getVoucherNumber()).append("\n");
         details.append("التاريخ: ").append(selected.getVoucherDate().toLocalDate()).append("\n");
-        details.append("الحساب: ").append(selected.getCustomer() != null ? selected.getCustomer().getName() : "نقدي").append("\n");
+        details.append(voucherType == VoucherType.RECEIPT ? "العميل: " : "المذخر: ")
+                .append(selected.getCustomer() != null ? selected.getCustomer().getName() : "نقدي").append("\n");
         details.append("المبلغ: ").append(numberFormat.format(selected.getAmount())).append(" ").append(selected.getCurrency()).append("\n");
         details.append("الخصم: ").append(numberFormat.format(selected.getDiscountAmount())).append("\n");
         details.append("الصافي: ").append(numberFormat.format(selected.getNetAmount())).append("\n");

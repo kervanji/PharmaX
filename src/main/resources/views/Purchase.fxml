@@ -9,21 +9,22 @@
             fitToWidth="true" fitToHeight="true"
             style="-fx-background-color: transparent; -fx-background: transparent;">
 
-    <VBox stylesheets="@../styles/main.css"
+    <VBox fx:id="rootContainer"
+          stylesheets="@../styles/main.css"
           spacing="15"
           style="-fx-background-color: -fx-bg-gradient; -fx-padding: 20; -fx-font-family: 'Geeza Pro', 'SF Arabic', 'Arial', 'Tahoma';">
     
     <!-- Header -->
-    <HBox alignment="CENTER" spacing="20" style="-fx-background-color: linear-gradient(to left, -fx-warning, -fx-warning-dark); -fx-padding: 15; -fx-background-radius: 12;">
+    <HBox fx:id="pageHeader" alignment="CENTER" spacing="20" style="-fx-background-color: linear-gradient(to left, -fx-warning, -fx-warning-dark); -fx-padding: 15; -fx-background-radius: 12;">
         <Label text="المشتريات" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: white;"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Button fx:id="previousPurchasesBtn" text="المشتريات السابقة" onAction="#showPreviousPurchases"
                 style="-fx-background-color: -fx-btn-secondary-bg; -fx-text-fill: -fx-warning-dark; -fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 8;"/>
     </HBox>
     
-    <HBox spacing="20" VBox.vgrow="ALWAYS">
+    <HBox fx:id="mainContentBox" spacing="20" VBox.vgrow="ALWAYS">
         <!-- Left Panel - Supplier Balance Info -->
-        <VBox spacing="10" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-badge-warning-bg; -fx-padding: 15; -fx-background-radius: 12; -fx-min-width: 220;">
+        <VBox fx:id="balancePanel" spacing="10" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-badge-warning-bg; -fx-padding: 15; -fx-background-radius: 12; -fx-min-width: 220;">
             <Label text="الرصيد السابق" style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
             <Label fx:id="previousBalanceLabel" text="0" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-badge-warning-text;"/>
             
@@ -44,9 +45,9 @@
         </VBox>
         
         <!-- Right Panel - Form -->
-        <VBox spacing="15" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 20; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 6);">
+        <VBox fx:id="formPanel" spacing="15" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 20; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 14, 0, 0, 6);">
 
-            <GridPane hgap="6" vgap="10" nodeOrientation="RIGHT_TO_LEFT" alignment="TOP_LEFT">
+            <GridPane fx:id="formGrid" hgap="6" vgap="10" nodeOrientation="RIGHT_TO_LEFT" alignment="TOP_LEFT">
                 <columnConstraints>
                     <ColumnConstraints percentWidth="12" halignment="LEFT"/>
                     <ColumnConstraints percentWidth="38" hgrow="ALWAYS"/>
@@ -61,10 +62,10 @@
                 </rowConstraints>
 
                 <!-- Row 0: supplier and voucher number -->
-                <Label text="المورد/الحساب" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.valignment="CENTER"/>
+                <Label text="اسم المذخر" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="0" GridPane.valignment="CENTER"/>
                 <HBox spacing="8" alignment="CENTER_LEFT" GridPane.columnIndex="1" GridPane.rowIndex="0" GridPane.valignment="CENTER" GridPane.hgrow="ALWAYS">
                     <Button text="+" onAction="#addNewCustomer" styleClass="button-danger"/>
-                    <ComboBox fx:id="customerCombo" prefWidth="240" maxWidth="Infinity" promptText="اختر المورد/الحساب" editable="true" HBox.hgrow="ALWAYS"/>
+                    <ComboBox fx:id="customerCombo" prefWidth="240" maxWidth="Infinity" promptText="اختر اسم المذخر" editable="true" HBox.hgrow="ALWAYS"/>
                 </HBox>
 
                 <Label text="رقم المستند" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="2" GridPane.rowIndex="0" GridPane.valignment="CENTER"/>
@@ -78,7 +79,7 @@
 
                 <!-- Row 2: Description and discount -->
                 <Label text="البيان" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.valignment="CENTER"/>
-                <TextField fx:id="descriptionField" promptText="مشتريات من .."
+                <TextField fx:id="descriptionField" promptText="مشتريات من مذخر .."
                            style="-fx-padding: 10; -fx-background-radius: 8;"
                            GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.valignment="CENTER" GridPane.hgrow="ALWAYS" maxWidth="Infinity"/>
 
@@ -99,10 +100,12 @@
             </GridPane>
 
             <!-- Items Table Section -->
-            <VBox spacing="8" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-bg-main; -fx-padding: 10; -fx-background-radius: 8;">
+            <VBox fx:id="itemsSection" spacing="8" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-bg-main; -fx-padding: 10; -fx-background-radius: 8;">
                 <HBox spacing="10" alignment="CENTER_RIGHT" style="-fx-padding: 5;">
                     <Label text="المواد المشتراة" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-badge-warning-text;"/>
                     <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="toggleTableSizeBtn" text="تكبير الجدول" onAction="#handleToggleItemsTableSize"
+                            style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 8; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-cursor: hand;"/>
                     <Button text="+ إضافة مادة" onAction="#handleAddItem"
                             style="-fx-background-color: -fx-warning; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8 16; -fx-background-radius: 8; -fx-cursor: hand;"/>
                 </HBox>
@@ -127,7 +130,7 @@
     </HBox>
     
     <!-- Action Buttons -->
-    <HBox alignment="CENTER" spacing="15" style="-fx-padding: 10;">
+    <HBox fx:id="actionButtonsBox" alignment="CENTER" spacing="15" style="-fx-padding: 10;">
         <CheckBox fx:id="printCheckbox" text="طباعة"/>
         <Button fx:id="saveBtn" text="حفظ" onAction="#handleSave"
                 style="-fx-background-color: linear-gradient(to right, -fx-warning, -fx-warning-dark); -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 40; -fx-background-radius: 8; -fx-cursor: hand;"/>

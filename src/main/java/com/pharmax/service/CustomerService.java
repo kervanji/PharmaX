@@ -22,6 +22,7 @@ public class CustomerService {
     
     public Customer createCustomer(Customer customer) {
         logger.info("Creating new customer: {}", customer.getName());
+        customer.setAccountType(Customer.TYPE_CUSTOMER);
         
         // Always generate sequential customer code on create (defensive)
         customer.setCustomerCode(generateCustomerCode());
@@ -30,6 +31,14 @@ public class CustomerService {
         validateCustomer(customer);
         
         return customerRepository.save(customer);
+    }
+
+    public Customer createSupplier(Customer supplier) {
+        logger.info("Creating new supplier: {}", supplier.getName());
+        supplier.setAccountType(Customer.TYPE_SUPPLIER);
+        supplier.setCustomerCode(generateCustomerCode());
+        validateCustomer(supplier);
+        return customerRepository.save(supplier);
     }
     
     public Customer updateCustomer(Customer customer) {
@@ -51,6 +60,14 @@ public class CustomerService {
     
     public List<Customer> getAllCustomers() {
         return customerRepository.findAll();
+    }
+
+    public List<Customer> getSaleCustomers() {
+        return customerRepository.findSaleCustomers();
+    }
+
+    public List<Customer> getSuppliers() {
+        return customerRepository.findSuppliers();
     }
     
     public List<Customer> searchCustomersByName(String name) {
@@ -76,24 +93,24 @@ public class CustomerService {
     }
     
     private void validateCustomer(Customer customer) {
+        boolean supplier = Customer.TYPE_SUPPLIER.equals(customer.getAccountType());
+
         if (customer.getName() == null || customer.getName().trim().isEmpty()) {
-            throw new IllegalArgumentException("اسم العميل مطلوب");
+            throw new IllegalArgumentException(supplier ? "اسم المذخر مطلوب" : "اسم العميل مطلوب");
         }
 
-        if (customer.getPhoneNumber() == null || customer.getPhoneNumber().trim().isEmpty()) {
+        if (!supplier && (customer.getPhoneNumber() == null || customer.getPhoneNumber().trim().isEmpty())) {
             throw new IllegalArgumentException("رقم الهاتف مطلوب");
         }
 
-        if (!isValidPhoneNumber(customer.getPhoneNumber().trim())) {
+        if (customer.getPhoneNumber() != null
+                && !customer.getPhoneNumber().trim().isEmpty()
+                && !isValidPhoneNumber(customer.getPhoneNumber().trim())) {
             throw new IllegalArgumentException("رقم الهاتف غير صالح (يجب أن يبدأ بـ 07)");
         }
 
         if (customer.getCustomerCode() == null || customer.getCustomerCode().trim().isEmpty()) {
             throw new IllegalArgumentException("كود العميل مطلوب");
-        }
-
-        if (customer.getProjectLocation() == null || customer.getProjectLocation().trim().isEmpty()) {
-            throw new IllegalArgumentException("مواقع المشاريع مطلوبة (أدخل موقعاً واحداً على الأقل)");
         }
 
         Optional<Customer> byCode = customerRepository.findByCustomerCode(customer.getCustomerCode());
