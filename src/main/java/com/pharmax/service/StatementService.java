@@ -117,8 +117,8 @@ public class StatementService {
                             "مشتريات",
                             voucher.getVoucherNumber(),
                             voucher.getDescription(),
-                            voucher.getAmount(), // Debit
                             0.0,
+                            voucher.getAmount(), // Credit: we owe the supplier
                             voucher.getCurrency(),
                             voucher));
                 }

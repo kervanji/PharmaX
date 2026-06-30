@@ -5,6 +5,7 @@ import com.pharmax.service.CustomerService;
 import com.pharmax.service.VoucherService;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -41,11 +42,13 @@ public class PaymentVoucherController implements Initializable {
     @FXML private Label amountInWordsLabel;
     @FXML private TextField descriptionField;
     @FXML private TextArea notesArea;
+    @FXML private TextField purchaseInvoiceSearchField;
     @FXML private Label previousBalanceLabel;
     @FXML private Label currentBalanceLabel;
     @FXML private Label balanceIqdLabel;
     @FXML private Label balanceUsdLabel;
     @FXML private CheckBox printCheckbox;
+    @FXML private Button saveBtn;
     @FXML private VBox otherCurrenciesBox;
     
     // Installment fields
@@ -57,19 +60,26 @@ public class PaymentVoucherController implements Initializable {
     // Previous vouchers table
     @FXML private TableView<PreviousVoucherRow> previousVouchersTable;
     @FXML private TableColumn<PreviousVoucherRow, String> pvNumberColumn;
+    @FXML private TableColumn<PreviousVoucherRow, String> pvSupplierInvoiceColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvDateColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvAmountColumn;
     @FXML private TableColumn<PreviousVoucherRow, String> pvRemainingColumn;
+    @FXML private TableColumn<PreviousVoucherRow, String> pvStatusColumn;
     
     private final VoucherService voucherService = new VoucherService();
     private final CustomerService customerService = new CustomerService();
     private final DecimalFormat numberFormat = new DecimalFormat("#,###.##");
+    private static final String PAID_STATUS_TEXT = "\u0645\u062f\u0641\u0648\u0639";
+    private static final String UNPAID_STATUS_TEXT = "\u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639";
     private static final String DEFAULT_CASH_ACCOUNT = "صندوق 181";
     
     private ObservableList<Customer> customers;
     private Customer selectedCustomer;
     private ObservableList<PreviousVoucherRow> previousVoucherSource;
     private FilteredList<PreviousVoucherRow> previousVoucherRows;
+    private Long selectedPurchaseVoucherId;
+    private String selectedPurchaseVoucherNumber;
+    private boolean suppressTableSelectionEvents;
 
     private boolean tabMode = false;
     private String tabId;
@@ -88,18 +98,71 @@ public class PaymentVoucherController implements Initializable {
         loadCustomers();
         setupPreviousVouchersTable();
         setupListeners();
-        handleNew();
+        resetForm(false);
     }
 
     private void setupPreviousVouchersTable() {
         if (previousVouchersTable == null) return;
         pvNumberColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().voucherNumber));
+        if (pvSupplierInvoiceColumn != null) {
+            pvSupplierInvoiceColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().supplierInvoiceNumber));
+        }
         pvDateColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().dateText));
         pvAmountColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().amountText));
         pvRemainingColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().remainingText));
+        if (pvStatusColumn != null) {
+            pvStatusColumn.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().statusText));
+            pvStatusColumn.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String status, boolean empty) {
+                    super.updateItem(status, empty);
+                    if (empty || status == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(status);
+                        setStyle(status.startsWith(PAID_STATUS_TEXT)
+                                ? "-fx-text-fill: -fx-success-text; -fx-font-weight: bold;"
+                                : "-fx-text-fill: -fx-warning-text; -fx-font-weight: bold;");
+                    }
+                }
+            });
+        }
         previousVoucherSource = FXCollections.observableArrayList();
         previousVoucherRows = new FilteredList<>(previousVoucherSource, r -> true);
         previousVouchersTable.setItems(previousVoucherRows);
+        previousVouchersTable.setRowFactory(tv -> {
+            TableRow<PreviousVoucherRow> row = new TableRow<>() {
+                @Override
+                protected void updateItem(PreviousVoucherRow item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setDisable(false);
+                        setStyle("");
+                    } else if (item.paid) {
+                        setDisable(true);
+                        setStyle("-fx-opacity: 0.55; -fx-cursor: default;");
+                    } else {
+                        setDisable(false);
+                        setStyle("");
+                    }
+                }
+            };
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty() && row.getItem() != null && row.getItem().paid) {
+                    event.consume();
+                    clearTableSelectionSafely();
+                    showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع مسبقاً ولا يمكن دفعه مرة أخرى");
+                }
+            });
+            return row;
+        });
+        previousVouchersTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, row) -> {
+            if (suppressTableSelectionEvents || row == null) {
+                return;
+            }
+            applyPurchaseInvoiceToPayment(row);
+        });
     }
 
     private void loadPreviousVouchers() {
@@ -111,7 +174,7 @@ public class PaymentVoucherController implements Initializable {
         boolean isUsd = "دولار".equals(currency);
         double currentBalance = isUsd ? selectedCustomer.getBalanceUsd() : selectedCustomer.getBalanceIqd();
 
-        List<Voucher> vouchers = voucherService.getVouchersByCustomerAndType(selectedCustomer.getId(), VoucherType.PAYMENT);
+        List<Voucher> vouchers = voucherService.getVouchersByCustomerAndType(selectedCustomer.getId(), VoucherType.PURCHASE);
         if (vouchers == null || vouchers.isEmpty()) return;
 
         vouchers = vouchers.stream()
@@ -123,19 +186,30 @@ public class PaymentVoucherController implements Initializable {
         
         for (Voucher v : vouchers) {
             String dateText = v.getVoucherDate() != null ? v.getVoucherDate().toLocalDate().toString() : "-";
-            String amountText = numberFormat.format(v.getNetAmount() != null ? v.getNetAmount() : 0.0) + (isUsd ? " $" : " د.ع");
+            double netAmount = v.getNetAmount() != null ? v.getNetAmount() : 0.0;
+            boolean paid = voucherService.isPurchaseVoucherPaid(v.getId());
+            Voucher paymentVoucher = paid ? voucherService.findPaymentForPurchaseVoucher(v.getId()).orElse(null) : null;
+            String statusText = paid
+                    ? PAID_STATUS_TEXT + (paymentVoucher != null && paymentVoucher.getVoucherNumber() != null
+                    ? " - " + paymentVoucher.getVoucherNumber()
+                    : "")
+                    : UNPAID_STATUS_TEXT;
+            String amountText = numberFormat.format(netAmount) + (isUsd ? " $" : " د.ع");
             String remainingText = numberFormat.format(running) + (isUsd ? " $" : " د.ع");
 
             if (displayCount < 50) {
                 previousVoucherSource.add(new PreviousVoucherRow(
+                        v.getId(),
                         v.getVoucherNumber() != null ? v.getVoucherNumber() : "-",
-                        dateText, amountText, remainingText));
+                        safe(v.getSupplierInvoiceNumber()),
+                        dateText, amountText, remainingText, netAmount, v.getCurrency(), paid, statusText));
                 displayCount++;
             }
 
-            double net = v.getNetAmount() != null ? v.getNetAmount() : 0.0;
-            running += net;
+            running += netAmount;
         }
+        applyPurchaseInvoiceFilter();
+        updateSaveButtonState();
     }
     
     private void setupForm() {
@@ -145,6 +219,10 @@ public class PaymentVoucherController implements Initializable {
         amountCurrencyCombo.setItems(FXCollections.observableArrayList("دينار", "دولار"));
         amountCurrencyCombo.setValue("دينار");
         firstInstallmentDatePicker.setValue(LocalDate.now().plusMonths(1));
+
+        if (amountField != null) {
+            amountField.setEditable(false);
+        }
         
         customerCombo.setConverter(new StringConverter<Customer>() {
             @Override
@@ -171,6 +249,7 @@ public class PaymentVoucherController implements Initializable {
     private void setupListeners() {
         customerCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             selectedCustomer = newVal;
+            clearPurchaseInvoiceSelection();
             updateCustomerBalanceDisplay();
             updateDescription();
             loadPreviousVouchers();
@@ -201,7 +280,12 @@ public class PaymentVoucherController implements Initializable {
         amountCurrencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             updateAmountInWords();
             calculateNetAmount();
+            loadPreviousVouchers();
         });
+
+        if (purchaseInvoiceSearchField != null) {
+            purchaseInvoiceSearchField.textProperty().addListener((obs, oldVal, newVal) -> applyPurchaseInvoiceFilter());
+        }
     }
     
     
@@ -240,7 +324,7 @@ public class PaymentVoucherController implements Initializable {
                 String currency = amountCurrencyCombo.getValue();
                 double currentBalance = "دولار".equals(currency) ? 
                     selectedCustomer.getBalanceUsd() : selectedCustomer.getBalanceIqd();
-                double newBalance = currentBalance - netAmount;
+                double newBalance = currentBalance + netAmount;
                 currentBalanceLabel.setText(numberFormat.format(newBalance) + 
                     ("دولار".equals(currency) ? " $" : " د.ع"));
             }
@@ -330,13 +414,25 @@ public class PaymentVoucherController implements Initializable {
                 showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار المذخر");
                 return;
             }
-            
-            double amount = parseAmount(amountField.getText());
-            if (amount <= 0) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى إدخال مبلغ صحيح");
+
+            if (selectedPurchaseVoucherId == null) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار فاتورة مشتريات غير مدفوعة من القائمة");
+                return;
+            }
+
+            if (voucherService.isPurchaseVoucherPaid(selectedPurchaseVoucherId)) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "تم دفع هذا الوصل مسبقاً ولا يمكن دفعه مرة أخرى");
+                clearPurchaseInvoiceSelection();
+                loadPreviousVouchers();
                 return;
             }
             
+            double amount = parseAmount(amountField.getText());
+            if (amount <= 0) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار فاتورة مشتريات صحيحة من القائمة");
+                return;
+            }
+
             // Create voucher
             Voucher voucher = new Voucher();
             voucher.setVoucherType(VoucherType.PAYMENT);
@@ -352,6 +448,8 @@ public class PaymentVoucherController implements Initializable {
             voucher.setNetAmount(amount - parseAmount(discountAmountField.getText()));
             voucher.setAmountInWords(amountInWordsLabel.getText());
             voucher.setDescription(descriptionField.getText());
+            voucher.setParentVoucherId(selectedPurchaseVoucherId);
+            voucher.setReferenceNumber(selectedPurchaseVoucherNumber);
 
             if (notesArea != null && notesArea.getText() != null && !notesArea.getText().isEmpty()) {
                 voucher.setNotes(notesArea.getText());
@@ -377,10 +475,14 @@ public class PaymentVoucherController implements Initializable {
                 }
             }
             
-            handleNew();
+            resetForm(true);
             loadCustomers();
             
         } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("تم دفع هذا الوصل مسبقاً")) {
+                clearPurchaseInvoiceSelection();
+                loadPreviousVouchers();
+            }
             if (e.getMessage() != null && e.getMessage().contains("UNIQUE") && e.getMessage().contains("voucher_number")) {
                 voucherNumberField.setText(voucherService.generateVoucherNumber(VoucherType.PAYMENT));
             }
@@ -412,15 +514,12 @@ public class PaymentVoucherController implements Initializable {
         }
     }
     
-    @FXML
-    private void handleNew() {
+    private void resetForm(boolean keepCustomer) {
         voucherNumberField.setText(voucherService.generateVoucherNumber(VoucherType.PAYMENT));
         voucherDatePicker.setValue(LocalDate.now());
-        customerCombo.setValue(null);
         amountField.setText("");
         discountPercentField.setText("0");
         discountAmountField.setText("0");
-        descriptionField.setText("");
         if (notesArea != null) {
             notesArea.setText("");
         }
@@ -431,9 +530,125 @@ public class PaymentVoucherController implements Initializable {
         installmentOptionsBox.setManaged(false);
         installmentCountField.setText("");
         firstInstallmentDatePicker.setValue(LocalDate.now().plusMonths(1));
-        
-        selectedCustomer = null;
-        updateCustomerBalanceDisplay();
+
+        clearPurchaseInvoiceSelection();
+
+        if (keepCustomer && selectedCustomer != null) {
+            updateDescription();
+            updateCustomerBalanceDisplay();
+            loadPreviousVouchers();
+        } else {
+            customerCombo.setValue(null);
+            selectedCustomer = null;
+            descriptionField.setText("");
+            updateCustomerBalanceDisplay();
+            if (purchaseInvoiceSearchField != null) {
+                purchaseInvoiceSearchField.clear();
+            }
+            if (previousVoucherSource != null) {
+                previousVoucherSource.clear();
+            }
+        }
+        updateSaveButtonState();
+    }
+
+    private void applyPurchaseInvoiceFilter() {
+        if (previousVoucherRows == null) {
+            return;
+        }
+        String query = purchaseInvoiceSearchField != null && purchaseInvoiceSearchField.getText() != null
+                ? purchaseInvoiceSearchField.getText().trim().toLowerCase()
+                : "";
+        previousVoucherRows.setPredicate(row -> {
+            if (query.isEmpty()) {
+                return true;
+            }
+            return contains(row.voucherNumber, query)
+                    || contains(row.supplierInvoiceNumber, query)
+                    || contains(row.dateText, query)
+                    || contains(row.amountText, query)
+                    || contains(row.statusText, query);
+        });
+    }
+
+    private void applyPurchaseInvoiceToPayment(PreviousVoucherRow row) {
+        if (row.paid || voucherService.isPurchaseVoucherPaid(row.voucherId)) {
+            clearPurchaseInvoiceFormFields();
+            clearTableSelectionSafely();
+            showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع مسبقاً ولا يمكن دفعه مرة أخرى");
+            return;
+        }
+
+        selectedPurchaseVoucherId = row.voucherId;
+        selectedPurchaseVoucherNumber = row.voucherNumber;
+        amountField.setText(numberFormat.format(row.amount));
+        if (amountCurrencyCombo != null && row.currency != null && !row.currency.isBlank()) {
+            amountCurrencyCombo.setValue(row.currency);
+        }
+        String listNo = row.supplierInvoiceNumber != null && !row.supplierInvoiceNumber.isBlank()
+                ? " / قائمة المذخر " + row.supplierInvoiceNumber
+                : "";
+        descriptionField.setText("دفع إلى مذخر .. "
+                + (selectedCustomer != null ? selectedCustomer.getName() : "")
+                + " عن مشتريات " + row.voucherNumber + listNo);
+        calculateNetAmount();
+        updateAmountInWords();
+        updateSaveButtonState();
+    }
+
+    private boolean contains(String value, String query) {
+        return value != null && value.toLowerCase().contains(query);
+    }
+
+    private String safe(String value) {
+        return value != null ? value : "";
+    }
+
+    private void clearSelectedPurchaseInvoice() {
+        selectedPurchaseVoucherId = null;
+        selectedPurchaseVoucherNumber = null;
+    }
+
+    private void clearPurchaseInvoiceSelection() {
+        clearPurchaseInvoiceFormFields();
+        clearTableSelectionSafely();
+    }
+
+    private void clearPurchaseInvoiceFormFields() {
+        clearSelectedPurchaseInvoice();
+        amountField.setText("");
+        discountPercentField.setText("0");
+        discountAmountField.setText("0");
+        amountInWordsLabel.setText("صفر");
+        if (selectedCustomer != null) {
+            updateDescription();
+            calculateNetAmount();
+        }
+        updateSaveButtonState();
+    }
+
+    private void clearTableSelectionSafely() {
+        if (previousVouchersTable == null) {
+            return;
+        }
+        suppressTableSelectionEvents = true;
+        Platform.runLater(() -> {
+            try {
+                previousVouchersTable.getSelectionModel().clearSelection();
+            } finally {
+                suppressTableSelectionEvents = false;
+            }
+        });
+    }
+
+    private void updateSaveButtonState() {
+        if (saveBtn == null) {
+            return;
+        }
+        boolean canSave = selectedCustomer != null
+                && selectedPurchaseVoucherId != null
+                && !voucherService.isPurchaseVoucherPaid(selectedPurchaseVoucherId);
+        saveBtn.setDisable(!canSave);
     }
     
     @FXML
@@ -544,16 +759,30 @@ public class PaymentVoucherController implements Initializable {
     }
     
     private static class PreviousVoucherRow {
+        final Long voucherId;
         final String voucherNumber;
+        final String supplierInvoiceNumber;
         final String dateText;
         final String amountText;
         final String remainingText;
+        final double amount;
+        final String currency;
+        final boolean paid;
+        final String statusText;
 
-        private PreviousVoucherRow(String voucherNumber, String dateText, String amountText, String remainingText) {
+        private PreviousVoucherRow(Long voucherId, String voucherNumber, String supplierInvoiceNumber, String dateText,
+                                   String amountText, String remainingText, double amount, String currency,
+                                   boolean paid, String statusText) {
+            this.voucherId = voucherId;
             this.voucherNumber = voucherNumber;
+            this.supplierInvoiceNumber = supplierInvoiceNumber;
             this.dateText = dateText;
             this.amountText = amountText;
             this.remainingText = remainingText;
+            this.amount = amount;
+            this.currency = currency;
+            this.paid = paid;
+            this.statusText = statusText;
         }
     }
 

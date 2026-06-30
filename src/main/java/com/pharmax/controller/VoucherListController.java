@@ -31,11 +31,13 @@ import javafx.util.StringConverter;
 public class VoucherListController implements Initializable {
     
     @FXML private Label titleLabel;
+    @FXML private TextField searchField;
     @FXML private ComboBox<Customer> customerFilterCombo;
     @FXML private DatePicker fromDatePicker;
     @FXML private DatePicker toDatePicker;
     @FXML private TableView<Voucher> vouchersTable;
     @FXML private TableColumn<Voucher, String> voucherNumberCol;
+    @FXML private TableColumn<Voucher, String> supplierInvoiceNumberCol;
     @FXML private TableColumn<Voucher, String> dateCol;
     @FXML private TableColumn<Voucher, String> customerCol;
     @FXML private TableColumn<Voucher, String> amountCol;
@@ -76,6 +78,9 @@ public class VoucherListController implements Initializable {
 
     public void setInitialSearchTerm(String term) {
         this.initialSearchTerm = term;
+        if (searchField != null) {
+            searchField.setText(term != null ? term : "");
+        }
         if (term != null && !term.isBlank()) {
             selectCustomerByName(term.trim());
         }
@@ -178,6 +183,10 @@ public class VoucherListController implements Initializable {
     private void setupTable() {
         voucherNumberCol.setCellValueFactory(data -> 
             new SimpleStringProperty(data.getValue().getVoucherNumber()));
+        if (supplierInvoiceNumberCol != null) {
+            supplierInvoiceNumberCol.setCellValueFactory(data ->
+                    new SimpleStringProperty(safe(data.getValue().getSupplierInvoiceNumber())));
+        }
         
         dateCol.setCellValueFactory(data -> 
             new SimpleStringProperty(data.getValue().getVoucherDate().toLocalDate().format(dateFormatter)));
@@ -225,16 +234,25 @@ public class VoucherListController implements Initializable {
     private void updateTitle() {
         if (voucherType == VoucherType.RECEIPT) {
             titleLabel.setText("سندات القبض");
+            setSupplierInvoiceColumnVisible(false);
             updateAccountLabels("اختر العميل", "العميل");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-success-text;");
         } else if (voucherType == VoucherType.PURCHASE) {
             titleLabel.setText("المشتريات");
+            setSupplierInvoiceColumnVisible(true);
             updateAccountLabels("اختر المذخر", "المذخر");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-text;");
         } else {
             titleLabel.setText("سندات الدفع");
+            setSupplierInvoiceColumnVisible(false);
             updateAccountLabels("اختر المذخر", "المذخر");
             titleLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;");
+        }
+    }
+
+    private void setSupplierInvoiceColumnVisible(boolean visible) {
+        if (supplierInvoiceNumberCol != null) {
+            supplierInvoiceNumberCol.setVisible(visible);
         }
     }
 
@@ -255,7 +273,7 @@ public class VoucherListController implements Initializable {
     
     @FXML
     private void handleSearch() {
-        String searchTerm = null;
+        String searchTerm = searchField != null ? searchField.getText() : null;
         Long customerId = selectedCustomer != null ? selectedCustomer.getId() : null;
         LocalDateTime from = fromDatePicker.getValue() != null ? 
             fromDatePicker.getValue().atStartOfDay() : null;
@@ -293,6 +311,9 @@ public class VoucherListController implements Initializable {
         
         StringBuilder details = new StringBuilder();
         details.append("رقم السند: ").append(selected.getVoucherNumber()).append("\n");
+        if (selected.getSupplierInvoiceNumber() != null && !selected.getSupplierInvoiceNumber().isBlank()) {
+            details.append("رقم قائمة المذخر: ").append(selected.getSupplierInvoiceNumber()).append("\n");
+        }
         details.append("التاريخ: ").append(selected.getVoucherDate().toLocalDate()).append("\n");
         details.append(voucherType == VoucherType.RECEIPT ? "العميل: " : "المذخر: ")
                 .append(selected.getCustomer() != null ? selected.getCustomer().getName() : "نقدي").append("\n");
@@ -310,6 +331,10 @@ public class VoucherListController implements Initializable {
         }
         
         showAlert(Alert.AlertType.INFORMATION, "تفاصيل السند", details.toString());
+    }
+
+    private String safe(String value) {
+        return value != null ? value : "";
     }
     
     @FXML

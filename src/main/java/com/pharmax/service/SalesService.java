@@ -242,20 +242,60 @@ public class SalesService {
         if (saleOpt.isPresent()) {
             Sale sale = saleOpt.get();
             sale.setPaymentStatus(newStatus);
+            double debtPaymentAmount = 0.0;
             
             // If payment is completed, update customer balance
             if ("PAID".equals(newStatus)) {
                 double currentPaid = sale.getPaidAmount() != null ? sale.getPaidAmount() : 0.0;
                 double remaining = sale.getFinalAmount() - currentPaid;
                 if (Math.abs(remaining) > 1e-9) {
-                    customerService.updateCustomerBalance(sale.getCustomer().getId(), remaining);
+                    customerService.updateCustomerBalanceByCurrency(sale.getCustomer().getId(), remaining, sale.getCurrency());
+                    debtPaymentAmount = remaining;
                 }
                 sale.setPaidAmount(sale.getFinalAmount());
             }
             
-            return saleRepository.save(sale);
+            Sale savedSale = saleRepository.save(sale);
+            if ("PAID".equals(newStatus) && debtPaymentAmount > 1e-9) {
+                recordSaleDebtPayment(savedSale, debtPaymentAmount);
+            }
+            return savedSale;
         }
         throw new IllegalArgumentException("البيع غير موجود");
+    }
+
+    private void recordSaleDebtPayment(Sale sale, double amount) {
+        Transaction transaction = null;
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+            Customer customer = sale.getCustomer() != null && sale.getCustomer().getId() != null
+                    ? session.get(Customer.class, sale.getCustomer().getId())
+                    : null;
+            cashboxService.recordEntry(
+                    session,
+                    LocalDateTime.now(),
+                    "sale_debt_payment",
+                    "IN",
+                    amount,
+                    sale.getCurrency(),
+                    "sale",
+                    sale.getId(),
+                    0L,
+                    customer,
+                    null,
+                    customer,
+                    "CASH",
+                    "تسديد دين فاتورة بيع رقم " + (sale.getSaleCode() != null ? sale.getSaleCode() : sale.getId()),
+                    sale.getCreatedBy()
+            );
+            transaction.commit();
+        } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
+            logger.error("Failed to record sale debt payment in cashbox", e);
+            throw new RuntimeException("تم تحديث الفاتورة لكن فشل تسجيل حركة الصندوق: " + e.getMessage(), e);
+        }
     }
     
     private String generateSaleCode() {

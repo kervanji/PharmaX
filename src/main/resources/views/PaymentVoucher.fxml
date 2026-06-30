@@ -130,12 +130,20 @@
             </HBox>
 
             <VBox spacing="8" VBox.vgrow="ALWAYS" style="-fx-background-color: -fx-bg-main; -fx-padding: 10; -fx-background-radius: 8;">
+                <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                    <Label text="فواتير مشتريات المذخر" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <TextField fx:id="purchaseInvoiceSearchField" promptText="بحث برقم القائمة أو رقم المستند" prefWidth="260"
+                               style="-fx-padding: 8; -fx-background-radius: 8;"/>
+                </HBox>
                 <TableView fx:id="previousVouchersTable" VBox.vgrow="ALWAYS" style="-fx-background-radius: 8;">
                     <columns>
-                        <TableColumn fx:id="pvNumberColumn" text="رقم" prefWidth="150" />
+                        <TableColumn fx:id="pvNumberColumn" text="رقم المستند" prefWidth="150" />
+                        <TableColumn fx:id="pvSupplierInvoiceColumn" text="رقم القائمة" prefWidth="150" />
                         <TableColumn fx:id="pvDateColumn" text="التاريخ" prefWidth="180" />
                         <TableColumn fx:id="pvAmountColumn" text="المبلغ" prefWidth="180" />
-                        <TableColumn fx:id="pvRemainingColumn" text="المتبقي بعده" prefWidth="180" />
+                        <TableColumn fx:id="pvRemainingColumn" text="رصيد المذخر" prefWidth="180" />
+                        <TableColumn fx:id="pvStatusColumn" text="الحالة" prefWidth="160" />
                     </columns>
                 </TableView>
             </VBox>
@@ -146,10 +154,8 @@
     <!-- Action Buttons -->
     <HBox alignment="CENTER" spacing="15" style="-fx-padding: 10;">
         <CheckBox fx:id="printCheckbox" text="طباعة"/>
-        <Button fx:id="saveBtn" text="حفظ" onAction="#handleSave"
+        <Button fx:id="saveBtn" text="حفظ" onAction="#handleSave" disable="true"
                 style="-fx-background-color: linear-gradient(to right, -fx-danger, -fx-danger-dark); -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 40; -fx-background-radius: 8; -fx-cursor: hand;"/>
-        <Button fx:id="newBtn" text="جديد" onAction="#handleNew"
-                style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 40; -fx-background-radius: 8; -fx-cursor: hand;"/>
         <Button text="إغلاق" onAction="#handleClose"
                 style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-font-size: 14px; -fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand; -fx-border-color: -fx-border-input; -fx-border-radius: 8;"/>
     </HBox>

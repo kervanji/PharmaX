@@ -13,6 +13,7 @@ import com.pharmax.service.PrintService;
 import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.ProductUnitService;
 import com.pharmax.util.SessionManager;
+import com.pharmax.util.TabManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javafx.beans.property.SimpleStringProperty;
@@ -350,57 +351,39 @@ public class InventoryListController {
 
     @FXML
     private void handleAddProduct() {
-        try {
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(MainApp.class.getResource("/views/ProductForm.fxml"));
-            loader.setCharset(StandardCharsets.UTF_8);
-            Parent root = loader.load();
-
-            Stage stage = new Stage();
-            stage.setTitle("منتج جديد");
-            stage.initModality(Modality.APPLICATION_MODAL);
-            Scene scene = new Scene(root);
-            com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
-            com.pharmax.MainApp.applyCurrentFontSize(scene);
-            stage.setScene(scene);
-            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
-            stage.setMaximized(true);
-
-            ProductController controller = loader.getController();
-            controller.setDialogStage(stage);
-
-            stage.showAndWait();
-            loadProducts();
-        } catch (IOException e) {
-            showError("خطأ", "فشل في فتح نافذة إضافة منتج");
+        ProductController controller = TabManager.getInstance().openTab(
+                "new-product",
+                "منتج جديد",
+                "add_product.svg",
+                "/views/ProductForm.fxml",
+                (ProductController productController) -> {
+                    productController.setTabMode(true);
+                    productController.setTabId("new-product");
+                    productController.setAfterSaveCallback(this::handleRefresh);
+                });
+        if (controller == null && !TabManager.getInstance().isTabOpen("new-product")) {
+            showError("خطأ", "فشل في فتح تاب إضافة منتج");
         }
     }
 
     private void handleEditProduct(Product product) {
-        try {
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(MainApp.class.getResource("/views/ProductForm.fxml"));
-            loader.setCharset(StandardCharsets.UTF_8);
-            Parent root = loader.load();
-
-            Stage stage = new Stage();
-            stage.setTitle("تعديل منتج");
-            stage.initModality(Modality.APPLICATION_MODAL);
-            Scene scene = new Scene(root);
-            com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
-            com.pharmax.MainApp.applyCurrentFontSize(scene);
-            stage.setScene(scene);
-            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
-            stage.setMaximized(true);
-
-            ProductController controller = loader.getController();
-            controller.setDialogStage(stage);
-            controller.setProduct(product);
-
-            stage.showAndWait();
-            loadProducts();
-        } catch (IOException e) {
-            showError("خطأ", "فشل في فتح نافذة تعديل المنتج");
+        if (product == null || product.getId() == null) {
+            return;
+        }
+        String tabId = "product-edit-" + product.getId();
+        ProductController controller = TabManager.getInstance().openTab(
+                tabId,
+                "تعديل منتج - " + product.getName(),
+                "add_product.svg",
+                "/views/ProductForm.fxml",
+                (ProductController productController) -> {
+                    productController.setTabMode(true);
+                    productController.setTabId(tabId);
+                    productController.setAfterSaveCallback(this::handleRefresh);
+                    productController.setProduct(product);
+                });
+        if (controller == null && !TabManager.getInstance().isTabOpen(tabId)) {
+            showError("خطأ", "فشل في فتح تاب تعديل المنتج");
         }
     }
 
@@ -428,29 +411,17 @@ public class InventoryListController {
 
     @FXML
     private void handleManageCategories() {
-        try {
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(MainApp.class.getResource("/views/CategoryManager.fxml"));
-            loader.setCharset(StandardCharsets.UTF_8);
-            Parent root = loader.load();
-
-            Stage stage = new Stage();
-            stage.setTitle("إدارة الفئات");
-            stage.initModality(Modality.APPLICATION_MODAL);
-            Scene scene = new Scene(root);
-            com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
-            com.pharmax.MainApp.applyCurrentFontSize(scene);
-            stage.setScene(scene);
-            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
-            stage.setMaximized(true);
-
-            CategoryController controller = loader.getController();
-            controller.setDialogStage(stage);
-
-            stage.showAndWait();
-            setupFilters();
-        } catch (IOException e) {
-            showError("خطأ", "فشل في فتح نافذة إدارة الفئات");
+        CategoryController controller = TabManager.getInstance().openTab(
+                "categories",
+                "إدارة الفئات",
+                "categories_management.svg",
+                "/views/CategoryManager.fxml",
+                (CategoryController categoryController) -> {
+                    categoryController.setTabMode(true);
+                    categoryController.setAfterChangeCallback(this::setupFilters);
+                });
+        if (controller == null && !TabManager.getInstance().isTabOpen("categories")) {
+            showError("خطأ", "فشل في فتح تاب إدارة الفئات");
         }
     }
 

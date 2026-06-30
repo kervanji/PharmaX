@@ -111,7 +111,7 @@
                     <RadioButton fx:id="percentagePriceRadio" text="نسبة مئوية" style="-fx-font-size: 13px;"/>
                 </HBox>
 
-                <Label text="سعر البيع:*" GridPane.rowIndex="1" GridPane.columnIndex="0"
+                <Label text="سعر بيع العلبة:*" GridPane.rowIndex="1" GridPane.columnIndex="0"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <VBox spacing="4" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.columnSpan="3">
                     <HBox spacing="6">
@@ -123,10 +123,10 @@
                         <TextField fx:id="unitPriceUsdField" HBox.hgrow="ALWAYS" promptText="0.00 $"
                                    style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
                     </HBox>
-                    <Label fx:id="calculatedRetailPriceLabel" text="سعر البيع المحسوب: --"
+                    <Label fx:id="calculatedRetailPriceLabel" text="سعر بيع العلبة المحسوب: --"
                            visible="false" managed="false"
                            style="-fx-font-size: 12px; -fx-text-fill: -fx-accent-color; -fx-font-weight: bold;"/>
-                    <Label fx:id="profitMarginRetailLabel" text="هامش: 0.00 د.ع (0%)"
+                    <Label fx:id="profitMarginRetailLabel" text="هامش العلبة: 0.00 د.ع (0%)"
                            style="-fx-font-size: 12px; -fx-text-fill: -fx-success-text; -fx-font-weight: bold;"/>
                 </VBox>
             </GridPane>
@@ -218,10 +218,15 @@
 
         <VBox spacing="10" nodeOrientation="RIGHT_TO_LEFT"
               style="-fx-background-color: -fx-form-section-bg; -fx-background-radius: 10; -fx-padding: 12; -fx-border-color: -fx-border-main; -fx-border-radius: 10;">
-            <Label text="وحدات التعبئة والباركود"
-                   style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+            <HBox spacing="10" alignment="CENTER_RIGHT" nodeOrientation="RIGHT_TO_LEFT">
+                <Label text="وحدات التعبئة والباركود"
+                       style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="packagingExpandButton" text="تكبير الجدول" onAction="#handleTogglePackagingTableSize"
+                        style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 8 14;"/>
+            </HBox>
 
-            <GridPane hgap="10" vgap="8" nodeOrientation="RIGHT_TO_LEFT">
+            <GridPane fx:id="packagingControlsGrid" hgap="10" vgap="8" nodeOrientation="RIGHT_TO_LEFT">
                 <columnConstraints>
                     <ColumnConstraints percentWidth="12"/>
                     <ColumnConstraints percentWidth="16"/>
@@ -274,7 +279,7 @@
                 </HBox>
             </GridPane>
 
-            <TableView fx:id="packagingTable" prefHeight="150" nodeOrientation="RIGHT_TO_LEFT">
+            <TableView fx:id="packagingTable" prefHeight="150" nodeOrientation="RIGHT_TO_LEFT" VBox.vgrow="ALWAYS">
                 <columns>
                     <TableColumn fx:id="packagingUnitColumn" text="الوحدة" prefWidth="130"/>
                     <TableColumn fx:id="packagingBarcodeColumn" text="الباركود" prefWidth="150"/>

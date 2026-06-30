@@ -67,6 +67,8 @@ public class PurchaseController implements Initializable {
     @FXML
     private TextField voucherNumberField;
     @FXML
+    private TextField supplierInvoiceNumberField;
+    @FXML
     private DatePicker voucherDatePicker;
     @FXML
     private ComboBox<Customer> customerCombo;
@@ -1183,6 +1185,8 @@ public class PurchaseController implements Initializable {
             Voucher voucher = new Voucher();
             voucher.setVoucherType(VoucherType.PURCHASE);
             voucher.setVoucherNumber(voucherNumberField.getText());
+            voucher.setSupplierInvoiceNumber(sanitizeOptionalText(
+                    supplierInvoiceNumberField != null ? supplierInvoiceNumberField.getText() : null));
             voucher.setVoucherDate(voucherDatePicker.getValue().atStartOfDay());
             voucher.setCurrency(selectedCurrency);
             voucher.setExchangeRate(exchangeRate);
@@ -1345,6 +1349,9 @@ public class PurchaseController implements Initializable {
     @FXML
     private void handleNew() {
         voucherNumberField.setText(voucherService.generateVoucherNumber(VoucherType.PURCHASE));
+        if (supplierInvoiceNumberField != null) {
+            supplierInvoiceNumberField.clear();
+        }
         voucherDatePicker.setValue(LocalDate.now());
         customerCombo.setValue(null);
         discountPercentField.setText("0");

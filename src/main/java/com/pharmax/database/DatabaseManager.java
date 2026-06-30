@@ -31,7 +31,8 @@ public class DatabaseManager {
             "db/migrations/20260502_purchase_returns.sql",
             "db/migrations/20260502_cashbox_foundation.sql",
             "db/migrations/20260502_permissions_audit.sql",
-            "db/migrations/20260503_batch_production_date.sql");
+            "db/migrations/20260503_batch_production_date.sql",
+            "db/migrations/20260504_supplier_invoice_number.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -147,6 +148,11 @@ public class DatabaseManager {
         }
         try {
             stmt.execute("ALTER TABLE products ADD COLUMN special_price_usd REAL");
+        } catch (SQLException ignored) {
+        }
+
+        try {
+            stmt.execute("ALTER TABLE vouchers ADD COLUMN supplier_invoice_number TEXT");
         } catch (SQLException ignored) {
         }
 
@@ -619,6 +625,7 @@ public class DatabaseManager {
                     CREATE TABLE IF NOT EXISTS vouchers (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         voucher_number TEXT UNIQUE NOT NULL,
+                        supplier_invoice_number TEXT,
                         voucher_type TEXT NOT NULL,
                         voucher_date DATETIME DEFAULT CURRENT_TIMESTAMP,
                         currency TEXT NOT NULL DEFAULT 'دينار',
@@ -863,6 +870,7 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
             "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
             "CREATE INDEX IF NOT EXISTS idx_vouchers_number ON vouchers(voucher_number)",
+            "CREATE INDEX IF NOT EXISTS idx_vouchers_supplier_invoice ON vouchers(supplier_invoice_number)",
             "CREATE INDEX IF NOT EXISTS idx_vouchers_type ON vouchers(voucher_type)",
             "CREATE INDEX IF NOT EXISTS idx_vouchers_customer ON vouchers(customer_id)",
             "CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers(voucher_date)",

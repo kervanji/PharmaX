@@ -77,6 +77,11 @@
                 <Label text="التاريخ" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="1" GridPane.valignment="CENTER"/>
                 <DatePicker fx:id="voucherDatePicker" prefWidth="180" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.valignment="CENTER"/>
 
+                <Label text="رقم قائمة المذخر" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="2" GridPane.rowIndex="1" GridPane.valignment="CENTER"/>
+                <TextField fx:id="supplierInvoiceNumberField" promptText="اختياري"
+                           style="-fx-padding: 10; -fx-background-radius: 8;"
+                           GridPane.columnIndex="3" GridPane.rowIndex="1" GridPane.valignment="CENTER" GridPane.hgrow="ALWAYS" maxWidth="Infinity"/>
+
                 <!-- Row 2: Description and discount -->
                 <Label text="البيان" style="-fx-font-weight: bold; -fx-text-fill: -fx-form-label;" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.valignment="CENTER"/>
                 <TextField fx:id="descriptionField" promptText="مشتريات من مذخر .."

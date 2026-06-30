@@ -332,6 +332,8 @@ public class MainController {
                     false, true, false),
             new TileDef("cashbox", "💵", "settings.png", "الصندوق",
                     "linear-gradient(to bottom right, #15803d, #16a34a)", "handleCashbox"),
+            new TileDef("payment-voucher", "📤", "payment_voucher.svg", "سند دفع",
+                    "linear-gradient(to bottom right, #dc2626, #ef4444)", "handlePaymentVoucher"),
             new TileDef("barcode-print", "▥", "barcode_printing.png", "طباعة باركود",
                     "linear-gradient(to bottom right, #475569, #64748b)", "handleBarcodePrint"),
             new TileDef("user-management", "👤", "user_management.png", "إدارة المستخدمين",

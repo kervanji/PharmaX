@@ -32,6 +32,7 @@ public class CategoryController {
     private final InventoryService inventoryService = new InventoryService();
     private Category editingCategory = null;
     private boolean tabMode = false;
+    private Runnable afterChangeCallback;
     
     @FXML
     private void initialize() {
@@ -116,6 +117,10 @@ public class CategoryController {
     public void setTabMode(boolean tabMode) {
         this.tabMode = tabMode;
     }
+
+    public void setAfterChangeCallback(Runnable afterChangeCallback) {
+        this.afterChangeCallback = afterChangeCallback;
+    }
     
     @FXML
     private void handleAddCategory() {
@@ -145,6 +150,7 @@ public class CategoryController {
             categoryNameField.clear();
             categoryDescField.clear();
             loadCategories();
+            notifyAfterChange();
         } catch (Exception e) {
             showError("خطأ", e.getMessage());
         }
@@ -176,6 +182,7 @@ public class CategoryController {
                     categoryService.deleteCategory(category);
                     showInfo("تم", "تم حذف الفئة بنجاح");
                     loadCategories();
+                    notifyAfterChange();
                 } catch (Exception e) {
                     showError("خطأ", "فشل في حذف الفئة: " + e.getMessage());
                 }
@@ -189,6 +196,12 @@ public class CategoryController {
             com.pharmax.util.TabManager.getInstance().closeTab("categories");
         } else if (dialogStage != null) {
             dialogStage.close();
+        }
+    }
+
+    private void notifyAfterChange() {
+        if (afterChangeCallback != null) {
+            afterChangeCallback.run();
         }
     }
     

@@ -17,6 +17,9 @@ public class Voucher {
     
     @Column(name = "voucher_number", nullable = false, unique = true)
     private String voucherNumber;
+
+    @Column(name = "supplier_invoice_number")
+    private String supplierInvoiceNumber;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "voucher_type", nullable = false)
@@ -122,6 +125,9 @@ public class Voucher {
     
     public String getVoucherNumber() { return voucherNumber; }
     public void setVoucherNumber(String voucherNumber) { this.voucherNumber = voucherNumber; }
+
+    public String getSupplierInvoiceNumber() { return supplierInvoiceNumber; }
+    public void setSupplierInvoiceNumber(String supplierInvoiceNumber) { this.supplierInvoiceNumber = supplierInvoiceNumber; }
     
     public VoucherType getVoucherType() { return voucherType; }
     public void setVoucherType(VoucherType voucherType) { this.voucherType = voucherType; }

@@ -15,6 +15,8 @@
         <Region HBox.hgrow="ALWAYS"/>
         
         <!-- Search & Filter -->
+        <TextField fx:id="searchField" promptText="بحث برقم المستند أو رقم القائمة أو البيان" prefWidth="260"
+                   style="-fx-padding: 8; -fx-background-radius: 8;"/>
         <ComboBox fx:id="customerFilterCombo" promptText="اختر العميل" editable="true" prefWidth="220"
                   style="-fx-padding: 6; -fx-background-radius: 8;"/>
         <DatePicker fx:id="fromDatePicker" promptText="من تاريخ" prefWidth="140"/>
@@ -27,6 +29,7 @@
     <TableView fx:id="vouchersTable" VBox.vgrow="ALWAYS">
         <columns>
             <TableColumn fx:id="voucherNumberCol" text="رقم السند" prefWidth="100"/>
+            <TableColumn fx:id="supplierInvoiceNumberCol" text="رقم القائمة" prefWidth="130"/>
             <TableColumn fx:id="dateCol" text="التاريخ" prefWidth="120"/>
             <TableColumn fx:id="customerCol" text="الحساب" prefWidth="180"/>
             <TableColumn fx:id="amountCol" text="المبلغ" prefWidth="120"/>

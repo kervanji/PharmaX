@@ -148,6 +148,9 @@ public class VoucherService {
         meta.setPadding(3f);
         meta.setBackgroundColor(metaBgColor);
         meta.addElement(new Phrase("رقم السند: " + safe(voucher.getVoucherNumber()), arabicFont));
+        if (isPurchase && voucher.getSupplierInvoiceNumber() != null && !voucher.getSupplierInvoiceNumber().isBlank()) {
+            meta.addElement(new Phrase("رقم قائمة المذخر: " + safe(voucher.getSupplierInvoiceNumber()), arabicFont));
+        }
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy/MM/dd");
         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
         meta.addElement(new Phrase("التاريخ: " + (voucher.getVoucherDate() != null ? voucher.getVoucherDate().format(dateFmt) : "-"), arabicFont));
@@ -443,6 +446,8 @@ public class VoucherService {
             if (voucher.getDescription() == null || voucher.getDescription().isEmpty()) {
                 voucher.setDescription(generateDescription(voucher));
             }
+
+            validatePurchasePaymentNotDuplicate(session, voucher);
             
             session.saveOrUpdate(voucher);
             session.flush();
@@ -494,6 +499,8 @@ public class VoucherService {
             if (voucher.getDescription() == null || voucher.getDescription().isEmpty()) {
                 voucher.setDescription(generateDescription(voucher));
             }
+
+            validatePurchasePaymentNotDuplicate(session, voucher);
             
             voucher.setIsInstallment(true);
             voucher.setTotalInstallments(numberOfInstallments);
@@ -611,6 +618,32 @@ public class VoucherService {
             query.setParameter("customerId", customerId);
             query.setParameter("type", type);
             return query.list();
+        }
+    }
+
+    public boolean isPurchaseVoucherPaid(Long purchaseVoucherId) {
+        if (purchaseVoucherId == null) {
+            return false;
+        }
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            return isPurchaseVoucherPaid(session, purchaseVoucherId, null);
+        }
+    }
+
+    public Optional<Voucher> findPaymentForPurchaseVoucher(Long purchaseVoucherId) {
+        if (purchaseVoucherId == null) {
+            return Optional.empty();
+        }
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            Query<Voucher> query = session.createQuery(
+                    "FROM Voucher v WHERE v.voucherType = :type " +
+                            "AND v.parentVoucherId = :parentVoucherId " +
+                            "AND v.isCancelled = false ORDER BY v.createdAt DESC",
+                    Voucher.class);
+            query.setParameter("type", VoucherType.PAYMENT);
+            query.setParameter("parentVoucherId", purchaseVoucherId);
+            query.setMaxResults(1);
+            return query.uniqueResultOptional();
         }
     }
 
@@ -753,7 +786,7 @@ public class VoucherService {
                 hql.append("AND v.voucherDate BETWEEN :from AND :to ");
             }
             if (searchTerm != null && !searchTerm.isEmpty()) {
-                hql.append("AND (v.voucherNumber LIKE :search OR v.description LIKE :search OR v.customer.name LIKE :search) ");
+                hql.append("AND (v.voucherNumber LIKE :search OR v.supplierInvoiceNumber LIKE :search OR v.description LIKE :search OR v.customer.name LIKE :search) ");
             }
             if (customerId != null) {
                 hql.append("AND v.customer.id = :customerId ");
@@ -849,7 +882,7 @@ public class VoucherService {
         // سند دفع = نحن دفعنا للعميل/المورد
         boolean isUsd = "دولار".equals(currency) || "USD".equalsIgnoreCase(currency);
 
-        if (voucher.getVoucherType() == VoucherType.RECEIPT) {
+        if (voucher.getVoucherType() == VoucherType.RECEIPT || voucher.getVoucherType() == VoucherType.PAYMENT) {
             if (isUsd) {
                 customer.setBalanceUsd(customer.getBalanceUsd() + amount);
             } else {
@@ -857,7 +890,6 @@ public class VoucherService {
                 customer.setCurrentBalance(customer.getCurrentBalance() + amount);
             }
         } else {
-            // PAYMENT و PURCHASE كلاهما يخصم من رصيد العميل/المورد
             if (isUsd) {
                 customer.setBalanceUsd(customer.getBalanceUsd() - amount);
             } else {
@@ -884,7 +916,7 @@ public class VoucherService {
         boolean isUsd = "دولار".equals(currency) || "USD".equalsIgnoreCase(currency);
 
         // عكس تأثير السند
-        if (voucher.getVoucherType() == VoucherType.RECEIPT) {
+        if (voucher.getVoucherType() == VoucherType.RECEIPT || voucher.getVoucherType() == VoucherType.PAYMENT) {
             if (isUsd) {
                 customer.setBalanceUsd(customer.getBalanceUsd() - amount);
             } else {
@@ -1040,6 +1072,42 @@ public class VoucherService {
                     createdBy
             );
         }
+    }
+
+    private void validatePurchasePaymentNotDuplicate(Session session, Voucher voucher) {
+        if (voucher == null
+                || voucher.getVoucherType() != VoucherType.PAYMENT
+                || voucher.getParentVoucherId() == null) {
+            return;
+        }
+
+        Voucher parent = session.get(Voucher.class, voucher.getParentVoucherId());
+        if (parent == null || parent.getVoucherType() != VoucherType.PURCHASE) {
+            return;
+        }
+
+        if (isPurchaseVoucherPaid(session, parent.getId(), voucher.getId())) {
+            throw new IllegalArgumentException("تم دفع هذا الوصل مسبقاً ولا يمكن دفعه مرة أخرى");
+        }
+    }
+
+    private boolean isPurchaseVoucherPaid(Session session, Long purchaseVoucherId, Long excludePaymentVoucherId) {
+        if (purchaseVoucherId == null) {
+            return false;
+        }
+        String hql = "SELECT COUNT(v.id) FROM Voucher v WHERE v.voucherType = :type " +
+                "AND v.parentVoucherId = :parentVoucherId AND v.isCancelled = false";
+        if (excludePaymentVoucherId != null) {
+            hql += " AND v.id <> :excludeId";
+        }
+        Query<Long> query = session.createQuery(hql, Long.class);
+        query.setParameter("type", VoucherType.PAYMENT);
+        query.setParameter("parentVoucherId", purchaseVoucherId);
+        if (excludePaymentVoucherId != null) {
+            query.setParameter("excludeId", excludePaymentVoucherId);
+        }
+        Long count = query.uniqueResult();
+        return count != null && count > 0;
     }
 
     private LocalDate parseOptionalExpirationDate(String expirationDate) {

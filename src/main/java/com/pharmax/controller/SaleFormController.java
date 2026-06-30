@@ -25,6 +25,7 @@ import javafx.util.StringConverter;
 import javafx.application.Platform;
 import com.pharmax.util.AppConfigStore;
 import com.pharmax.util.SessionManager;
+import com.pharmax.util.TabManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,6 +175,7 @@ public class SaleFormController {
     private boolean globalProductSearchInstalled = false;
     private boolean suppressProductAutoAdd = false;
     private boolean categoryFilterListenerInstalled = false;
+    private boolean refreshingComboData = false;
     private Product selectedProduct = null;
     private ProductUnit selectedUnit = null;
     private ProductUnit pendingBarcodeUnit = null;
@@ -635,6 +637,9 @@ public class SaleFormController {
 
         if (!categoryFilterListenerInstalled) {
             categoryFilterComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+                if (refreshingComboData) {
+                    return;
+                }
                 applyProductFilters();
                 if (productSearchQuery != null && !productSearchQuery.isBlank() && !productComboBox.isShowing()) {
                     productComboBox.show();
@@ -706,6 +711,9 @@ public class SaleFormController {
         // Enable search in customer ComboBox
         if (customerComboBox.getEditor() != null) {
             customerComboBox.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                if (refreshingComboData) {
+                    return;
+                }
                 if (!isDebtCustomerSelectionVisible()) {
                     return;
                 }
@@ -896,6 +904,9 @@ public class SaleFormController {
 
         if (productComboBox.getEditor() != null) {
             productComboBox.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                if (refreshingComboData) {
+                    return;
+                }
                 if (productComboBox.getValue() != null) {
                     String rendered = productComboBox.getConverter().toString(productComboBox.getValue());
                     if (rendered.equals(newText)) {
@@ -931,54 +942,70 @@ public class SaleFormController {
 
     private void refreshData() {
         Customer selectedCustomer = lastSelectedDebtCustomer != null ? lastSelectedDebtCustomer : customerComboBox.getValue();
-        Product selectedProductBeforeRefresh = selectedProduct != null ? selectedProduct : productComboBox.getValue();
 
-        List<Customer> customers = customerRepository.findSaleCustomers();
-        filteredCustomers = new FilteredList<>(FXCollections.observableArrayList(customers), c -> true);
-        customerComboBox.setItems(filteredCustomers);
-        if (selectedCustomer != null && selectedCustomer.getId() != null && !isDefaultSaleCustomer(selectedCustomer)) {
-            customers.stream()
-                    .filter(customer -> selectedCustomer.getId().equals(customer.getId()))
-                    .findFirst()
-                    .ifPresent(customer -> {
-                        lastSelectedDebtCustomer = customer;
-                        if (isDebtCustomerSelectionVisible()) {
-                            customerComboBox.setValue(customer);
-                        }
-                    });
-        } else if (!isDebtCustomerSelectionVisible()) {
-            selectDefaultSaleCustomer();
-        }
+        refreshingComboData = true;
+        suppressProductAutoAdd = true;
+        try {
+            hideComboPopup(customerComboBox);
+            hideComboPopup(categoryFilterComboBox);
+            hideComboPopup(productComboBox);
 
-        List<Product> products = productRepository.findAll().stream()
-                .filter(Product::getIsActive)
-                .toList();
-        unitsByProduct.clear();
-        for (Product product : products) {
-            unitsByProduct.put(product.getId(), productUnitService.getUnitsForProductOrDefault(product));
-        }
+            if (productComboBox != null) {
+                productComboBox.getSelectionModel().clearSelection();
+                productComboBox.setValue(null);
+                if (productComboBox.getEditor() != null) {
+                    productComboBox.getEditor().clear();
+                }
+            }
+            productSearchQuery = "";
+            selectedProduct = null;
+            selectedUnit = null;
+            if (unitComboBox != null) {
+                unitComboBox.getItems().clear();
+                unitComboBox.setValue(null);
+            }
 
-        filteredProducts = new FilteredList<>(FXCollections.observableArrayList(products), p -> true);
-        productComboBox.setItems(filteredProducts);
-        setupCategoryFilter(products);
-        if (selectedProductBeforeRefresh != null && selectedProductBeforeRefresh.getId() != null) {
-            products.stream()
-                    .filter(product -> selectedProductBeforeRefresh.getId().equals(product.getId()))
-                    .findFirst()
-                    .ifPresent(product -> {
-                        suppressProductAutoAdd = true;
-                        try {
-                            selectedProduct = product;
-                            productComboBox.setValue(product);
-                            handleProductSelection(product);
-                        } finally {
-                            suppressProductAutoAdd = false;
-                        }
-                    });
+            List<Customer> customers = customerRepository.findSaleCustomers();
+            filteredCustomers = new FilteredList<>(FXCollections.observableArrayList(customers), c -> true);
+            customerComboBox.setItems(filteredCustomers);
+            if (selectedCustomer != null && selectedCustomer.getId() != null && !isDefaultSaleCustomer(selectedCustomer)) {
+                customers.stream()
+                        .filter(customer -> selectedCustomer.getId().equals(customer.getId()))
+                        .findFirst()
+                        .ifPresent(customer -> {
+                            lastSelectedDebtCustomer = customer;
+                            if (isDebtCustomerSelectionVisible()) {
+                                customerComboBox.setValue(customer);
+                            }
+                        });
+            } else if (!isDebtCustomerSelectionVisible()) {
+                selectDefaultSaleCustomer();
+            }
+
+            List<Product> products = productRepository.findAll().stream()
+                    .filter(Product::getIsActive)
+                    .toList();
+            unitsByProduct.clear();
+            for (Product product : products) {
+                unitsByProduct.put(product.getId(), productUnitService.getUnitsForProductOrDefault(product));
+            }
+
+            filteredProducts = new FilteredList<>(FXCollections.observableArrayList(products), p -> true);
+            productComboBox.setItems(filteredProducts);
+            setupCategoryFilter(products);
+        } finally {
+            suppressProductAutoAdd = false;
+            refreshingComboData = false;
         }
 
         refreshCartBatchPreviews();
         updateTotals();
+    }
+
+    private void hideComboPopup(ComboBox<?> comboBox) {
+        if (comboBox != null) {
+            comboBox.hide();
+        }
     }
 
     private void addSelectedProductWithSingleQuantity(Product product) {
@@ -1869,56 +1896,52 @@ public class SaleFormController {
                 return;
             }
 
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(getClass().getResource("/views/ProductForm.fxml"));
-            loader.setCharset(StandardCharsets.UTF_8);
-            Parent root = loader.load();
-
-            Stage stage = new Stage();
-            stage.setTitle("تعديل منتج");
-            stage.initModality(Modality.WINDOW_MODAL);
-            if (dialogStage != null) {
-                stage.initOwner(dialogStage);
-            }
-            Scene scene = new Scene(root);
-            com.pharmax.util.ThemeManager.getInstance().applyTheme(scene);
-            com.pharmax.MainApp.applyCurrentFontSize(scene);
-            stage.setScene(scene);
-            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
-
-            ProductController controller = loader.getController();
-            controller.setDialogStage(stage);
-            controller.setProduct(product);
-
-            stage.showAndWait();
-
-            // Refresh table to reflect any changes
-            itemsTable.refresh();
-            updateTotals();
-
-            // Refresh selected product info if needed
-            if (selectedProduct != null && selectedProduct.getId().equals(product.getId())) {
-                Product updated = productRepository.findById(product.getId()).orElse(null);
-                if (updated != null) {
-                    selectedProduct = updated;
-                    // Update labels
-                    String unit = updated.getUnitOfMeasure();
-                    if (unit == null || unit.trim().isEmpty())
-                        unit = "وحدة";
-                    double stock = updated.getQuantityInStock();
-                    if (stock <= 0) {
-                        stockLabel.setText("المخزون المتاح: " + stock + " " + unit + " (نفذ المخزون)");
-                        stockLabel.setStyle("-fx-text-fill: -fx-danger-text; -fx-font-weight: bold;");
-                    } else {
-                        stockLabel.setText("المخزون المتاح: " + stock + " " + unit);
-                        stockLabel.setStyle("-fx-text-fill: -fx-text-hint;");
-                    }
-                    priceLabel.setText("السعر: " + numberFormatter.format(updated.getUnitPrice()) + " دينار");
-                }
+            String tabId = "product-edit-" + product.getId();
+            ProductController controller = TabManager.getInstance().openTab(
+                    tabId,
+                    "تعديل منتج - " + product.getName(),
+                    "add_product.svg",
+                    "/views/ProductForm.fxml",
+                    (ProductController productController) -> {
+                        productController.setTabMode(true);
+                        productController.setTabId(tabId);
+                        productController.setAfterSaveCallback(() -> refreshSaleAfterProductEdit(product.getId()));
+                        productController.setProduct(product);
+                    });
+            if (controller == null && !TabManager.getInstance().isTabOpen(tabId)) {
+                showError("خطأ", "فشل في فتح تاب تعديل المنتج");
             }
         } catch (Exception e) {
             logger.error("Failed to open product form", e);
-            showError("خطأ", "فشل في فتح نافذة تعديل المنتج");
+            showError("خطأ", "فشل في فتح تاب تعديل المنتج");
+        }
+    }
+
+    private void refreshSaleAfterProductEdit(Long productId) {
+        boolean restoreSelectedProduct = productId != null
+                && selectedProduct != null
+                && productId.equals(selectedProduct.getId());
+        refreshData();
+        itemsTable.refresh();
+        updateTotals();
+
+        if (restoreSelectedProduct) {
+            Product updated = productRepository.findById(productId).orElse(null);
+            if (updated != null) {
+                selectedProduct = updated;
+                if (productComboBox != null) {
+                    suppressProductAutoAdd = true;
+                    try {
+                        productComboBox.setValue(updated);
+                    } finally {
+                        suppressProductAutoAdd = false;
+                    }
+                }
+                unitsByProduct.put(productId, productUnitService.getUnitsForProductOrDefault(updated));
+                updateSelectedProductStockLabel();
+                updateSelectedProductPriceLabel();
+                updateProductPreviewPanel();
+            }
         }
     }
 

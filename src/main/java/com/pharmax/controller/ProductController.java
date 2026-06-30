@@ -17,6 +17,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -29,6 +30,9 @@ import java.util.List;
 import java.util.Locale;
 
 public class ProductController {
+    private static final String STRIP_UNIT = "شريط";
+    private static final String BOX_UNIT = "علبة";
+
     @FXML
     private TextField productCodeField;
     @FXML
@@ -88,6 +92,10 @@ public class ProductController {
     @FXML
     private TableView<ProductUnitRow> packagingTable;
     @FXML
+    private GridPane packagingControlsGrid;
+    @FXML
+    private Button packagingExpandButton;
+    @FXML
     private TableColumn<ProductUnitRow, String> packagingUnitColumn;
     @FXML
     private TableColumn<ProductUnitRow, String> packagingBarcodeColumn;
@@ -144,6 +152,9 @@ public class ProductController {
     private Product product;
     private boolean isEditMode = false;
     private boolean tabMode = false;
+    private String tabId = "new-product";
+    private Runnable afterSaveCallback;
+    private boolean packagingTableExpanded = false;
     private Double originalCostPrice = null; // Store original cost for sellers who can't see it
     private Double originalUnitPrice = null; // Store original selling price for sellers who can't edit it
     private final InventoryService inventoryService = new InventoryService();
@@ -251,7 +262,7 @@ public class ProductController {
             packagingUnitComboBox.setItems(FXCollections.observableArrayList(selectablePackagingUnits));
         }
         if (unitOfMeasureComboBox != null && unitOfMeasureComboBox.getValue() == null) {
-            unitOfMeasureComboBox.setValue("شريط");
+            unitOfMeasureComboBox.setValue(STRIP_UNIT);
         }
     }
 
@@ -275,6 +286,7 @@ public class ProductController {
                     .setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue().isActiveUnit()));
         }
         packagingTable.setItems(packagingRows);
+        applyPackagingTableSize();
         if (packagingConversionField != null
                 && (packagingConversionField.getText() == null || packagingConversionField.getText().isBlank())) {
             packagingConversionField.setText("1");
@@ -293,7 +305,7 @@ public class ProductController {
             if (packagingActiveCheckBox != null) {
                 packagingActiveCheckBox.setSelected(row.isActiveUnit());
             }
-            if ("علبة".equals(row.getUnitName()) && stripsPerBoxField != null && row.getConversionFactor() > 0) {
+            if (BOX_UNIT.equals(row.getUnitName()) && stripsPerBoxField != null && row.getConversionFactor() > 0) {
                 stripsPerBoxField.setText(formatQuantity(row.getConversionFactor()));
             }
             refreshUnitBreakdownLabels();
@@ -310,6 +322,7 @@ public class ProductController {
         if (stripsPerBoxField != null) {
             stripsPerBoxField.textProperty().addListener((obs, oldVal, newVal) -> {
                 syncPackagingEditorWithStripBox();
+                syncStripBoxRowFromShortcut();
                 refreshUnitBreakdownLabels();
             });
         }
@@ -340,9 +353,15 @@ public class ProductController {
             updateAllProfitMargins();
         });
 
-        // Selling price changes trigger their respective profit margin
-        unitPriceField.textProperty().addListener((obs, oldVal, newVal) -> updateAllProfitMargins());
-        unitPriceUsdField.textProperty().addListener((obs, oldVal, newVal) -> updateAllProfitMargins());
+        // The main selling price is the box price; strip price is derived from it.
+        unitPriceField.textProperty().addListener((obs, oldVal, newVal) -> {
+            syncStripBoxRowFromShortcut();
+            updateAllProfitMargins();
+        });
+        unitPriceUsdField.textProperty().addListener((obs, oldVal, newVal) -> {
+            syncStripBoxRowFromShortcut();
+            updateAllProfitMargins();
+        });
         wholesalePriceField.textProperty().addListener((obs, oldVal, newVal) -> updateAllProfitMargins());
         wholesalePriceUsdField.textProperty().addListener((obs, oldVal, newVal) -> updateAllProfitMargins());
         specialPriceField.textProperty().addListener((obs, oldVal, newVal) -> updateAllProfitMargins());
@@ -402,13 +421,13 @@ public class ProductController {
             return;
         }
         if (!percentagePriceRadio.isSelected() || price <= 0) {
-            calculatedRetailPriceLabel.setText("سعر البيع المحسوب: --");
+            calculatedRetailPriceLabel.setText("سعر بيع العلبة المحسوب: --");
             return;
         }
 
         double costIqd = parseDouble(costPriceField.getText());
         String currency = costIqd > 0 ? "د.ع" : "$";
-        calculatedRetailPriceLabel.setText("سعر البيع المحسوب: " + numberFormat.format(price) + " " + currency);
+        calculatedRetailPriceLabel.setText("سعر بيع العلبة المحسوب: " + numberFormat.format(price) + " " + currency);
     }
 
     /**
@@ -500,7 +519,8 @@ public class ProductController {
             double percentage = (profit / costValue) * 100;
 
             String color = profit >= 0 ? "-fx-success-text" : "-fx-danger-text";
-            label.setText(String.format("هامش: %s %s (%.1f%%)", numberFormat.format(profit), currency, percentage));
+            String marginLabel = label == profitMarginRetailLabel ? "هامش العلبة" : "هامش";
+            label.setText(String.format("%s: %s %s (%.1f%%)", marginLabel, numberFormat.format(profit), currency, percentage));
             label.setStyle("-fx-font-size: 12px; -fx-text-fill: " + color + "; -fx-font-weight: bold;");
         } catch (Exception e) {
             label.setText("--");
@@ -513,6 +533,16 @@ public class ProductController {
 
     public void setTabMode(boolean tabMode) {
         this.tabMode = tabMode;
+    }
+
+    public void setTabId(String tabId) {
+        if (tabId != null && !tabId.isBlank()) {
+            this.tabId = tabId;
+        }
+    }
+
+    public void setAfterSaveCallback(Runnable afterSaveCallback) {
+        this.afterSaveCallback = afterSaveCallback;
     }
 
     public void setProduct(Product product) {
@@ -557,14 +587,16 @@ public class ProductController {
         loadStripsPerBox(product);
         if (baseUnitComboBox != null) {
             String baseUnit = product.getBaseUnit() != null ? product.getBaseUnit() : product.getUnitOfMeasure();
-            baseUnitComboBox.setValue(baseUnit != null ? baseUnit : "شريط");
+            baseUnitComboBox.setValue(baseUnit != null ? baseUnit : STRIP_UNIT);
         }
         isActiveCheckBox.setSelected(product.getIsActive());
         if (quickSaleProductCheckBox != null) {
             quickSaleProductCheckBox.setSelected(Boolean.TRUE.equals(product.getIsQuickSale()));
         }
         loadPackagingRows(product);
+        loadBoxSellingPriceFields(product);
         syncPackagingEditorWithStripBox();
+        syncStripBoxRowFromShortcut();
 
         // Hide opening batch section in edit mode
         hideOpeningBatchSection();
@@ -588,7 +620,7 @@ public class ProductController {
         }
 
         productUnitService.getUnitsForProductOrDefault(product).stream()
-                .filter(unit -> unit.getUnitName() != null && unit.getUnitName().trim().equals("علبة"))
+                .filter(unit -> unit.getUnitName() != null && unit.getUnitName().trim().equals(BOX_UNIT))
                 .filter(unit -> unit.getEffectiveConversionFactor() > 1)
                 .findFirst()
                 .ifPresent(unit -> stripsPerBoxField.setText(formatQuantity(unit.getEffectiveConversionFactor())));
@@ -601,6 +633,21 @@ public class ProductController {
             packagingRows.add(ProductUnitRow.fromUnit(unit));
         }
         refreshUnitBreakdownLabels();
+    }
+
+    private void loadBoxSellingPriceFields(Product product) {
+        ProductUnitRow boxRow = findPackagingRow(BOX_UNIT);
+        if (boxRow != null) {
+            if (boxRow.getSalePrice() > 0) {
+                unitPriceField.setText(String.valueOf(boxRow.getSalePrice()));
+            }
+            if (boxRow.getSalePriceUsd() > 0) {
+                unitPriceUsdField.setText(String.valueOf(boxRow.getSalePriceUsd()));
+            }
+        } else if (product != null) {
+            unitPriceField.setText(product.getUnitPrice() != null ? String.valueOf(product.getUnitPrice()) : "");
+            unitPriceUsdField.setText(product.getUnitPriceUsd() != null ? String.valueOf(product.getUnitPriceUsd()) : "");
+        }
     }
 
     @FXML
@@ -656,8 +703,16 @@ public class ProductController {
             packagingRows.add(row);
         }
         packagingTable.refresh();
-        if ("علبة".equals(unitName) && stripsPerBoxField != null) {
-            stripsPerBoxField.setText(formatQuantity(conversionFactor));
+        if (BOX_UNIT.equals(unitName)) {
+            if (stripsPerBoxField != null) {
+                stripsPerBoxField.setText(formatQuantity(conversionFactor));
+            }
+            if (row.getSalePrice() > 0) {
+                unitPriceField.setText(String.valueOf(row.getSalePrice()));
+            }
+            if (row.getSalePriceUsd() > 0) {
+                unitPriceUsdField.setText(String.valueOf(row.getSalePriceUsd()));
+            }
         }
         clearPackagingInputs();
         refreshUnitBreakdownLabels();
@@ -779,6 +834,9 @@ public class ProductController {
                 showInfo("تم الإضافة", "تم إضافة المنتج بنجاح");
             }
 
+            if (afterSaveCallback != null) {
+                afterSaveCallback.run();
+            }
             closeForm();
         } catch (Exception e) {
             showError("خطأ", e.getMessage());
@@ -792,9 +850,37 @@ public class ProductController {
 
     private void closeForm() {
         if (tabMode) {
-            com.pharmax.util.TabManager.getInstance().closeTab("new-product");
+            com.pharmax.util.TabManager.getInstance().closeTab(tabId);
         } else if (dialogStage != null) {
             dialogStage.close();
+        }
+    }
+
+    @FXML
+    private void handleTogglePackagingTableSize() {
+        packagingTableExpanded = !packagingTableExpanded;
+        applyPackagingTableSize();
+    }
+
+    private void applyPackagingTableSize() {
+        if (packagingTable == null) {
+            return;
+        }
+
+        if (packagingTableExpanded) {
+            packagingTable.setPrefHeight(520);
+            packagingTable.setMinHeight(420);
+        } else {
+            packagingTable.setPrefHeight(150);
+            packagingTable.setMinHeight(120);
+        }
+
+        if (packagingControlsGrid != null) {
+            packagingControlsGrid.setVisible(!packagingTableExpanded);
+            packagingControlsGrid.setManaged(!packagingTableExpanded);
+        }
+        if (packagingExpandButton != null) {
+            packagingExpandButton.setText(packagingTableExpanded ? "تصغير الجدول" : "تكبير الجدول");
         }
     }
 
@@ -962,6 +1048,9 @@ public class ProductController {
                 try {
                     inventoryService.deleteProduct(product);
                     showInfo("تم الحذف", "تم حذف المنتج بنجاح");
+                    if (afterSaveCallback != null) {
+                        afterSaveCallback.run();
+                    }
                     closeForm();
                 } catch (Exception e) {
                     showError("خطأ", "فشل في حذف المنتج: " + e.getMessage());
@@ -982,7 +1071,7 @@ public class ProductController {
             return false;
         }
 
-        if (!validateRequiredCurrencyPair("السعر المفرد", unitPriceField, unitPriceUsdField)) {
+        if (!validateRequiredCurrencyPair("سعر بيع العلبة", unitPriceField, unitPriceUsdField)) {
             return false;
         }
 
@@ -1087,15 +1176,15 @@ public class ProductController {
         if (stripsPerBox <= 0) {
             return;
         }
-        if (baseUnitComboBox != null && !"شريط".equals(baseUnitComboBox.getValue())) {
-            baseUnitComboBox.setValue("شريط");
+        if (baseUnitComboBox != null && !STRIP_UNIT.equals(baseUnitComboBox.getValue())) {
+            baseUnitComboBox.setValue(STRIP_UNIT);
         }
         if (packagingUnitComboBox != null
                 && (packagingUnitComboBox.getValue() == null || packagingUnitComboBox.getValue().isBlank())) {
-            packagingUnitComboBox.setValue("علبة");
+            packagingUnitComboBox.setValue(BOX_UNIT);
         }
         if (packagingUnitComboBox != null
-                && "علبة".equals(packagingUnitComboBox.getValue())
+                && BOX_UNIT.equals(packagingUnitComboBox.getValue())
                 && packagingConversionField != null) {
             packagingConversionField.setText(formatQuantity(stripsPerBox));
         }
@@ -1107,46 +1196,85 @@ public class ProductController {
             return;
         }
 
-        ProductUnitRow existingBox = packagingRows.stream()
-                .filter(row -> "علبة".equalsIgnoreCase(row.getUnitName()))
-                .findFirst()
-                .orElse(null);
+        ProductUnitRow existingStrip = findPackagingRow(STRIP_UNIT);
+        ProductUnitRow existingBox = findPackagingRow(BOX_UNIT);
 
-        String barcode = existingBox != null ? existingBox.getBarcode() : "";
-        double salePrice = existingBox != null ? existingBox.getSalePrice() : 0;
-        double salePriceUsd = existingBox != null ? existingBox.getSalePriceUsd() : 0;
-        boolean defaultUnit = existingBox != null && existingBox.isDefaultUnit();
-        boolean activeUnit = existingBox == null || existingBox.isActiveUnit();
+        String stripBarcode = existingStrip != null ? existingStrip.getBarcode() : "";
+        boolean stripActive = existingStrip == null || existingStrip.isActiveUnit();
+        String boxBarcode = existingBox != null ? existingBox.getBarcode() : "";
+        boolean boxActive = existingBox == null || existingBox.isActiveUnit();
 
-        if (packagingUnitComboBox != null && "علبة".equals(packagingUnitComboBox.getValue())) {
-            barcode = safeTrim(packagingBarcodeField);
-            salePrice = parseDouble(packagingPriceField.getText());
-            salePriceUsd = parseDouble(packagingPriceUsdField.getText());
-            defaultUnit = packagingDefaultCheckBox.isSelected();
-            activeUnit = packagingActiveCheckBox == null || packagingActiveCheckBox.isSelected();
+        if (packagingUnitComboBox != null && STRIP_UNIT.equals(packagingUnitComboBox.getValue())) {
+            stripBarcode = safeTrim(packagingBarcodeField);
+            stripActive = packagingActiveCheckBox == null || packagingActiveCheckBox.isSelected();
+        } else if (packagingUnitComboBox != null && BOX_UNIT.equals(packagingUnitComboBox.getValue())) {
+            boxBarcode = safeTrim(packagingBarcodeField);
+            boxActive = packagingActiveCheckBox == null || packagingActiveCheckBox.isSelected();
         }
 
+        double boxPrice = parseDouble(unitPriceField != null ? unitPriceField.getText() : null);
+        double boxPriceUsd = parseDouble(unitPriceUsdField != null ? unitPriceUsdField.getText() : null);
+        double stripPrice = boxPrice > 0 ? boxPrice / stripsPerBox : 0;
+        double stripPriceUsd = boxPriceUsd > 0 ? boxPriceUsd / stripsPerBox : 0;
+
+        ProductUnitRow updatedStrip = new ProductUnitRow(
+                STRIP_UNIT,
+                stripBarcode,
+                1,
+                stripPrice,
+                stripPriceUsd,
+                true,
+                stripActive);
         ProductUnitRow updatedBox = new ProductUnitRow(
-                "علبة",
-                barcode,
+                BOX_UNIT,
+                boxBarcode,
                 stripsPerBox,
-                salePrice,
-                salePriceUsd,
-                defaultUnit,
-                activeUnit);
+                boxPrice,
+                boxPriceUsd,
+                false,
+                boxActive);
 
-        if (updatedBox.isDefaultUnit()) {
-            packagingRows.forEach(row -> row.setDefaultUnit(false));
-        }
-
-        if (existingBox != null) {
-            packagingRows.set(packagingRows.indexOf(existingBox), updatedBox);
-        } else {
-            packagingRows.add(updatedBox);
-        }
+        packagingRows.forEach(row -> row.setDefaultUnit(false));
+        upsertPackagingRow(updatedStrip);
+        upsertPackagingRow(updatedBox);
+        syncSelectedPackagingEditorPrices(stripPrice, stripPriceUsd, boxPrice, boxPriceUsd);
 
         if (packagingTable != null) {
             packagingTable.refresh();
+        }
+    }
+
+    private ProductUnitRow findPackagingRow(String unitName) {
+        if (unitName == null) {
+            return null;
+        }
+        return packagingRows.stream()
+                .filter(row -> unitName.equalsIgnoreCase(row.getUnitName()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void upsertPackagingRow(ProductUnitRow row) {
+        ProductUnitRow existing = findPackagingRow(row.getUnitName());
+        if (existing != null) {
+            packagingRows.set(packagingRows.indexOf(existing), row);
+        } else {
+            packagingRows.add(row);
+        }
+    }
+
+    private void syncSelectedPackagingEditorPrices(double stripPrice, double stripPriceUsd,
+            double boxPrice, double boxPriceUsd) {
+        if (packagingUnitComboBox == null || packagingPriceField == null || packagingPriceUsdField == null) {
+            return;
+        }
+        String selectedUnit = packagingUnitComboBox.getValue();
+        if (STRIP_UNIT.equals(selectedUnit)) {
+            packagingPriceField.setText(stripPrice > 0 ? String.valueOf(stripPrice) : "");
+            packagingPriceUsdField.setText(stripPriceUsd > 0 ? String.valueOf(stripPriceUsd) : "");
+        } else if (BOX_UNIT.equals(selectedUnit)) {
+            packagingPriceField.setText(boxPrice > 0 ? String.valueOf(boxPrice) : "");
+            packagingPriceUsdField.setText(boxPriceUsd > 0 ? String.valueOf(boxPriceUsd) : "");
         }
     }
 
