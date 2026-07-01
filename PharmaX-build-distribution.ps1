@@ -179,6 +179,15 @@ if (Test-Path $exeSource) {
 # Optional DB file (if exists)
 Copy-Item (Join-Path $PROJECT_DIR "pharmax.db") $DIST_DIR -ErrorAction SilentlyContinue
 
+# Google Drive OAuth credentials (required for cloud backup)
+$credSource = Join-Path $PROJECT_DIR "src\main\resources\credentials.json"
+if (Test-Path $credSource) {
+    Copy-Item $credSource (Join-Path $DIST_DIR "credentials.json") -Force
+    Write-Host "Included credentials.json in distribution" -ForegroundColor Green
+} else {
+    Write-Host "Warning: credentials.json not found - Google Drive backup will not work until it is added" -ForegroundColor Yellow
+}
+
 # -----------------------------
 # Step 6: Create launchers + README
 # -----------------------------

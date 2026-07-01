@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.pharmax.model.LicenseInfo;
 import com.pharmax.model.LicenseStatus;
 import com.pharmax.util.DeviceFingerprint;
+import com.pharmax.util.PharmaXAppDirs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,27 +35,35 @@ public class LicenseService {
     }
 
     private File getLicenseFile() {
-        String userHome = System.getProperty("user.home");
-        String os = System.getProperty("os.name").toLowerCase();
-        File appDataDir;
+        return PharmaXAppDirs.getLicenseFile();
+    }
 
-        if (os.contains("win")) {
-            String appData = System.getenv("APPDATA");
-            if (appData != null) {
-                appDataDir = new File(appData, "PharmaX");
-            } else {
-                appDataDir = new File(userHome, "AppData\\Roaming\\PharmaX");
+    /**
+     * Returns true when the user must enter an activation code before using the app.
+     * First install always requires activation; activated licenses persist across updates.
+     */
+    public boolean isActivationRequired() {
+        LicenseInfo info = loadLicense();
+        if (info == null) {
+            return true;
+        }
+        if (info.getLicenseStatus() == LicenseStatus.ACTIVATED && verifyLicenseSignature(info)) {
+            return false;
+        }
+        if (info.getLicenseStatus() == LicenseStatus.TRIAL && verifyLicenseSignature(info)) {
+            try {
+                LocalDate firstRun = LocalDate.parse(info.getFirstRunDate(), DateTimeFormatter.ISO_LOCAL_DATE);
+                long daysBetween = ChronoUnit.DAYS.between(firstRun, LocalDate.now());
+                return daysBetween > info.getTrialDays();
+            } catch (DateTimeParseException e) {
+                return true;
             }
-        } else if (os.contains("mac")) {
-            appDataDir = new File(userHome, "Library/Application Support/PharmaX");
-        } else {
-            appDataDir = new File(userHome, ".pharmax");
         }
+        return true;
+    }
 
-        if (!appDataDir.exists()) {
-            appDataDir.mkdirs();
-        }
-        return new File(appDataDir, "license.dat");
+    public boolean isFirstInstall() {
+        return !getLicenseFile().exists();
     }
 
     public boolean isTrialValidOrActivated() {
@@ -62,16 +71,8 @@ public class LicenseService {
         String currentDateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
 
         if (info == null) {
-            // First run
-            info = new LicenseInfo();
-            info.setFirstRunDate(currentDateStr);
-            info.setTrialDays(30);
-            info.setLicenseStatus(LicenseStatus.TRIAL);
-            info.setDeviceIdHash(DeviceFingerprint.getFingerprintSha256Hex());
-            info.setCreatedAt(currentDateStr);
-            info.setLastRunDate(currentDateStr);
-            saveLicense(info);
-            return true;
+            // First install — activation required before use
+            return false;
         }
 
         // Check for tampering
@@ -82,8 +83,8 @@ public class LicenseService {
             return false;
         }
 
-        // Check device ID mismatch
-        if (!info.getDeviceIdHash().equalsIgnoreCase(DeviceFingerprint.getFingerprintSha256Hex())) {
+        // Check device ID (with legacy fingerprint migration for existing installs)
+        if (!isDeviceAuthorized(info)) {
             logger.warn("Device ID mismatch.");
             return false;
         }
@@ -148,7 +149,28 @@ public class LicenseService {
 
     public boolean isActivated() {
         LicenseInfo info = loadLicense();
-        return info != null && info.getLicenseStatus() == LicenseStatus.ACTIVATED && verifyLicenseSignature(info);
+        return info != null
+                && info.getLicenseStatus() == LicenseStatus.ACTIVATED
+                && verifyLicenseSignature(info)
+                && isDeviceAuthorized(info);
+    }
+
+    private boolean isDeviceAuthorized(LicenseInfo info) {
+        String current = DeviceFingerprint.getFingerprintSha256Hex();
+        if (info.getDeviceIdHash() != null && info.getDeviceIdHash().equalsIgnoreCase(current)) {
+            return true;
+        }
+
+        // Migrate licenses created before the stable machine-id fingerprint
+        String legacy = DeviceFingerprint.getLegacyFingerprintSha256Hex();
+        if (info.getDeviceIdHash() != null && info.getDeviceIdHash().equalsIgnoreCase(legacy)) {
+            info.setDeviceIdHash(current);
+            saveLicense(info);
+            logger.info("Migrated license device fingerprint to stable machine id");
+            return true;
+        }
+
+        return false;
     }
 
     public ActivationResult activate(String activationCode) {

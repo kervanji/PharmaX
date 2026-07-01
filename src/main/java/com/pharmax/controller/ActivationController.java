@@ -10,6 +10,8 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 
 public class ActivationController {
+    @FXML private Label activationTitleLabel;
+    @FXML private Label activationHintLabel;
     @FXML private TextField activationCodeField;
     @FXML private Label deviceIdLabel;
     @FXML private Label errorLabel;
@@ -23,6 +25,24 @@ public class ActivationController {
     private void initialize() {
         if (deviceIdLabel != null) {
             deviceIdLabel.setText(licenseService.getDeviceFingerprintShort());
+        }
+
+        if (licenseService.isFirstInstall()) {
+            if (activationTitleLabel != null) {
+                activationTitleLabel.setText("تفعيل البرنامج");
+                activationTitleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-color;");
+            }
+            if (activationHintLabel != null) {
+                activationHintLabel.setText("مرحباً! أدخل كود التفعيل للبدء. لن يُطلب منك مرة أخرى بعد التفعيل.");
+            }
+        } else {
+            if (activationTitleLabel != null) {
+                activationTitleLabel.setText("انتهت الفترة التجريبية");
+                activationTitleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;");
+            }
+            if (activationHintLabel != null) {
+                activationHintLabel.setText("يرجى التواصل مع المطور للحصول على كود تفعيل دائم.");
+            }
         }
 
         if (activationCodeField != null) {

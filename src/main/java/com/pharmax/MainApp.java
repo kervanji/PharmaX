@@ -71,7 +71,7 @@ public class MainApp extends Application {
             backupService = new com.pharmax.service.drive.BackupService(googleDriveService);
 
             // Check if tokens already exist (previously connected) - reconnect silently (no browser)
-            java.io.File tokensDir = new java.io.File(System.getProperty("user.home") + "/.PharmaX/drive_tokens");
+            java.io.File tokensDir = com.pharmax.util.PharmaXAppDirs.getDriveTokensDir();
             if (tokensDir.exists() && tokensDir.list() != null && tokensDir.list().length > 0) {
                 new Thread(() -> {
                     if (googleDriveService.initializeSilently()) {

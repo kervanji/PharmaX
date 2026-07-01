@@ -23,8 +23,8 @@
                     <font><Font name="System Bold" size="30"/></font>
                 </Label>
 
-                <Label text="انتهت الفترة التجريبية" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-danger-text;"/>
-                <Label text="يرجى التواصل مع المطور للحصول على كود تفعيل دائم." style="-fx-font-size: 13px; -fx-text-fill: -fx-text-hint;" textAlignment="CENTER" wrapText="true"/>
+                <Label fx:id="activationTitleLabel" text="تفعيل البرنامج" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-color;"/>
+                <Label fx:id="activationHintLabel" text="مرحباً! أدخل كود التفعيل للبدء. لن يُطلب منك مرة أخرى بعد التفعيل." style="-fx-font-size: 13px; -fx-text-fill: -fx-text-hint;" textAlignment="CENTER" wrapText="true"/>
 
                 <VBox spacing="4" alignment="CENTER" style="-fx-background-color: rgba(255,255,255,0.05); -fx-padding: 10; -fx-background-radius: 8; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 8;">
                     <Label text="معلومات المطور" style="-fx-text-fill: -fx-text-main; -fx-font-size: 14px; -fx-font-weight: bold;"/>

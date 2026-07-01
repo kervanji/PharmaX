@@ -16,13 +16,16 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
+import com.pharmax.util.PharmaXAppDirs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,7 +43,7 @@ public class GoogleDriveService {
     private static final Logger logger = LoggerFactory.getLogger(GoogleDriveService.class);
     private static final String APPLICATION_NAME = "PharmaX Inventory Management";
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-    private static final String TOKENS_DIRECTORY_PATH = System.getProperty("user.home") + "/.PharmaX/drive_tokens";
+    private static final String TOKENS_DIRECTORY_PATH = PharmaXAppDirs.getDriveTokensDir().getAbsolutePath();
     private static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE);
     private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
     private static final String BACKUP_FOLDER_NAME = "PharmaX Backups";
@@ -50,35 +53,172 @@ public class GoogleDriveService {
     private volatile boolean initializing = false;
 
     public GoogleDriveService() {
+        migrateLegacyTokenDirectory();
+    }
+
+    private void migrateLegacyTokenDirectory() {
+        java.io.File legacyDir = new java.io.File(System.getProperty("user.home"), ".PharmaX/drive_tokens");
+        java.io.File targetDir = PharmaXAppDirs.getDriveTokensDir();
+        if (!legacyDir.isDirectory() || legacyDir.equals(targetDir)) {
+            return;
+        }
+        java.io.File[] legacyFiles = legacyDir.listFiles();
+        if (legacyFiles == null || legacyFiles.length == 0) {
+            return;
+        }
+        if (!targetDir.exists()) {
+            targetDir.mkdirs();
+        }
+        java.io.File[] existing = targetDir.listFiles();
+        if (existing != null && existing.length > 0) {
+            return;
+        }
+        for (java.io.File legacyFile : legacyFiles) {
+            if (legacyFile.isFile()) {
+                try {
+                    Files.copy(legacyFile.toPath(),
+                            new java.io.File(targetDir, legacyFile.getName()).toPath(),
+                            StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    logger.warn("Failed to migrate legacy Google Drive token {}", legacyFile.getName(), e);
+                }
+            }
+        }
+        logger.info("Migrated Google Drive tokens from legacy directory");
     }
 
     private GoogleAuthorizationCodeFlow buildFlow(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
-        InputStream in = GoogleDriveService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-        if (in == null) {
-            // Fallback to trying to find it in the current directory or a config folder if
-            // not in resources
-            java.io.File specificFile = new java.io.File("credentials.json");
-            if (specificFile.exists()) {
-                in = new FileInputStream(specificFile);
-            } else {
-                throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
+        try (InputStream in = openCredentialsStream()) {
+            GoogleClientSecrets clientSecrets = loadClientSecrets(in);
+
+            java.io.File tokenDir = PharmaXAppDirs.getDriveTokensDir();
+            if (!tokenDir.exists()) {
+                tokenDir.mkdirs();
             }
+
+            return new GoogleAuthorizationCodeFlow.Builder(
+                    HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+                    .setDataStoreFactory(new FileDataStoreFactory(tokenDir))
+                    .setAccessType("offline")
+                    .build();
+        }
+    }
+
+    private InputStream openCredentialsStream() throws IOException {
+        java.io.File appDataFile = PharmaXAppDirs.getCredentialsFile();
+
+        if (isValidCredentialsFile(appDataFile)) {
+            return new FileInputStream(appDataFile);
         }
 
-        GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+        if (appDataFile.isFile()) {
+            logger.warn("Invalid credentials.json in AppData, attempting to restore from application bundle");
+            appDataFile.delete();
+        }
 
-        return new GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-                .setAccessType("offline")
-                .build();
+        InputStream fromJar = GoogleDriveService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
+        if (fromJar != null) {
+            persistCredentials(fromJar, appDataFile);
+            return new FileInputStream(appDataFile);
+        }
+
+        java.io.File localFile = new java.io.File("credentials.json");
+        if (isValidCredentialsFile(localFile)) {
+            try (InputStream localIn = new FileInputStream(localFile)) {
+                persistCredentials(localIn, appDataFile);
+            }
+            return new FileInputStream(appDataFile);
+        }
+
+        throw new FileNotFoundException(
+                "ملف credentials.json غير موجود. تأكد من تثبيت البرنامج بشكل صحيح.");
+    }
+
+    private boolean isValidCredentialsFile(java.io.File file) {
+        if (!file.isFile() || file.length() == 0) {
+            return false;
+        }
+        try (InputStream in = new FileInputStream(file)) {
+            loadClientSecrets(in);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void persistCredentials(InputStream source, java.io.File destination) throws IOException {
+        java.io.File parent = destination.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        Files.copy(source, destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        logger.info("Saved Google Drive credentials to {}", destination.getAbsolutePath());
+    }
+
+    private GoogleClientSecrets loadClientSecrets(InputStream in) throws IOException {
+        byte[] bytes = in.readAllBytes();
+        String content = new String(bytes, StandardCharsets.UTF_8).trim();
+        if (content.isEmpty() || !content.startsWith("{")) {
+            throw new IOException(
+                    "ملف credentials.json غير صالح. أعد تثبيت البرنامج أو تواصل مع الدعم الفني.");
+        }
+
+        try {
+            return GoogleClientSecrets.load(JSON_FACTORY, new StringReader(content));
+        } catch (Exception e) {
+            throw new IOException(
+                    "تعذر قراءة credentials.json: " + e.getMessage(), e);
+        }
+    }
+
+    private Credential loadStoredCredential(GoogleAuthorizationCodeFlow flow) throws IOException {
+        try {
+            return flow.loadCredential("user");
+        } catch (Exception e) {
+            if (isJsonParseError(e)) {
+                logger.warn("Corrupted Google Drive token store detected, clearing saved tokens");
+                clearStoredCredentials(flow);
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private boolean isJsonParseError(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String name = current.getClass().getName();
+            if (name.contains("MalformedJsonException") || name.contains("JsonParseException")) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && message.contains("MalformedJsonException")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void clearStoredCredentials(GoogleAuthorizationCodeFlow flow) {
+        try {
+            flow.getCredentialDataStore().delete("user");
+        } catch (Exception clearError) {
+            logger.warn("Failed to remove stored Google Drive credential from data store", clearError);
+        }
+
+        try {
+            deleteTokenDirectoryContents(Path.of(TOKENS_DIRECTORY_PATH));
+        } catch (IOException clearError) {
+            logger.warn("Failed to clean Google Drive token directory", clearError);
+        }
     }
 
     private Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
         GoogleAuthorizationCodeFlow flow = buildFlow(HTTP_TRANSPORT);
 
         // Try loading stored credential first (no port bind needed)
-        Credential storedCredential = flow.loadCredential("user");
+        Credential storedCredential = loadStoredCredential(flow);
         if (storedCredential != null && (storedCredential.getRefreshToken() != null
                 || storedCredential.getExpiresInSeconds() == null
                 || storedCredential.getExpiresInSeconds() > 60)) {
@@ -137,7 +277,7 @@ public class GoogleDriveService {
         try {
             final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
             GoogleAuthorizationCodeFlow flow = buildFlow(HTTP_TRANSPORT);
-            Credential storedCredential = flow.loadCredential("user");
+            Credential storedCredential = loadStoredCredential(flow);
             if (storedCredential != null && (storedCredential.getRefreshToken() != null
                     || storedCredential.getExpiresInSeconds() == null
                     || storedCredential.getExpiresInSeconds() > 60)) {
@@ -212,15 +352,9 @@ public class GoogleDriveService {
         try {
             final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
             GoogleAuthorizationCodeFlow flow = buildFlow(HTTP_TRANSPORT);
-            flow.getCredentialDataStore().delete("user");
+            clearStoredCredentials(flow);
         } catch (Exception clearError) {
             logger.warn("Failed to remove stored Google Drive credential from data store", clearError);
-        }
-
-        try {
-            deleteTokenDirectoryContents(Path.of(TOKENS_DIRECTORY_PATH));
-        } catch (IOException clearError) {
-            logger.warn("Failed to clean Google Drive token directory", clearError);
         }
     }
 

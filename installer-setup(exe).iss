@@ -71,6 +71,7 @@ Source: "distribution\PharmaX.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "distribution\PharmaX.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "distribution\PharmaX.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "distribution\README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
+Source: "distribution\credentials.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 
 ; Runtime (Java) - copy everything to avoid missing security/config files
 Source: "distribution\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
