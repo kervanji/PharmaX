@@ -17,6 +17,7 @@ import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 import com.pharmax.util.PharmaXAppDirs;
+import com.pharmax.util.SecureCredentialsStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,54 +106,7 @@ public class GoogleDriveService {
     }
 
     private InputStream openCredentialsStream() throws IOException {
-        java.io.File appDataFile = PharmaXAppDirs.getCredentialsFile();
-
-        if (isValidCredentialsFile(appDataFile)) {
-            return new FileInputStream(appDataFile);
-        }
-
-        if (appDataFile.isFile()) {
-            logger.warn("Invalid credentials.json in AppData, attempting to restore from application bundle");
-            appDataFile.delete();
-        }
-
-        InputStream fromJar = GoogleDriveService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-        if (fromJar != null) {
-            persistCredentials(fromJar, appDataFile);
-            return new FileInputStream(appDataFile);
-        }
-
-        java.io.File localFile = new java.io.File("credentials.json");
-        if (isValidCredentialsFile(localFile)) {
-            try (InputStream localIn = new FileInputStream(localFile)) {
-                persistCredentials(localIn, appDataFile);
-            }
-            return new FileInputStream(appDataFile);
-        }
-
-        throw new FileNotFoundException(
-                "ملف credentials.json غير موجود. تأكد من تثبيت البرنامج بشكل صحيح.");
-    }
-
-    private boolean isValidCredentialsFile(java.io.File file) {
-        if (!file.isFile() || file.length() == 0) {
-            return false;
-        }
-        try (InputStream in = new FileInputStream(file)) {
-            loadClientSecrets(in);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void persistCredentials(InputStream source, java.io.File destination) throws IOException {
-        java.io.File parent = destination.getParentFile();
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs();
-        }
-        Files.copy(source, destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        logger.info("Saved Google Drive credentials to {}", destination.getAbsolutePath());
+        return SecureCredentialsStore.openCredentialsStream();
     }
 
     private GoogleClientSecrets loadClientSecrets(InputStream in) throws IOException {

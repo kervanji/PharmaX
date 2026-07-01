@@ -225,8 +225,7 @@ public class PharmacyReportService {
         }
 
         List<CashboxReportRow> rows = new ArrayList<>();
-        LocalDate cursor = start;
-        while (!cursor.isAfter(end)) {
+        for (LocalDate cursor : cashboxService.getDatesWithActivity(start, end)) {
             CashboxService.CashTotals totals = cashboxService.calculateTotals(cursor);
             Optional<DailyClosing> closingOpt = cashboxService.getClosingByDate(cursor);
             String status = closingOpt.map(DailyClosing::getStatus).orElse("OPEN");
@@ -242,7 +241,6 @@ public class PharmacyReportService {
                     difference,
                     status
             ));
-            cursor = cursor.plusDays(1);
         }
         return rows;
     }

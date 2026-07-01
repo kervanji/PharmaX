@@ -15,8 +15,11 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class CashboxService {
     private static final Logger logger = LoggerFactory.getLogger(CashboxService.class);
@@ -256,4 +259,56 @@ public class CashboxService {
     }
 
     public record CashTotals(double openingCash, double totalIn, double totalOut, double expectedCash) {}
+
+    /**
+     * Returns only dates that have real cashbox activity (movements, opening balance, or closing).
+     */
+    public List<LocalDate> getDatesWithActivity(LocalDate fromDate, LocalDate toDate) {
+        LocalDate start = fromDate != null ? fromDate : LocalDate.now().minusDays(30);
+        LocalDate end = toDate != null ? toDate : LocalDate.now();
+        if (end.isBefore(start)) {
+            return List.of();
+        }
+
+        Set<LocalDate> dates = new TreeSet<>();
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            @SuppressWarnings("unchecked")
+            List<String> ledgerDates = session.createNativeQuery(
+                            "SELECT DISTINCT DATE(transaction_date) FROM cashbox_ledger " +
+                                    "WHERE voided = 0 AND DATE(transaction_date) BETWEEN :start AND :end")
+                    .setParameter("start", start.toString())
+                    .setParameter("end", end.toString())
+                    .list();
+            for (String value : ledgerDates) {
+                if (value != null && !value.isBlank()) {
+                    dates.add(LocalDate.parse(value.substring(0, 10)));
+                }
+            }
+
+            List<LocalDate> openingDates = session.createQuery(
+                            "SELECT o.openingDate FROM CashboxManualOpening o " +
+                                    "WHERE o.openingDate BETWEEN :start AND :end",
+                            LocalDate.class)
+                    .setParameter("start", start)
+                    .setParameter("end", end)
+                    .list();
+            dates.addAll(openingDates);
+
+            List<LocalDate> closingDates = session.createQuery(
+                            "SELECT d.closingDate FROM DailyClosing d " +
+                                    "WHERE d.closingDate BETWEEN :start AND :end",
+                            LocalDate.class)
+                    .setParameter("start", start)
+                    .setParameter("end", end)
+                    .list();
+            dates.addAll(closingDates);
+        } catch (Exception e) {
+            logger.error("Failed to load cashbox activity dates", e);
+            return List.of();
+        }
+
+        List<LocalDate> sorted = new ArrayList<>(dates);
+        sorted.removeIf(date -> date.isBefore(start) || date.isAfter(end));
+        return sorted;
+    }
 }
