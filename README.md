@@ -77,7 +77,7 @@ mvn javafx:run
 
 ```bash
 mvn clean package
-java -jar target/inventory-management-1.2.5.jar
+java -jar target/inventory-management-1.3.0.jar
 ```
 
 ## هيكل المشروع

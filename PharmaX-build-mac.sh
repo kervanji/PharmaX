@@ -9,7 +9,7 @@ set -e # Exit on error
 # Configuration
 # -----------------------------
 APP_NAME="PharmaX"
-APP_VERSION="1.2.5"
+APP_VERSION="1.3.0"
 JAVAFX_VERSION="17.0.10"
 MAIN_CLASS="com.pharmax.MainApp"
 

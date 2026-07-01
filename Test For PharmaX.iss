@@ -3,7 +3,7 @@
 ; Non-commercial use only
 
 #define MyAppName "PharmaX"
-#define MyAppVersion "1.2.5"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "KervanjiHolding"
 #define MyAppURL "https://www.KervanjiHolding.com/"
 #define MyAppExeName "PharmaX.exe"
