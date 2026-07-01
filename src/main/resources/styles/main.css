@@ -1139,6 +1139,20 @@
     -fx-border-width: 1;
 }
 
+.backup-status-icon {
+    -fx-font-size: 16px;
+    -fx-text-fill: -fx-accent-text;
+    -fx-min-width: 24;
+}
+
+.backup-row-title {
+    -fx-text-fill: -fx-text-main;
+}
+
+.backup-row-detail {
+    -fx-text-fill: -fx-text-hint;
+}
+
 /* ===== Responsive Font Size Classes (em-based) ===== */
 /* These scale proportionally when root -fx-font-size changes */
 

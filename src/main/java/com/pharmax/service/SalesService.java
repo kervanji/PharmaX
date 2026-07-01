@@ -7,6 +7,7 @@ import com.pharmax.database.Repository.ProductRepository;
 import com.pharmax.database.Repository.ProductBatchRepository;
 import com.pharmax.database.Repository.SaleItemRepository;
 import com.pharmax.model.*;
+import com.pharmax.util.SessionManager;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.slf4j.Logger;
@@ -138,6 +139,7 @@ public class SalesService {
             sale.setSaleItems(savedItems);
 
             if ("CASH".equalsIgnoreCase(sale.getPaymentMethod()) && paidAmount > 0) {
+                String customerName = customer != null && customer.getName() != null ? customer.getName() : "نقدي";
                 cashboxService.recordEntry(
                         session,
                         sale.getSaleDate(),
@@ -152,7 +154,7 @@ public class SalesService {
                         null,
                         null,
                         "CASH",
-                        "مقبوض نقدي من فاتورة بيع " + sale.getSaleCode(),
+                        "بيع نقدي فاتورة " + sale.getSaleCode() + " - العميل: " + customerName,
                         sale.getCreatedBy());
             }
 
@@ -271,6 +273,9 @@ public class SalesService {
             Customer customer = sale.getCustomer() != null && sale.getCustomer().getId() != null
                     ? session.get(Customer.class, sale.getCustomer().getId())
                     : null;
+            String customerName = customer != null && customer.getName() != null ? customer.getName() : "نقدي";
+            String collector = SessionManager.getInstance().getCurrentDisplayName();
+            String creditGiver = sale.getCreatedBy() != null ? sale.getCreatedBy() : "-";
             cashboxService.recordEntry(
                     session,
                     LocalDateTime.now(),
@@ -285,8 +290,10 @@ public class SalesService {
                     null,
                     customer,
                     "CASH",
-                    "تسديد دين فاتورة بيع رقم " + (sale.getSaleCode() != null ? sale.getSaleCode() : sale.getId()),
-                    sale.getCreatedBy()
+                    "تحصيل دين فاتورة " + (sale.getSaleCode() != null ? sale.getSaleCode() : sale.getId())
+                            + " من العميل: " + customerName,
+                    collector,
+                    creditGiver
             );
             transaction.commit();
         } catch (Exception e) {

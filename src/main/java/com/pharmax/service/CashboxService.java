@@ -2,8 +2,10 @@ package com.pharmax.service;
 
 import com.pharmax.database.DatabaseManager;
 import com.pharmax.model.CashboxLedger;
+import com.pharmax.model.CashboxManualOpening;
 import com.pharmax.model.Customer;
 import com.pharmax.model.DailyClosing;
+import com.pharmax.util.SessionManager;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.query.Query;
@@ -36,6 +38,26 @@ public class CashboxService {
                                      String paymentMethod,
                                      String description,
                                      String createdBy) {
+        return recordEntry(session, transactionDate, entryType, direction, amount, currency, sourceType, sourceId,
+                sourceItemId, customer, supplier, account, paymentMethod, description, createdBy, null);
+    }
+
+    public CashboxLedger recordEntry(Session session,
+                                     LocalDateTime transactionDate,
+                                     String entryType,
+                                     String direction,
+                                     Double amount,
+                                     String currency,
+                                     String sourceType,
+                                     Long sourceId,
+                                     Long sourceItemId,
+                                     Customer customer,
+                                     Customer supplier,
+                                     Customer account,
+                                     String paymentMethod,
+                                     String description,
+                                     String createdBy,
+                                     String relatedCreatedBy) {
         if (session == null) {
             throw new IllegalArgumentException("جلسة قاعدة البيانات مطلوبة");
         }
@@ -63,6 +85,7 @@ public class CashboxService {
         entry.setPaymentMethod(paymentMethod);
         entry.setDescription(description);
         entry.setCreatedBy(createdBy);
+        entry.setRelatedCreatedBy(relatedCreatedBy);
         session.save(entry);
         return entry;
     }
@@ -118,6 +141,11 @@ public class CashboxService {
 
     public double getOpeningCashForDate(LocalDate date) {
         LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        Optional<CashboxManualOpening> manualOpening = getManualOpening(effectiveDate);
+        if (manualOpening.isPresent()) {
+            return manualOpening.get().getOpeningCash();
+        }
+
         try (Session session = DatabaseManager.getSessionFactory().openSession()) {
             Query<DailyClosing> query = session.createQuery(
                     "FROM DailyClosing d WHERE d.closingDate < :date AND d.status = :status ORDER BY d.closingDate DESC",
@@ -128,6 +156,56 @@ public class CashboxService {
             DailyClosing previousClosing = query.uniqueResult();
             return previousClosing != null ? previousClosing.getActualCash() : 0.0;
         }
+    }
+
+    public Optional<CashboxManualOpening> getManualOpening(LocalDate date) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            return Optional.ofNullable(session.get(CashboxManualOpening.class, effectiveDate));
+        }
+    }
+
+    public CashboxManualOpening setManualOpeningCash(LocalDate date, double openingCash, String setBy) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        if (openingCash < 0) {
+            throw new IllegalArgumentException("رصيد الافتتاح لا يمكن أن يكون سالباً");
+        }
+        if (isDayClosed(effectiveDate)) {
+            throw new IllegalArgumentException("لا يمكن تعديل رصيد الافتتاح بعد إقفال اليوم");
+        }
+        if (getManualOpening(effectiveDate).isPresent() && !SessionManager.getInstance().isAdmin()) {
+            throw new IllegalArgumentException("تم إدخال رصيد الافتتاح مسبقاً ولا يمكن تعديله إلا من قبل المدير");
+        }
+
+        Transaction transaction = null;
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+            CashboxManualOpening opening = session.get(CashboxManualOpening.class, effectiveDate);
+            if (opening == null) {
+                opening = new CashboxManualOpening();
+                opening.setOpeningDate(effectiveDate);
+            }
+            opening.setOpeningCash(openingCash);
+            opening.setSetBy(setBy);
+            opening.setSetAt(LocalDateTime.now());
+            session.saveOrUpdate(opening);
+            auditLogService.record(session, "CASHBOX_OPENING_SET", "cashbox_manual_opening", null,
+                    "تم تعيين رصيد افتتاح " + effectiveDate + " إلى " + openingCash + " بواسطة " + setBy);
+            transaction.commit();
+            return opening;
+        } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
+            logger.error("Failed to set manual opening cash", e);
+            throw new RuntimeException("فشل في حفظ رصيد الافتتاح: " + e.getMessage(), e);
+        }
+    }
+
+    public boolean isDayClosed(LocalDate date) {
+        return getClosingByDate(date)
+                .map(closing -> "CLOSED".equalsIgnoreCase(closing.getStatus()))
+                .orElse(false);
     }
 
     public Optional<DailyClosing> getClosingByDate(LocalDate date) {

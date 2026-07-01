@@ -42,6 +42,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.prefs.Preferences;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.printing.PDFPrintable;
@@ -53,6 +56,7 @@ public class SaleFormController {
     private static final String DEFAULT_SALE_CUSTOMER_CODE = "CASH";
     private static final String DEFAULT_SALE_CUSTOMER_NAME = "زبون نقدي";
     private static final String DEFAULT_PRICE_TYPE = "مفرد";
+    private static final String PREF_SALE_TABLE_HIDDEN_COLUMNS = "saleForm.itemsTable.hiddenColumns";
 
     @FXML
     private VBox root;
@@ -1864,6 +1868,107 @@ public class SaleFormController {
                 .addListener((javafx.collections.ListChangeListener<SaleItemRow>) change -> updateSelectedItemsTotal());
         itemsTable.setEditable(true);
         updateSelectedItemsTotal();
+        setupItemsTableColumnMenu();
+    }
+
+    private void setupItemsTableColumnMenu() {
+        if (itemsTable == null) {
+            return;
+        }
+
+        Map<String, TableColumn<SaleItemRow, ?>> columnsById = new LinkedHashMap<>();
+        putColumnIfPresent(columnsById, "productName", productNameColumn, "المنتج");
+        putColumnIfPresent(columnsById, "stripPrice", stripPriceColumn, "سعر الشريط");
+        putColumnIfPresent(columnsById, "boxPrice", boxPriceColumn, "سعر العلبة");
+        putColumnIfPresent(columnsById, "quantity", quantityColumn, "الكمية");
+        putColumnIfPresent(columnsById, "soldUnit", soldUnitColumn, "الوحدة");
+        putColumnIfPresent(columnsById, "conversionFactor", conversionFactorColumn, "التحويل");
+        putColumnIfPresent(columnsById, "baseQuantity", baseQuantityColumn, "كمية الأساس");
+        putColumnIfPresent(columnsById, "batchPreview", batchPreviewColumn, "دفعات FEFO");
+        putColumnIfPresent(columnsById, "unitPrice", unitPriceColumn, "السعر");
+        putColumnIfPresent(columnsById, "discount", discountColumn, "الخصم");
+        putColumnIfPresent(columnsById, "total", totalColumn, "الإجمالي");
+        putColumnIfPresent(columnsById, "edit", editColumn, "تعديل");
+        putColumnIfPresent(columnsById, "action", actionColumn, "حذف");
+
+        Set<String> hiddenColumns = loadHiddenSaleTableColumns();
+        for (Map.Entry<String, TableColumn<SaleItemRow, ?>> entry : columnsById.entrySet()) {
+            entry.getValue().setVisible(!hiddenColumns.contains(entry.getKey()));
+        }
+
+        ContextMenu menu = new ContextMenu();
+        List<CheckMenuItem> columnMenuItems = new ArrayList<>();
+        MenuItem showAllItem = new MenuItem("إظهار كل الأعمدة");
+        showAllItem.setOnAction(event -> {
+            hiddenColumns.clear();
+            columnsById.values().forEach(column -> column.setVisible(true));
+            columnMenuItems.forEach(item -> item.setSelected(true));
+            saveHiddenSaleTableColumns(hiddenColumns);
+        });
+        menu.getItems().add(showAllItem);
+        menu.getItems().add(new SeparatorMenuItem());
+
+        for (Map.Entry<String, TableColumn<SaleItemRow, ?>> entry : columnsById.entrySet()) {
+            String columnId = entry.getKey();
+            TableColumn<SaleItemRow, ?> column = entry.getValue();
+            String label = column.getUserData() instanceof String text ? text : columnId;
+            CheckMenuItem item = new CheckMenuItem(label);
+            item.setSelected(column.isVisible());
+            item.selectedProperty().addListener((obs, oldVal, visible) -> {
+                column.setVisible(visible);
+                if (visible) {
+                    hiddenColumns.remove(columnId);
+                } else {
+                    hiddenColumns.add(columnId);
+                }
+                saveHiddenSaleTableColumns(hiddenColumns);
+            });
+            columnMenuItems.add(item);
+            menu.getItems().add(item);
+        }
+        itemsTable.setContextMenu(menu);
+    }
+
+    private void putColumnIfPresent(Map<String, TableColumn<SaleItemRow, ?>> columnsById,
+                                    String id,
+                                    TableColumn<SaleItemRow, ?> column,
+                                    String label) {
+        if (column != null) {
+            column.setUserData(label);
+            columnsById.put(id, column);
+        }
+    }
+
+    private Set<String> loadHiddenSaleTableColumns() {
+        Set<String> hidden = new HashSet<>();
+        try {
+            String username = SessionManager.getInstance().getCurrentUsername();
+            String raw = Preferences.userNodeForPackage(SaleFormController.class)
+                    .get(PREF_SALE_TABLE_HIDDEN_COLUMNS + "." + username, "");
+            if (raw != null && !raw.isBlank()) {
+                for (String part : raw.split(",")) {
+                    if (!part.isBlank()) {
+                        hidden.add(part.trim());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load sale table column preferences", e);
+        }
+        return hidden;
+    }
+
+    private void saveHiddenSaleTableColumns(Set<String> hiddenColumns) {
+        try {
+            String username = SessionManager.getInstance().getCurrentUsername();
+            String raw = hiddenColumns == null || hiddenColumns.isEmpty()
+                    ? ""
+                    : String.join(",", hiddenColumns);
+            Preferences.userNodeForPackage(SaleFormController.class)
+                    .put(PREF_SALE_TABLE_HIDDEN_COLUMNS + "." + username, raw);
+        } catch (Exception e) {
+            logger.warn("Failed to save sale table column preferences", e);
+        }
     }
 
     private void updateSelectedItemsTotal() {

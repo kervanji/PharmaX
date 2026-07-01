@@ -26,6 +26,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import com.pharmax.util.DashboardAccessService;
 import com.pharmax.util.DashboardLayoutService;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
@@ -54,6 +55,7 @@ import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -136,6 +138,18 @@ public class MainController {
     private Button sellerLayoutBtn;
     @FXML
     private Button resetLayoutBtn;
+    @FXML
+    private Button saveDefaultLayoutBtn;
+    @FXML
+    private HBox lowStockAlertCard;
+    @FXML
+    private HBox expiryAlertCard;
+    @FXML
+    private HBox dataQualityAlertCard;
+    @FXML
+    private HBox cashboxAlertCard;
+    @FXML
+    private HBox installmentAlertCard;
     @FXML
     private Label installmentReminderDaysLabel;
     @FXML
@@ -327,18 +341,18 @@ public class MainController {
                     "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
             new TileDef("purchase-return", "↩️", "returns.png", "مرتجع شراء",
                     "linear-gradient(to bottom right, #a16207, #ca8a04)", "handlePurchaseReturn"),
-            new TileDef("pharmacy-reports", "📊", "sales_reports.png", "التقارير",
-                    "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handlePharmacyReports",
-                    false, true, false),
-            new TileDef("cashbox", "💵", "settings.png", "الصندوق",
-                    "linear-gradient(to bottom right, #15803d, #16a34a)", "handleCashbox"),
             new TileDef("payment-voucher", "📤", "payment_voucher.svg", "سند دفع",
                     "linear-gradient(to bottom right, #dc2626, #ef4444)", "handlePaymentVoucher"),
+            new TileDef("cashbox", "💵", "settings.png", "الصندوق",
+                    "linear-gradient(to bottom right, #15803d, #16a34a)", "handleCashbox"),
             new TileDef("barcode-print", "▥", "barcode_printing.png", "طباعة باركود",
                     "linear-gradient(to bottom right, #475569, #64748b)", "handleBarcodePrint"),
             new TileDef("user-management", "👤", "user_management.png", "إدارة المستخدمين",
                     "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handleUserManagement",
                     true, false, false),
+            new TileDef("pharmacy-reports", "📊", "sales_reports.png", "التقارير",
+                    "linear-gradient(to bottom right, #0f766e, #14b8a6)", "handlePharmacyReports",
+                    false, true, false),
             new TileDef("settings", "⚙️", "settings.png", "الإعدادات",
                     "linear-gradient(to bottom right, #334155, #475569)", "handleSettings",
                     false, false, true),
@@ -349,6 +363,8 @@ public class MainController {
 
     @FXML
     private void initialize() {
+        DashboardLayoutService.ensureDefaultLayoutFiles();
+
         // Build tile definition map
         tileDefMap = new LinkedHashMap<>();
         for (TileDef def : defaultTileDefinitions) {
@@ -440,6 +456,11 @@ public class MainController {
             layoutEditControls.setVisible(isAdmin);
             layoutEditControls.setManaged(isAdmin);
         }
+        if (saveDefaultLayoutBtn != null) {
+            boolean isAdmin = session.getCurrentRole() == UserRole.ADMIN;
+            saveDefaultLayoutBtn.setVisible(isAdmin);
+            saveDefaultLayoutBtn.setManaged(isAdmin);
+        }
     }
 
     // ==================== Dashboard Tile Builder ====================
@@ -454,12 +475,13 @@ public class MainController {
         SessionManager session = SessionManager.getInstance();
         String username = session.isLoggedIn() ? session.getCurrentUsername() : "default";
 
-        // Load saved order from current user's layout
+        // Load saved order from current user's layout, otherwise use default layout
         List<String> savedOrder = DashboardLayoutService.loadTileOrder(username);
-        // Load hidden tiles from current user's layout (personal preference)
+        if (savedOrder.isEmpty()) {
+            savedOrder = DashboardLayoutService.loadDefaultTileOrder();
+        }
         hiddenTileIds = DashboardLayoutService.loadHiddenTiles(username);
-        // Load seller-hidden tiles from admin's layout (centralized control)
-        sellerHiddenTileIds = DashboardLayoutService.loadSellerHiddenTiles("admin");
+        sellerHiddenTileIds = DashboardLayoutService.loadSellerHiddenTiles();
         List<TileDef> orderedDefs;
 
         if (!savedOrder.isEmpty()) {
@@ -507,6 +529,33 @@ public class MainController {
 
         // Keep references for permission-based tiles
         updateTileReferences();
+        refreshAlertWidgetAccess();
+    }
+
+    private void refreshAlertWidgetAccess() {
+        setAlertCardAccessible(lowStockAlertCard, "low-stock");
+        setAlertCardAccessible(expiryAlertCard, "expiry-alerts");
+        setAlertCardAccessible(dataQualityAlertCard, "view-inventory");
+        setAlertCardAccessible(cashboxAlertCard, "cashbox");
+        setAlertCardAccessible(installmentAlertCard, "purchase");
+    }
+
+    private void setAlertCardAccessible(HBox card, String tileId) {
+        if (card == null) {
+            return;
+        }
+        boolean accessible = DashboardAccessService.canAccessTile(tileId);
+        card.setVisible(accessible);
+        card.setManaged(accessible);
+        card.setDisable(!accessible);
+    }
+
+    private boolean guardTileAccess(String tileId) {
+        if (DashboardAccessService.canAccessTile(tileId)) {
+            return true;
+        }
+        showError("غير مسموح", "لا تملك صلاحية الوصول لهذه الواجهة");
+        return false;
     }
 
     private VBox createTileNode(TileDef def) {
@@ -566,7 +615,9 @@ public class MainController {
         // Set click handler
         tile.setOnMouseClicked(event -> {
             if (editMode)
-                return; // Don't trigger action in edit mode
+                return;
+            if (!guardTileAccess(def.id))
+                return;
             invokeTileHandler(def.handlerMethod);
         });
 
@@ -799,7 +850,12 @@ public class MainController {
         String tileId = tile.getId();
         TileDef def = tileDefMap.get(tileId);
         if (def != null) {
-            tile.setOnMouseClicked(event -> invokeTileHandler(def.handlerMethod));
+            tile.setOnMouseClicked(event -> {
+                if (!guardTileAccess(def.id)) {
+                    return;
+                }
+                invokeTileHandler(def.handlerMethod);
+            });
         }
     }
 
@@ -816,8 +872,27 @@ public class MainController {
                 .filter(id -> id != null && !id.isEmpty())
                 .collect(Collectors.toList());
 
-        DashboardLayoutService.saveTileLayout(username, tileIds, hiddenTileIds, sellerHiddenTileIds);
-        showInfo("تم الحفظ", "تم حفظ ترتيب الواجهة بنجاح");
+        DashboardLayoutService.saveTileLayout(username, tileIds, hiddenTileIds, Collections.emptySet());
+        DashboardLayoutService.saveSellerLayout(tileIds, sellerHiddenTileIds);
+        if (sellerEditMode) {
+            showInfo("تم الحفظ", "تم حفظ واجهة البائع بنجاح");
+        } else {
+            showInfo("تم الحفظ", "تم حفظ ترتيب الواجهة بنجاح");
+        }
+    }
+
+    @FXML
+    private void handleSaveAsDefaultLayout() {
+        if (tilesFlowPane == null) {
+            return;
+        }
+        List<String> tileIds = tilesFlowPane.getChildren().stream()
+                .filter(n -> n instanceof VBox)
+                .map(Node::getId)
+                .filter(id -> id != null && !id.isEmpty())
+                .collect(Collectors.toList());
+        DashboardLayoutService.saveDefaultLayout(tileIds, hiddenTileIds, sellerHiddenTileIds);
+        showInfo("تم الحفظ", "تم حفظ الترتيب الحالي كافتراضي للنظام");
     }
 
     @FXML
@@ -827,10 +902,10 @@ public class MainController {
 
         DashboardLayoutService.resetLayout(username);
         hiddenTileIds.clear();
-        sellerHiddenTileIds.clear();
+        sellerHiddenTileIds = DashboardLayoutService.loadSellerHiddenTiles();
 
-        // Exit edit mode and rebuild
         editMode = false;
+        sellerEditMode = false;
         disableEditMode();
         buildDashboardTiles();
 
@@ -1044,6 +1119,7 @@ public class MainController {
 
     @FXML
     private void handleInstallmentAlertClick() {
+        if (!guardTileAccess("purchase")) return;
         try {
             int reminderDays = getInstallmentReminderDays();
             List<Installment> overdueInstallments = voucherService.getDueInstallments();
@@ -1248,6 +1324,7 @@ public class MainController {
 
     @FXML
     private void handleNewProduct() {
+        if (!guardTileAccess("new-product")) return;
         TabManager.getInstance().openTab(
                 "new-product",
                 "منتج جديد",
@@ -1258,6 +1335,7 @@ public class MainController {
 
     @FXML
     private void handleNewSale() {
+        if (!guardTileAccess("pos")) return;
         TabManager.getInstance().openTab(
                 "new-sale",
                 "بيع جديد",
@@ -1271,6 +1349,7 @@ public class MainController {
 
     @FXML
     private void handleViewInventory() {
+        if (!guardTileAccess("view-inventory")) return;
         TabManager.getInstance().openTab(
                 "inventory",
                 "المخزون",
@@ -1281,6 +1360,7 @@ public class MainController {
 
     @FXML
     private void handleLowStock() {
+        if (!guardTileAccess("low-stock")) return;
         TabManager.getInstance().openTab(
                 "low-stock",
                 "منخفض المخزون",
@@ -1291,6 +1371,7 @@ public class MainController {
 
     @FXML
     private void handleExpiryAlerts() {
+        if (!guardTileAccess("expiry-alerts")) return;
         TabManager.getInstance().openTab(
                 "expiry-alerts",
                 "تنبيهات الانتهاء",
@@ -1311,6 +1392,7 @@ public class MainController {
 
     @FXML
     private void handleBarcodePrint() {
+        if (!guardTileAccess("barcode-print")) return;
         TabManager.getInstance().openTab(
                 "barcode-print",
                 "طباعة باركود",
@@ -1330,6 +1412,7 @@ public class MainController {
 
     @FXML
     private void handleViewSales() {
+        if (!guardTileAccess("view-sales")) return;
         TabManager.getInstance().openTab(
                 "sales",
                 "المبيعات",
@@ -1394,6 +1477,7 @@ public class MainController {
 
     @FXML
     private void handleProductReturn() {
+        if (!guardTileAccess("product-return")) return;
         TabManager.getInstance().openTab(
                 "product-return",
                 "إرجاع مواد",
@@ -1708,6 +1792,7 @@ public class MainController {
 
     @FXML
     private void handlePaymentVoucher() {
+        if (!guardTileAccess("payment-voucher")) return;
         try {
             TabManager.getInstance().openTab(
                     "payment-voucher",
@@ -1725,6 +1810,7 @@ public class MainController {
 
     @FXML
     private void handlePurchase() {
+        if (!guardTileAccess("purchase")) return;
         try {
             TabManager.getInstance().openTab(
                     "purchase",
@@ -1742,6 +1828,7 @@ public class MainController {
 
     @FXML
     private void handlePurchaseReturn() {
+        if (!guardTileAccess("purchase-return")) return;
         try {
             TabManager.getInstance().openTab(
                     "purchase-return",
@@ -1759,6 +1846,7 @@ public class MainController {
 
     @FXML
     private void handleCashbox() {
+        if (!guardTileAccess("cashbox")) return;
         try {
             TabManager.getInstance().openTab(
                     "cashbox",
@@ -1829,6 +1917,7 @@ public class MainController {
 
     @FXML
     private void handleAbout() {
+        if (!guardTileAccess("about")) return;
         showInfo("عن البرنامج",
                 "PharmaX v1.2.5\n\n" +
                         "من تطوير: KervanjiHolding\n" +

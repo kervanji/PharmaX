@@ -28,6 +28,7 @@ import java.util.Optional;
 
 public class VoucherService {
     private static final Logger logger = LoggerFactory.getLogger(VoucherService.class);
+    private static final double PAYMENT_TOLERANCE = 0.001;
     private final CustomerService customerService;
     @SuppressWarnings("unused") private final InventoryService inventoryService;
     private final ProductBatchService productBatchService;
@@ -630,6 +631,24 @@ public class VoucherService {
         }
     }
 
+    public double getTotalPaidForPurchaseVoucher(Long purchaseVoucherId) {
+        if (purchaseVoucherId == null) {
+            return 0.0;
+        }
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            return getTotalPaidForPurchaseVoucher(session, purchaseVoucherId, null);
+        }
+    }
+
+    public double getPurchaseVoucherRemainingBalance(Long purchaseVoucherId) {
+        if (purchaseVoucherId == null) {
+            return 0.0;
+        }
+        try (Session session = DatabaseManager.getSessionFactory().openSession()) {
+            return getPurchaseVoucherRemainingBalance(session, purchaseVoucherId, null);
+        }
+    }
+
     public Optional<Voucher> findPaymentForPurchaseVoucher(Long purchaseVoucherId) {
         if (purchaseVoucherId == null) {
             return Optional.empty();
@@ -1033,6 +1052,8 @@ public class VoucherService {
         long sourceItemId = 0L;
 
         if (voucher.getVoucherType() == VoucherType.RECEIPT) {
+            String customerName = voucher.getCustomer() != null && voucher.getCustomer().getName() != null
+                    ? voucher.getCustomer().getName() : "نقدي";
             cashboxService.recordEntry(
                     session,
                     transactionDate,
@@ -1047,13 +1068,15 @@ public class VoucherService {
                     null,
                     voucher.getCustomer(),
                     "CASH",
-                    "سند قبض نقدي رقم " + voucher.getVoucherNumber(),
+                    "سند قبض نقدي رقم " + voucher.getVoucherNumber() + " - العميل: " + customerName,
                     createdBy
             );
             return;
         }
 
         if (voucher.getVoucherType() == VoucherType.PAYMENT && !Boolean.TRUE.equals(voucher.getIsInstallment())) {
+            String supplierName = voucher.getCustomer() != null && voucher.getCustomer().getName() != null
+                    ? voucher.getCustomer().getName() : "مذخر";
             cashboxService.recordEntry(
                     session,
                     transactionDate,
@@ -1068,7 +1091,7 @@ public class VoucherService {
                     voucher.getCustomer(),
                     voucher.getCustomer(),
                     "CASH",
-                    "سند دفع نقدي رقم " + voucher.getVoucherNumber(),
+                    "سند دفع نقدي رقم " + voucher.getVoucherNumber() + " - المذخر: " + supplierName,
                     createdBy
             );
         }
@@ -1086,28 +1109,55 @@ public class VoucherService {
             return;
         }
 
-        if (isPurchaseVoucherPaid(session, parent.getId(), voucher.getId())) {
-            throw new IllegalArgumentException("تم دفع هذا الوصل مسبقاً ولا يمكن دفعه مرة أخرى");
+        double paymentNet = voucher.getNetAmount() != null ? voucher.getNetAmount() : 0.0;
+        if (paymentNet <= PAYMENT_TOLERANCE) {
+            throw new IllegalArgumentException("مبلغ الدفع يجب أن يكون أكبر من صفر");
+        }
+
+        double remaining = getPurchaseVoucherRemainingBalance(session, parent.getId(), voucher.getId());
+        if (remaining <= PAYMENT_TOLERANCE) {
+            throw new IllegalArgumentException("تم دفع هذا الوصل بالكامل ولا يمكن دفعه مرة أخرى");
+        }
+        if (paymentNet > remaining + PAYMENT_TOLERANCE) {
+            throw new IllegalArgumentException(
+                    "مبلغ الدفع أكبر من المتبقي على فاتورة المشتريات (" + remaining + ")");
         }
     }
 
-    private boolean isPurchaseVoucherPaid(Session session, Long purchaseVoucherId, Long excludePaymentVoucherId) {
+    private double getPurchaseVoucherRemainingBalance(Session session, Long purchaseVoucherId, Long excludePaymentVoucherId) {
         if (purchaseVoucherId == null) {
-            return false;
+            return 0.0;
         }
-        String hql = "SELECT COUNT(v.id) FROM Voucher v WHERE v.voucherType = :type " +
+        Voucher purchase = session.get(Voucher.class, purchaseVoucherId);
+        if (purchase == null) {
+            return 0.0;
+        }
+        double purchaseNet = purchase.getNetAmount() != null ? purchase.getNetAmount() : 0.0;
+        double paid = getTotalPaidForPurchaseVoucher(session, purchaseVoucherId, excludePaymentVoucherId);
+        return Math.max(0.0, purchaseNet - paid);
+    }
+
+    private double getTotalPaidForPurchaseVoucher(Session session, Long purchaseVoucherId, Long excludePaymentVoucherId) {
+        if (purchaseVoucherId == null) {
+            return 0.0;
+        }
+        String hql = "SELECT COALESCE(SUM(v.netAmount), 0) FROM Voucher v WHERE v.voucherType = :type " +
                 "AND v.parentVoucherId = :parentVoucherId AND v.isCancelled = false";
         if (excludePaymentVoucherId != null) {
             hql += " AND v.id <> :excludeId";
         }
-        Query<Long> query = session.createQuery(hql, Long.class);
+        Query<Double> query = session.createQuery(hql, Double.class);
         query.setParameter("type", VoucherType.PAYMENT);
         query.setParameter("parentVoucherId", purchaseVoucherId);
         if (excludePaymentVoucherId != null) {
             query.setParameter("excludeId", excludePaymentVoucherId);
         }
-        Long count = query.uniqueResult();
-        return count != null && count > 0;
+        Double total = query.uniqueResult();
+        return total != null ? total : 0.0;
+    }
+
+    private boolean isPurchaseVoucherPaid(Session session, Long purchaseVoucherId, Long excludePaymentVoucherId) {
+        return getPurchaseVoucherRemainingBalance(session, purchaseVoucherId, excludePaymentVoucherId) <= PAYMENT_TOLERANCE;
     }
 
     private LocalDate parseOptionalExpirationDate(String expirationDate) {

@@ -3,6 +3,7 @@ package com.pharmax.controller;
 import com.pharmax.model.*;
 import com.pharmax.service.CustomerService;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductUnitService;
 import com.pharmax.service.VoucherService;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
@@ -31,6 +32,7 @@ import java.net.URL;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -118,6 +120,11 @@ public class PurchaseController implements Initializable {
     private final VoucherService voucherService = new VoucherService();
     private final CustomerService customerService = new CustomerService();
     private final InventoryService inventoryService = new InventoryService();
+    private final ProductUnitService productUnitService = new ProductUnitService();
+    private static final List<String> GENERIC_UNIT_NAMES = Arrays.asList(
+            "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
+            "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
+            "حقنة", "مل", "جرام", "قطعة");
     private final DecimalFormat numberFormat = new DecimalFormat("#,###.##");
     private static final String DEFAULT_CASH_ACCOUNT = "صندوق 181";
     private static final String DEFAULT_CURRENCY = "دينار";
@@ -597,9 +604,8 @@ public class PurchaseController implements Initializable {
         TextField quantityField = new TextField("1");
         quantityField.setPrefWidth(80);
 
-        TextField unitField = new TextField();
-        unitField.setPrefWidth(80);
-        unitField.setPromptText("(اختياري)");
+        ComboBox<ProductUnit> unitCombo = createPurchaseUnitComboBox();
+        unitCombo.setPrefWidth(250);
 
         TextField priceField = new TextField("0");
         priceField.setPrefWidth(120);
@@ -640,88 +646,28 @@ public class PurchaseController implements Initializable {
         currencyCombo.setValue("دينار");
         currencyCombo.setPrefWidth(250);
 
-        // Auto-fill from product selection
+        Runnable refreshPricesForSelection = () -> {
+            Product selected = productCombo.getValue();
+            boolean isUsdCurrency = "دولار".equals(currencyCombo.getValue());
+            applyProductPricesForUnit(selected, unitCombo.getValue(), isUsdCurrency,
+                    priceField, salePriceField, wholesalePriceField, specialPriceField);
+        };
+
         productCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            populatePurchaseUnitCombo(unitCombo, newVal, null);
             if (newVal != null) {
-                boolean isUsdCurrency = "دولار"
-                        .equals(currencyCombo != null ? currencyCombo.getValue() : DEFAULT_CURRENCY);
-                if (isUsdCurrency) {
-                    if (newVal.getCostPriceUsd() != null && newVal.getCostPriceUsd() > 0) {
-                        priceField.setText(String.valueOf(newVal.getCostPriceUsd()));
-                    } else if (newVal.getUnitPriceUsd() != null) {
-                        priceField.setText(String.valueOf(newVal.getUnitPriceUsd()));
-                    }
-                    if (newVal.getUnitPriceUsd() != null) {
-                        salePriceField.setText(String.valueOf(newVal.getUnitPriceUsd()));
-                    }
-                    if (newVal.getWholesalePriceUsd() != null) {
-                        wholesalePriceField.setText(String.valueOf(newVal.getWholesalePriceUsd()));
-                    }
-                    if (newVal.getSpecialPriceUsd() != null) {
-                        specialPriceField.setText(String.valueOf(newVal.getSpecialPriceUsd()));
-                    }
-                } else {
-                    if (newVal.getCostPrice() != null && newVal.getCostPrice() > 0) {
-                        priceField.setText(String.valueOf(newVal.getCostPrice()));
-                    } else if (newVal.getUnitPrice() != null) {
-                        priceField.setText(String.valueOf(newVal.getUnitPrice()));
-                    }
-                    if (newVal.getUnitPrice() != null) {
-                        salePriceField.setText(String.valueOf(newVal.getUnitPrice()));
-                    }
-                    if (newVal.getWholesalePrice() != null) {
-                        wholesalePriceField.setText(String.valueOf(newVal.getWholesalePrice()));
-                    }
-                    if (newVal.getSpecialPrice() != null) {
-                        specialPriceField.setText(String.valueOf(newVal.getSpecialPrice()));
-                    }
-                }
-                if (newVal.getUnitOfMeasure() != null) {
-                    unitField.setText(newVal.getUnitOfMeasure());
-                }
                 if (newVal.getCategory() != null && !newVal.getCategory().isEmpty()) {
                     categoryCombo.setValue(newVal.getCategory());
                 }
+                refreshPricesForSelection.run();
+            } else {
+                populatePurchaseUnitCombo(unitCombo, null, null);
             }
         });
 
-        currencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            Product selectedGroup = productCombo.getValue();
-            if (selectedGroup != null) {
-                boolean isUsdCurrency = "دولار".equals(newVal);
-                if (isUsdCurrency) {
-                    if (selectedGroup.getCostPriceUsd() != null && selectedGroup.getCostPriceUsd() > 0) {
-                        priceField.setText(String.valueOf(selectedGroup.getCostPriceUsd()));
-                    } else if (selectedGroup.getUnitPriceUsd() != null) {
-                        priceField.setText(String.valueOf(selectedGroup.getUnitPriceUsd()));
-                    }
-                    if (selectedGroup.getUnitPriceUsd() != null) {
-                        salePriceField.setText(String.valueOf(selectedGroup.getUnitPriceUsd()));
-                    }
-                    if (selectedGroup.getWholesalePriceUsd() != null) {
-                        wholesalePriceField.setText(String.valueOf(selectedGroup.getWholesalePriceUsd()));
-                    }
-                    if (selectedGroup.getSpecialPriceUsd() != null) {
-                        specialPriceField.setText(String.valueOf(selectedGroup.getSpecialPriceUsd()));
-                    }
-                } else {
-                    if (selectedGroup.getCostPrice() != null && selectedGroup.getCostPrice() > 0) {
-                        priceField.setText(String.valueOf(selectedGroup.getCostPrice()));
-                    } else if (selectedGroup.getUnitPrice() != null) {
-                        priceField.setText(String.valueOf(selectedGroup.getUnitPrice()));
-                    }
-                    if (selectedGroup.getUnitPrice() != null) {
-                        salePriceField.setText(String.valueOf(selectedGroup.getUnitPrice()));
-                    }
-                    if (selectedGroup.getWholesalePrice() != null) {
-                        wholesalePriceField.setText(String.valueOf(selectedGroup.getWholesalePrice()));
-                    }
-                    if (selectedGroup.getSpecialPrice() != null) {
-                        specialPriceField.setText(String.valueOf(selectedGroup.getSpecialPrice()));
-                    }
-                }
-            }
-        });
+        unitCombo.valueProperty().addListener((obs, oldVal, newVal) -> refreshPricesForSelection.run());
+
+        currencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> refreshPricesForSelection.run());
 
         // margin update
         Runnable updateMargin = () -> {
@@ -769,7 +715,7 @@ public class PurchaseController implements Initializable {
         grid.add(new Label("الكمية"), 0, 2);
         grid.add(quantityField, 1, 2);
         grid.add(new Label("الوحدة"), 0, 3);
-        grid.add(unitField, 1, 3);
+        grid.add(unitCombo, 1, 3);
         grid.add(new Label("العملة"), 0, 4);
         grid.add(currencyCombo, 1, 4);
         grid.add(new Label("رقم التشغيلة"), 0, 5);
@@ -787,6 +733,8 @@ public class PurchaseController implements Initializable {
         grid.add(new Label("سعر خاص"), 0, 10);
         grid.add(specialPriceField, 1, 10);
         grid.add(marginSpecialLabel, 2, 10);
+
+        populatePurchaseUnitCombo(unitCombo, null, null);
 
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().setPrefWidth(550);
@@ -822,7 +770,7 @@ public class PurchaseController implements Initializable {
                 double salePrice = parseAmount(salePriceField.getText());
                 double wholesalePrice = parseAmount(wholesalePriceField.getText());
                 double specialPrice = parseAmount(specialPriceField.getText());
-                String unit = unitField.getText() != null ? unitField.getText().trim() : "";
+                String unit = resolveSelectedUnitName(unitCombo, selectedProduct);
                 String category = categoryCombo.getValue() != null ? categoryCombo.getValue().trim()
                         : (categoryCombo.getEditor().getText() != null ? categoryCombo.getEditor().getText().trim()
                                 : "");
@@ -898,9 +846,8 @@ public class PurchaseController implements Initializable {
         TextField quantityField = new TextField(String.valueOf(existingRow.getQuantity()));
         quantityField.setPrefWidth(80);
 
-        TextField unitField = new TextField(
-                existingRow.getUnitOfMeasure() != null ? existingRow.getUnitOfMeasure() : "");
-        unitField.setPrefWidth(80);
+        ComboBox<ProductUnit> unitCombo = createPurchaseUnitComboBox();
+        unitCombo.setPrefWidth(250);
 
         TextField priceField = new TextField(String.valueOf(existingRow.getUnitPrice()));
         priceField.setPrefWidth(120);
@@ -985,87 +932,29 @@ public class PurchaseController implements Initializable {
         currencyCombo.setValue(existingRow.getCurrency() != null ? existingRow.getCurrency() : "دينار");
         currencyCombo.setPrefWidth(250);
 
+        Runnable refreshPricesForSelection = () -> {
+            Product selected = productCombo.getValue();
+            boolean isUsdCurrency = "دولار".equals(currencyCombo.getValue());
+            applyProductPricesForUnit(selected, unitCombo.getValue(), isUsdCurrency,
+                    priceField, salePriceField, wholesalePriceField, specialPriceField);
+        };
+
+        populatePurchaseUnitCombo(unitCombo, existingRow.getProduct(), existingRow.getUnitOfMeasure());
+
         productCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            populatePurchaseUnitCombo(unitCombo, newVal, null);
             if (newVal != null) {
-                boolean isUsdCurrency = "دولار"
-                        .equals(currencyCombo != null ? currencyCombo.getValue() : DEFAULT_CURRENCY);
-                if (isUsdCurrency) {
-                    if (newVal.getCostPriceUsd() != null && newVal.getCostPriceUsd() > 0) {
-                        priceField.setText(String.valueOf(newVal.getCostPriceUsd()));
-                    } else if (newVal.getUnitPriceUsd() != null) {
-                        priceField.setText(String.valueOf(newVal.getUnitPriceUsd()));
-                    }
-                    if (newVal.getUnitPriceUsd() != null) {
-                        salePriceField.setText(String.valueOf(newVal.getUnitPriceUsd()));
-                    }
-                    if (newVal.getWholesalePriceUsd() != null) {
-                        wholesalePriceField.setText(String.valueOf(newVal.getWholesalePriceUsd()));
-                    }
-                    if (newVal.getSpecialPriceUsd() != null) {
-                        specialPriceField.setText(String.valueOf(newVal.getSpecialPriceUsd()));
-                    }
-                } else {
-                    if (newVal.getCostPrice() != null && newVal.getCostPrice() > 0) {
-                        priceField.setText(String.valueOf(newVal.getCostPrice()));
-                    } else if (newVal.getUnitPrice() != null) {
-                        priceField.setText(String.valueOf(newVal.getUnitPrice()));
-                    }
-                    if (newVal.getUnitPrice() != null) {
-                        salePriceField.setText(String.valueOf(newVal.getUnitPrice()));
-                    }
-                    if (newVal.getWholesalePrice() != null) {
-                        wholesalePriceField.setText(String.valueOf(newVal.getWholesalePrice()));
-                    }
-                    if (newVal.getSpecialPrice() != null) {
-                        specialPriceField.setText(String.valueOf(newVal.getSpecialPrice()));
-                    }
-                }
-                if (newVal.getUnitOfMeasure() != null) {
-                    unitField.setText(newVal.getUnitOfMeasure());
-                }
                 if (newVal.getCategory() != null && !newVal.getCategory().isEmpty()) {
                     categoryCombo.setValue(newVal.getCategory());
                 }
+                refreshPricesForSelection.run();
+            } else {
+                populatePurchaseUnitCombo(unitCombo, null, existingRow.getUnitOfMeasure());
             }
         });
 
-        currencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            Product selectedGroup = productCombo.getValue();
-            if (selectedGroup != null) {
-                boolean isUsdCurrency = "دولار".equals(newVal);
-                if (isUsdCurrency) {
-                    if (selectedGroup.getCostPriceUsd() != null && selectedGroup.getCostPriceUsd() > 0) {
-                        priceField.setText(String.valueOf(selectedGroup.getCostPriceUsd()));
-                    } else if (selectedGroup.getUnitPriceUsd() != null) {
-                        priceField.setText(String.valueOf(selectedGroup.getUnitPriceUsd()));
-                    }
-                    if (selectedGroup.getUnitPriceUsd() != null) {
-                        salePriceField.setText(String.valueOf(selectedGroup.getUnitPriceUsd()));
-                    }
-                    if (selectedGroup.getWholesalePriceUsd() != null) {
-                        wholesalePriceField.setText(String.valueOf(selectedGroup.getWholesalePriceUsd()));
-                    }
-                    if (selectedGroup.getSpecialPriceUsd() != null) {
-                        specialPriceField.setText(String.valueOf(selectedGroup.getSpecialPriceUsd()));
-                    }
-                } else {
-                    if (selectedGroup.getCostPrice() != null && selectedGroup.getCostPrice() > 0) {
-                        priceField.setText(String.valueOf(selectedGroup.getCostPrice()));
-                    } else if (selectedGroup.getUnitPrice() != null) {
-                        priceField.setText(String.valueOf(selectedGroup.getUnitPrice()));
-                    }
-                    if (selectedGroup.getUnitPrice() != null) {
-                        salePriceField.setText(String.valueOf(selectedGroup.getUnitPrice()));
-                    }
-                    if (selectedGroup.getWholesalePrice() != null) {
-                        wholesalePriceField.setText(String.valueOf(selectedGroup.getWholesalePrice()));
-                    }
-                    if (selectedGroup.getSpecialPrice() != null) {
-                        specialPriceField.setText(String.valueOf(selectedGroup.getSpecialPrice()));
-                    }
-                }
-            }
-        });
+        unitCombo.valueProperty().addListener((obs, oldVal, newVal) -> refreshPricesForSelection.run());
+        currencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> refreshPricesForSelection.run());
 
         grid.add(new Label("المادة"), 0, 0);
         grid.add(productCombo, 1, 0);
@@ -1074,7 +963,7 @@ public class PurchaseController implements Initializable {
         grid.add(new Label("الكمية"), 0, 2);
         grid.add(quantityField, 1, 2);
         grid.add(new Label("الوحدة"), 0, 3);
-        grid.add(unitField, 1, 3);
+        grid.add(unitCombo, 1, 3);
         grid.add(new Label("العملة"), 0, 4);
         grid.add(currencyCombo, 1, 4);
         grid.add(new Label("رقم التشغيلة"), 0, 5);
@@ -1126,7 +1015,7 @@ public class PurchaseController implements Initializable {
                 double salePrice = parseAmount(salePriceField.getText());
                 double wholesalePrice = parseAmount(wholesalePriceField.getText());
                 double specialPrice = parseAmount(specialPriceField.getText());
-                String unit = unitField.getText() != null ? unitField.getText().trim() : "";
+                String unit = resolveSelectedUnitName(unitCombo, selectedProduct);
                 String category = categoryCombo.getValue() != null ? categoryCombo.getValue().trim()
                         : (categoryCombo.getEditor().getText() != null ? categoryCombo.getEditor().getText().trim()
                                 : "");
@@ -1455,6 +1344,144 @@ public class PurchaseController implements Initializable {
             return LocalDate.parse(trimmed).toString();
         } catch (DateTimeParseException e) {
             return null;
+        }
+    }
+
+    private ComboBox<ProductUnit> createPurchaseUnitComboBox() {
+        ComboBox<ProductUnit> unitCombo = new ComboBox<>();
+        unitCombo.setPromptText("اختر الوحدة");
+        unitCombo.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(ProductUnit unit) {
+                return formatPurchaseUnitLabel(unit);
+            }
+
+            @Override
+            public ProductUnit fromString(String string) {
+                return null;
+            }
+        });
+        return unitCombo;
+    }
+
+    private String formatPurchaseUnitLabel(ProductUnit unit) {
+        if (unit == null) {
+            return "";
+        }
+        String name = unit.getUnitName() != null ? unit.getUnitName() : "وحدة";
+        Product product = unit.getProduct();
+        if (product != null) {
+            String baseUnit = productUnitService.resolveBaseUnit(product);
+            if (name.equals(baseUnit)) {
+                return name + " (أساس)";
+            }
+        }
+        double factor = unit.getEffectiveConversionFactor();
+        return factor == 1.0 ? name : name + " × " + numberFormat.format(factor);
+    }
+
+    private void populatePurchaseUnitCombo(ComboBox<ProductUnit> unitCombo, Product product, String preferredUnit) {
+        List<ProductUnit> units = product != null
+                ? productUnitService.getUnitsForProductOrDefault(product)
+                : buildGenericPurchaseUnits();
+        unitCombo.setItems(FXCollections.observableArrayList(units));
+
+        ProductUnit selected = findPurchaseUnit(units, product, preferredUnit);
+        unitCombo.setValue(selected);
+    }
+
+    private List<ProductUnit> buildGenericPurchaseUnits() {
+        List<ProductUnit> units = new java.util.ArrayList<>();
+        for (String unitName : GENERIC_UNIT_NAMES) {
+            ProductUnit unit = new ProductUnit();
+            unit.setUnitName(unitName);
+            unit.setConversionFactor(1.0);
+            units.add(unit);
+        }
+        return units;
+    }
+
+    private ProductUnit findPurchaseUnit(List<ProductUnit> units, Product product, String preferredUnit) {
+        if (units == null || units.isEmpty()) {
+            return null;
+        }
+        if (preferredUnit != null && !preferredUnit.isBlank()) {
+            ProductUnit matched = units.stream()
+                    .filter(unit -> preferredUnit.equals(unit.getUnitName()))
+                    .findFirst()
+                    .orElse(null);
+            if (matched != null) {
+                return matched;
+            }
+        }
+        if (product != null) {
+            String baseUnit = productUnitService.resolveBaseUnit(product);
+            ProductUnit baseMatch = units.stream()
+                    .filter(unit -> baseUnit.equals(unit.getUnitName()))
+                    .findFirst()
+                    .orElse(null);
+            if (baseMatch != null) {
+                return baseMatch;
+            }
+        }
+        return units.stream()
+                .filter(unit -> Boolean.TRUE.equals(unit.getIsDefault()))
+                .findFirst()
+                .orElse(units.get(0));
+    }
+
+    private String resolveSelectedUnitName(ComboBox<ProductUnit> unitCombo, Product product) {
+        ProductUnit selected = unitCombo.getValue();
+        if (selected != null && selected.getUnitName() != null && !selected.getUnitName().isBlank()) {
+            return selected.getUnitName().trim();
+        }
+        if (product != null) {
+            return productUnitService.resolveBaseUnit(product);
+        }
+        return "";
+    }
+
+    private void applyProductPricesForUnit(Product product, ProductUnit unit, boolean isUsdCurrency,
+            TextField priceField, TextField salePriceField,
+            TextField wholesalePriceField, TextField specialPriceField) {
+        if (product == null) {
+            return;
+        }
+        double factor = unit != null ? unit.getEffectiveConversionFactor() : 1.0;
+        if (isUsdCurrency) {
+            if (unit != null && unit.getSalePriceUsd() != null && unit.getSalePriceUsd() > 0) {
+                salePriceField.setText(String.valueOf(unit.getSalePriceUsd()));
+            } else if (product.getUnitPriceUsd() != null) {
+                salePriceField.setText(String.valueOf(product.getUnitPriceUsd() * factor));
+            }
+            if (product.getCostPriceUsd() != null && product.getCostPriceUsd() > 0) {
+                priceField.setText(String.valueOf(product.getCostPriceUsd() * factor));
+            } else if (product.getUnitPriceUsd() != null) {
+                priceField.setText(String.valueOf(product.getUnitPriceUsd() * factor));
+            }
+            if (product.getWholesalePriceUsd() != null) {
+                wholesalePriceField.setText(String.valueOf(product.getWholesalePriceUsd() * factor));
+            }
+            if (product.getSpecialPriceUsd() != null) {
+                specialPriceField.setText(String.valueOf(product.getSpecialPriceUsd() * factor));
+            }
+        } else {
+            if (unit != null && unit.getSalePrice() != null && unit.getSalePrice() > 0) {
+                salePriceField.setText(String.valueOf(unit.getSalePrice()));
+            } else if (product.getUnitPrice() != null) {
+                salePriceField.setText(String.valueOf(product.getUnitPrice() * factor));
+            }
+            if (product.getCostPrice() != null && product.getCostPrice() > 0) {
+                priceField.setText(String.valueOf(product.getCostPrice() * factor));
+            } else if (product.getUnitPrice() != null) {
+                priceField.setText(String.valueOf(product.getUnitPrice() * factor));
+            }
+            if (product.getWholesalePrice() != null) {
+                wholesalePriceField.setText(String.valueOf(product.getWholesalePrice() * factor));
+            }
+            if (product.getSpecialPrice() != null) {
+                specialPriceField.setText(String.valueOf(product.getSpecialPrice() * factor));
+            }
         }
     }
 

@@ -32,7 +32,8 @@ public class DatabaseManager {
             "db/migrations/20260502_cashbox_foundation.sql",
             "db/migrations/20260502_permissions_audit.sql",
             "db/migrations/20260503_batch_production_date.sql",
-            "db/migrations/20260504_supplier_invoice_number.sql");
+            "db/migrations/20260504_supplier_invoice_number.sql",
+            "db/migrations/20260701_cashbox_enhancements.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -171,6 +172,10 @@ public class DatabaseManager {
         }
         try {
             stmt.execute("ALTER TABLE sale_items ADD COLUMN base_quantity REAL DEFAULT 0");
+        } catch (SQLException ignored) {
+        }
+        try {
+            stmt.execute("ALTER TABLE cashbox_ledger ADD COLUMN related_created_by TEXT");
         } catch (SQLException ignored) {
         }
 
@@ -957,6 +962,7 @@ public class DatabaseManager {
             configuration.addAnnotatedClass(com.pharmax.model.PurchaseReturn.class);
             configuration.addAnnotatedClass(com.pharmax.model.PurchaseReturnItem.class);
             configuration.addAnnotatedClass(com.pharmax.model.CashboxLedger.class);
+            configuration.addAnnotatedClass(com.pharmax.model.CashboxManualOpening.class);
             configuration.addAnnotatedClass(com.pharmax.model.DailyClosing.class);
             configuration.addAnnotatedClass(com.pharmax.model.AuditLog.class);
 

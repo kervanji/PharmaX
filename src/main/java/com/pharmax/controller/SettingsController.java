@@ -1,5 +1,6 @@
 package com.pharmax.controller;
 
+import com.pharmax.MainApp;
 import com.pharmax.model.Customer;
 import com.pharmax.model.Product;
 import com.pharmax.model.Sale;
@@ -13,7 +14,11 @@ import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import com.pharmax.util.ThemeManager;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -340,22 +345,22 @@ public class SettingsController {
         dialog.setHeaderText("النسخ الاحتياطية المتاحة في Google Drive\nاختر نسخة لتنزيلها ثم استعادتها");
         dialog.getDialogPane().setPrefWidth(620);
         dialog.getDialogPane().setPrefHeight(500);
+        applyDialogTheme(dialog);
 
         ButtonType restoreButtonType = new ButtonType("استعادة النسخة المحددة", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(restoreButtonType, ButtonType.CANCEL);
 
-        // Disable restore button initially
-        javafx.scene.Node restoreBtn = dialog.getDialogPane().lookupButton(restoreButtonType);
+        Node restoreBtn = dialog.getDialogPane().lookupButton(restoreButtonType);
         restoreBtn.setDisable(true);
 
         VBox content = new VBox(10);
         content.setStyle("-fx-padding: 10;");
 
         Label infoLabel = new Label("سيتم تنزيل النسخة إلى: " + BACKUP_DOWNLOAD_DIR);
-        infoLabel.setStyle("-fx-text-fill: -fx-accent-text; -fx-font-size: 11px;");
+        infoLabel.getStyleClass().add("info-hint");
         content.getChildren().add(infoLabel);
 
-        javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane();
+        ScrollPane scrollPane = new ScrollPane();
         scrollPane.setFitToWidth(true);
         scrollPane.setPrefHeight(350);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
@@ -363,53 +368,67 @@ public class SettingsController {
         VBox backupListBox = new VBox(6);
         backupListBox.setStyle("-fx-padding: 5;");
 
-        // Track which backup is selected for restore
         final File[] selectedDbFile = { null };
-        final javafx.scene.layout.HBox[] selectedRow = { null };
+        final HBox[] selectedRow = { null };
+        ToggleGroup restoreGroup = new ToggleGroup();
 
         DateTimeFormatter displayFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd  HH:mm:ss");
 
         for (BackupFile backup : backups) {
-            javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(10);
+            HBox row = new HBox(10);
             row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            row.setStyle("-fx-background-color: -fx-form-section-bg; -fx-padding: 10; -fx-background-radius: 8; -fx-cursor: hand;");
+            row.getStyleClass().add("backup-row");
+
+            RadioButton selectRadio = new RadioButton();
+            selectRadio.setToggleGroup(restoreGroup);
+            selectRadio.setFocusTraversable(false);
 
             Label statusIcon = new Label("☁");
-            statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-accent-text; -fx-min-width: 24;");
+            statusIcon.setMinWidth(24);
+            statusIcon.getStyleClass().add("backup-status-icon");
 
             VBox infoBox = new VBox(2);
-            javafx.scene.layout.HBox.setHgrow(infoBox, javafx.scene.layout.Priority.ALWAYS);
+            HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             Label nameLabel = new Label(backup.getTimestamp().format(displayFmt));
-            nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: -fx-text-main;");
+            nameLabel.getStyleClass().addAll("backup-row-title", "text-subtitle");
 
             String sizeText = backup.getSize() > 0 ? String.format("%.1f KB", backup.getSize() / 1024.0) : "";
             Label detailLabel = new Label(backup.getName() + (sizeText.isEmpty() ? "" : "  •  " + sizeText));
-            detailLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: -fx-text-hint;");
+            detailLabel.getStyleClass().addAll("backup-row-detail", "text-small");
 
             infoBox.getChildren().addAll(nameLabel, detailLabel);
 
             Button downloadBtn = new Button("تنزيل");
-            downloadBtn.setStyle(
-                    "-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 12; -fx-background-radius: 6;");
+            downloadBtn.getStyleClass().add("button-primary");
 
-            // Check if already downloaded
             String expectedZipName = backup.getName();
             String expectedDbName = expectedZipName.replace(".zip", ".db");
             File existingDb = new File(BACKUP_DOWNLOAD_DIR, expectedDbName);
             if (existingDb.exists()) {
                 statusIcon.setText("✓");
-                statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-success-text; -fx-min-width: 24;");
+                statusIcon.getStyleClass().add("status-success");
                 downloadBtn.setText("تم التنزيل ✓");
-                downloadBtn.setStyle(
-                        "-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 12; -fx-background-radius: 6;");
+                downloadBtn.getStyleClass().add("button-success");
             }
+
+            Runnable updateRestoreSelection = () -> {
+                if (selectRadio.isSelected()) {
+                    File dbFile = new File(BACKUP_DOWNLOAD_DIR, expectedDbName);
+                    if (dbFile.exists()) {
+                        selectedDbFile[0] = dbFile;
+                        restoreBtn.setDisable(false);
+                    } else {
+                        selectedDbFile[0] = null;
+                        restoreBtn.setDisable(true);
+                    }
+                }
+            };
 
             downloadBtn.setOnAction(ev -> {
                 downloadBtn.setDisable(true);
                 downloadBtn.setText("جارِ التنزيل...");
                 statusIcon.setText("⏳");
-                statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-warning-text; -fx-min-width: 24;");
 
                 Task<File> dlTask = new Task<>() {
                     @Override
@@ -419,21 +438,19 @@ public class SettingsController {
                 };
 
                 dlTask.setOnSucceeded(ev2 -> {
-                    @SuppressWarnings("unused") File dbFile = dlTask.getValue();
                     statusIcon.setText("✓");
-                    statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-success-text; -fx-min-width: 24;");
+                    statusIcon.getStyleClass().add("status-success");
                     downloadBtn.setText("تم التنزيل ✓");
-                    downloadBtn.setStyle(
-                            "-fx-background-color: -fx-success-text; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 12; -fx-background-radius: 6;");
+                    downloadBtn.getStyleClass().add("button-success");
                     downloadBtn.setDisable(false);
+                    updateRestoreSelection.run();
                 });
 
                 dlTask.setOnFailed(ev2 -> {
                     statusIcon.setText("✗");
-                    statusIcon.setStyle("-fx-font-size: 16px; -fx-text-fill: -fx-danger-text; -fx-min-width: 24;");
+                    statusIcon.getStyleClass().add("status-danger");
                     downloadBtn.setText("فشل - إعادة");
-                    downloadBtn.setStyle(
-                            "-fx-background-color: -fx-danger; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 12; -fx-background-radius: 6;");
+                    downloadBtn.getStyleClass().add("button-danger");
                     downloadBtn.setDisable(false);
                     logger.error("Failed to download backup", dlTask.getException());
                 });
@@ -441,40 +458,28 @@ public class SettingsController {
                 new Thread(dlTask).start();
             });
 
-            // Click row to select for restore
-            row.setOnMouseClicked(ev -> {
-                // Deselect previous
-                if (selectedRow[0] != null) {
-                    selectedRow[0].setStyle(
-                            "-fx-background-color: -fx-form-section-bg; -fx-padding: 10; -fx-background-radius: 8; -fx-cursor: hand;");
-                }
-                // Select this row
-                row.setStyle(
-                        "-fx-background-color: -fx-selection-bg; -fx-padding: 10; -fx-background-radius: 8; -fx-cursor: hand; -fx-border-color: -fx-accent-light; -fx-border-radius: 8; -fx-border-width: 1;");
-                selectedRow[0] = row;
-
-                // Check if db file exists locally
-                String zipName = backup.getName();
-                String dbName = zipName.replace(".zip", ".db");
-                File dbFile = new File(BACKUP_DOWNLOAD_DIR, dbName);
-                if (dbFile.exists()) {
-                    selectedDbFile[0] = dbFile;
-                    restoreBtn.setDisable(false);
-                } else {
-                    selectedDbFile[0] = null;
-                    restoreBtn.setDisable(true);
+            selectRadio.selectedProperty().addListener((obs, oldVal, selected) -> {
+                if (selected) {
+                    if (selectedRow[0] != null) {
+                        selectedRow[0].getStyleClass().remove("backup-row-selected");
+                    }
+                    row.getStyleClass().add("backup-row-selected");
+                    selectedRow[0] = row;
+                    updateRestoreSelection.run();
                 }
             });
 
-            row.getChildren().addAll(statusIcon, infoBox, downloadBtn);
+            row.setOnMouseClicked(ev -> selectRadio.setSelected(true));
+
+            row.getChildren().addAll(selectRadio, statusIcon, infoBox, downloadBtn);
             backupListBox.getChildren().add(row);
         }
 
         scrollPane.setContent(backupListBox);
         content.getChildren().add(scrollPane);
 
-        Label hintLabel = new Label("💡 قم بتنزيل النسخة أولاً ثم اضغط عليها لتحديدها ثم اضغط 'استعادة'");
-        hintLabel.setStyle("-fx-text-fill: -fx-warning-text; -fx-font-size: 11px;");
+        Label hintLabel = new Label("💡 قم بتنزيل النسخة أولاً ثم حدّدها ثم اضغط 'استعادة'");
+        hintLabel.getStyleClass().add("warning-hint");
         content.getChildren().add(hintLabel);
 
         dialog.getDialogPane().setContent(content);
@@ -489,6 +494,25 @@ public class SettingsController {
         dialog.showAndWait().ifPresent(dbFile -> {
             if (dbFile != null && dbFile.exists()) {
                 performLocalRestore(dbFile);
+            }
+        });
+    }
+
+    private void applyDialogTheme(Dialog<?> dialog) {
+        dialog.setOnShown(event -> {
+            Node owner = driveStatusLabel != null ? driveStatusLabel : backupStatusLabel;
+            if (owner == null || owner.getScene() == null) {
+                return;
+            }
+            Scene ownerScene = owner.getScene();
+            dialog.getDialogPane().getStylesheets().setAll(ownerScene.getStylesheets());
+            Scene dialogScene = dialog.getDialogPane().getScene();
+            if (dialogScene != null) {
+                ThemeManager.getInstance().applyTheme(dialogScene);
+                int fontSize = SessionManager.getInstance().getUiFontSize();
+                if (fontSize != 13) {
+                    MainApp.applyFontSizeRecursive(dialog.getDialogPane(), fontSize);
+                }
             }
         });
     }

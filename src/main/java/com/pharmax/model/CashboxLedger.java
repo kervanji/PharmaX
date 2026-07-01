@@ -55,6 +55,9 @@ public class CashboxLedger {
     @Column(name = "created_by")
     private String createdBy;
 
+    @Column(name = "related_created_by")
+    private String relatedCreatedBy;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -102,6 +105,8 @@ public class CashboxLedger {
     public void setDescription(String description) { this.description = description; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getRelatedCreatedBy() { return relatedCreatedBy; }
+    public void setRelatedCreatedBy(String relatedCreatedBy) { this.relatedCreatedBy = relatedCreatedBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Boolean getVoided() { return voided != null ? voided : false; }

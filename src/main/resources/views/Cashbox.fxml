@@ -29,10 +29,16 @@
     </HBox>
 
     <HBox spacing="16">
-        <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
+        <VBox alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS"
               style="-fx-background-color: -fx-form-section-bg; -fx-padding: 16; -fx-background-radius: 12;">
-            <Label text="الرصيد الافتتاحي" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
-            <Label fx:id="openingCashLabel" text="0 د.ع" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+            <Label text="رصيد الافتتاح" style="-fx-font-size: 13px; -fx-text-fill: -fx-form-sublabel;"/>
+            <HBox spacing="8" alignment="CENTER">
+                <TextField fx:id="openingCashField" promptText="0" prefWidth="120" alignment="CENTER"/>
+                <Button fx:id="saveOpeningCashBtn" text="حفظ" onAction="#handleSaveOpeningCash"
+                        style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;"/>
+            </HBox>
+            <Label fx:id="openingCashHintLabel" text="أدخل رصيد الافتتاح يدوياً" wrapText="true"
+                   style="-fx-font-size: 11px; -fx-text-fill: -fx-form-sublabel;"/>
         </VBox>
         <VBox alignment="CENTER" spacing="4" HBox.hgrow="ALWAYS"
               style="-fx-background-color: -fx-success-bg; -fx-padding: 16; -fx-background-radius: 12;">
@@ -53,14 +59,18 @@
 
     <TableView fx:id="ledgerTable" VBox.vgrow="ALWAYS">
         <columns>
-            <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="150"/>
-            <TableColumn fx:id="entryTypeColumn" text="نوع الحركة" prefWidth="130"/>
+            <TableColumn fx:id="dateColumn" text="التاريخ" prefWidth="130"/>
+            <TableColumn fx:id="entryTypeColumn" text="نوع الحركة" prefWidth="120"/>
             <TableColumn fx:id="directionColumn" text="الاتجاه" prefWidth="70"/>
-            <TableColumn fx:id="amountColumn" text="المبلغ" prefWidth="100"/>
-            <TableColumn fx:id="currencyColumn" text="العملة" prefWidth="80"/>
-            <TableColumn fx:id="sourceTypeColumn" text="المصدر" prefWidth="110"/>
-            <TableColumn fx:id="sourceIdColumn" text="رقم المصدر" prefWidth="90"/>
-            <TableColumn fx:id="descriptionColumn" text="الوصف" prefWidth="260"/>
+            <TableColumn fx:id="amountColumn" text="المبلغ" prefWidth="90"/>
+            <TableColumn fx:id="currencyColumn" text="العملة" prefWidth="70"/>
+            <TableColumn fx:id="partyColumn" text="العميل/المذخر" prefWidth="130"/>
+            <TableColumn fx:id="accountColumn" text="الحساب" prefWidth="110"/>
+            <TableColumn fx:id="performerColumn" text="منفّذ العملية" prefWidth="110"/>
+            <TableColumn fx:id="creditGiverColumn" text="منح الدين" prefWidth="110"/>
+            <TableColumn fx:id="sourceTypeColumn" text="المصدر" prefWidth="100"/>
+            <TableColumn fx:id="sourceIdColumn" text="رقم المصدر" prefWidth="85"/>
+            <TableColumn fx:id="descriptionColumn" text="الوصف" prefWidth="220"/>
         </columns>
         <placeholder>
             <Label text="لا توجد حركات نقدية لهذا التاريخ"/>

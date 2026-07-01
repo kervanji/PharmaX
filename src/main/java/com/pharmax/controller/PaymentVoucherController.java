@@ -71,7 +71,9 @@ public class PaymentVoucherController implements Initializable {
     private final DecimalFormat numberFormat = new DecimalFormat("#,###.##");
     private static final String PAID_STATUS_TEXT = "\u0645\u062f\u0641\u0648\u0639";
     private static final String UNPAID_STATUS_TEXT = "\u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639";
+    private static final String PARTIAL_STATUS_TEXT = "\u0645\u062f\u0641\u0648\u0639 \u062c\u0632\u0626\u064a\u0627\u064b";
     private static final String DEFAULT_CASH_ACCOUNT = "صندوق 181";
+    private static final double PAYMENT_TOLERANCE = 0.001;
     
     private ObservableList<Customer> customers;
     private Customer selectedCustomer;
@@ -79,6 +81,7 @@ public class PaymentVoucherController implements Initializable {
     private FilteredList<PreviousVoucherRow> previousVoucherRows;
     private Long selectedPurchaseVoucherId;
     private String selectedPurchaseVoucherNumber;
+    private double selectedPurchaseRemainingBalance;
     private boolean suppressTableSelectionEvents;
 
     private boolean tabMode = false;
@@ -121,8 +124,10 @@ public class PaymentVoucherController implements Initializable {
                         setStyle("");
                     } else {
                         setText(status);
-                        setStyle(status.startsWith(PAID_STATUS_TEXT)
+                        setStyle(status.startsWith(PAID_STATUS_TEXT) && !status.startsWith(PARTIAL_STATUS_TEXT)
                                 ? "-fx-text-fill: -fx-success-text; -fx-font-weight: bold;"
+                                : status.startsWith(PARTIAL_STATUS_TEXT)
+                                ? "-fx-text-fill: -fx-accent-text; -fx-font-weight: bold;"
                                 : "-fx-text-fill: -fx-warning-text; -fx-font-weight: bold;");
                     }
                 }
@@ -137,22 +142,22 @@ public class PaymentVoucherController implements Initializable {
                 protected void updateItem(PreviousVoucherRow item, boolean empty) {
                     super.updateItem(item, empty);
                     if (empty || item == null) {
-                        setDisable(false);
                         setStyle("");
-                    } else if (item.paid) {
-                        setDisable(true);
+                        setMouseTransparent(false);
+                    } else if (item.fullyPaid) {
                         setStyle("-fx-opacity: 0.55; -fx-cursor: default;");
+                    } else if (item.partiallyPaid) {
+                        setStyle("-fx-opacity: 0.85;");
                     } else {
-                        setDisable(false);
                         setStyle("");
                     }
                 }
             };
-            row.setOnMouseClicked(event -> {
-                if (!row.isEmpty() && row.getItem() != null && row.getItem().paid) {
+            row.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, event -> {
+                if (!row.isEmpty() && row.getItem() != null && row.getItem().fullyPaid) {
                     event.consume();
                     clearTableSelectionSafely();
-                    showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع مسبقاً ولا يمكن دفعه مرة أخرى");
+                    showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع بالكامل ولا يمكن دفعه مرة أخرى");
                 }
             });
             return row;
@@ -187,13 +192,24 @@ public class PaymentVoucherController implements Initializable {
         for (Voucher v : vouchers) {
             String dateText = v.getVoucherDate() != null ? v.getVoucherDate().toLocalDate().toString() : "-";
             double netAmount = v.getNetAmount() != null ? v.getNetAmount() : 0.0;
-            boolean paid = voucherService.isPurchaseVoucherPaid(v.getId());
-            Voucher paymentVoucher = paid ? voucherService.findPaymentForPurchaseVoucher(v.getId()).orElse(null) : null;
-            String statusText = paid
-                    ? PAID_STATUS_TEXT + (paymentVoucher != null && paymentVoucher.getVoucherNumber() != null
-                    ? " - " + paymentVoucher.getVoucherNumber()
-                    : "")
-                    : UNPAID_STATUS_TEXT;
+            double totalPaid = voucherService.getTotalPaidForPurchaseVoucher(v.getId());
+            double remainingDue = Math.max(0.0, netAmount - totalPaid);
+            boolean fullyPaid = remainingDue <= PAYMENT_TOLERANCE;
+            boolean partiallyPaid = totalPaid > PAYMENT_TOLERANCE && !fullyPaid;
+            Voucher paymentVoucher = fullyPaid
+                    ? voucherService.findPaymentForPurchaseVoucher(v.getId()).orElse(null)
+                    : null;
+            String statusText;
+            if (fullyPaid) {
+                statusText = PAID_STATUS_TEXT + (paymentVoucher != null && paymentVoucher.getVoucherNumber() != null
+                        ? " - " + paymentVoucher.getVoucherNumber()
+                        : "");
+            } else if (partiallyPaid) {
+                statusText = PARTIAL_STATUS_TEXT + " - متبقي " + numberFormat.format(remainingDue)
+                        + (isUsd ? " $" : " د.ع");
+            } else {
+                statusText = UNPAID_STATUS_TEXT;
+            }
             String amountText = numberFormat.format(netAmount) + (isUsd ? " $" : " د.ع");
             String remainingText = numberFormat.format(running) + (isUsd ? " $" : " د.ع");
 
@@ -202,7 +218,8 @@ public class PaymentVoucherController implements Initializable {
                         v.getId(),
                         v.getVoucherNumber() != null ? v.getVoucherNumber() : "-",
                         safe(v.getSupplierInvoiceNumber()),
-                        dateText, amountText, remainingText, netAmount, v.getCurrency(), paid, statusText));
+                        dateText, amountText, remainingText, netAmount, remainingDue, v.getCurrency(),
+                        fullyPaid, partiallyPaid, statusText));
                 displayCount++;
             }
 
@@ -219,10 +236,6 @@ public class PaymentVoucherController implements Initializable {
         amountCurrencyCombo.setItems(FXCollections.observableArrayList("دينار", "دولار"));
         amountCurrencyCombo.setValue("دينار");
         firstInstallmentDatePicker.setValue(LocalDate.now().plusMonths(1));
-
-        if (amountField != null) {
-            amountField.setEditable(false);
-        }
         
         customerCombo.setConverter(new StringConverter<Customer>() {
             @Override
@@ -258,6 +271,7 @@ public class PaymentVoucherController implements Initializable {
         amountField.textProperty().addListener((obs, oldVal, newVal) -> {
             calculateNetAmount();
             updateAmountInWords();
+            updateSaveButtonState();
         });
         
         discountPercentField.textProperty().addListener((obs, oldVal, newVal) -> {
@@ -275,6 +289,7 @@ public class PaymentVoucherController implements Initializable {
         discountAmountField.textProperty().addListener((obs, oldVal, newVal) -> {
             calculateNetAmount();
             updateAmountInWords();
+            updateSaveButtonState();
         });
 
         amountCurrencyCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -421,15 +436,23 @@ public class PaymentVoucherController implements Initializable {
             }
 
             if (voucherService.isPurchaseVoucherPaid(selectedPurchaseVoucherId)) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "تم دفع هذا الوصل مسبقاً ولا يمكن دفعه مرة أخرى");
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "تم دفع هذا الوصل بالكامل ولا يمكن دفعه مرة أخرى");
                 clearPurchaseInvoiceSelection();
                 loadPreviousVouchers();
                 return;
             }
             
             double amount = parseAmount(amountField.getText());
-            if (amount <= 0) {
-                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى اختيار فاتورة مشتريات صحيحة من القائمة");
+            double discount = parseAmount(discountAmountField.getText());
+            double netPayment = amount - discount;
+            if (netPayment <= PAYMENT_TOLERANCE) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه", "يرجى إدخال مبلغ دفع أكبر من صفر");
+                return;
+            }
+            if (netPayment > selectedPurchaseRemainingBalance + PAYMENT_TOLERANCE) {
+                showAlert(Alert.AlertType.WARNING, "تنبيه",
+                        "مبلغ الدفع أكبر من المتبقي على الفاتورة ("
+                                + numberFormat.format(selectedPurchaseRemainingBalance) + ")");
                 return;
             }
 
@@ -479,7 +502,8 @@ public class PaymentVoucherController implements Initializable {
             loadCustomers();
             
         } catch (Exception e) {
-            if (e.getMessage() != null && e.getMessage().contains("تم دفع هذا الوصل مسبقاً")) {
+            if (e.getMessage() != null && (e.getMessage().contains("تم دفع هذا الوصل")
+                    || e.getMessage().contains("مبلغ الدفع أكبر من المتبقي"))) {
                 clearPurchaseInvoiceSelection();
                 loadPreviousVouchers();
             }
@@ -572,16 +596,19 @@ public class PaymentVoucherController implements Initializable {
     }
 
     private void applyPurchaseInvoiceToPayment(PreviousVoucherRow row) {
-        if (row.paid || voucherService.isPurchaseVoucherPaid(row.voucherId)) {
+        if (row.fullyPaid || voucherService.isPurchaseVoucherPaid(row.voucherId)) {
             clearPurchaseInvoiceFormFields();
             clearTableSelectionSafely();
-            showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع مسبقاً ولا يمكن دفعه مرة أخرى");
+            showAlert(Alert.AlertType.INFORMATION, "معلومة", "هذا الوصل مدفوع بالكامل ولا يمكن دفعه مرة أخرى");
             return;
         }
 
         selectedPurchaseVoucherId = row.voucherId;
         selectedPurchaseVoucherNumber = row.voucherNumber;
-        amountField.setText(numberFormat.format(row.amount));
+        selectedPurchaseRemainingBalance = row.remainingDue > 0
+                ? row.remainingDue
+                : voucherService.getPurchaseVoucherRemainingBalance(row.voucherId);
+        amountField.setText(numberFormat.format(selectedPurchaseRemainingBalance));
         if (amountCurrencyCombo != null && row.currency != null && !row.currency.isBlank()) {
             amountCurrencyCombo.setValue(row.currency);
         }
@@ -607,6 +634,7 @@ public class PaymentVoucherController implements Initializable {
     private void clearSelectedPurchaseInvoice() {
         selectedPurchaseVoucherId = null;
         selectedPurchaseVoucherNumber = null;
+        selectedPurchaseRemainingBalance = 0.0;
     }
 
     private void clearPurchaseInvoiceSelection() {
@@ -647,7 +675,9 @@ public class PaymentVoucherController implements Initializable {
         }
         boolean canSave = selectedCustomer != null
                 && selectedPurchaseVoucherId != null
-                && !voucherService.isPurchaseVoucherPaid(selectedPurchaseVoucherId);
+                && selectedPurchaseRemainingBalance > PAYMENT_TOLERANCE
+                && !voucherService.isPurchaseVoucherPaid(selectedPurchaseVoucherId)
+                && (parseAmount(amountField.getText()) - parseAmount(discountAmountField.getText())) > PAYMENT_TOLERANCE;
         saveBtn.setDisable(!canSave);
     }
     
@@ -766,13 +796,15 @@ public class PaymentVoucherController implements Initializable {
         final String amountText;
         final String remainingText;
         final double amount;
+        final double remainingDue;
         final String currency;
-        final boolean paid;
+        final boolean fullyPaid;
+        final boolean partiallyPaid;
         final String statusText;
 
         private PreviousVoucherRow(Long voucherId, String voucherNumber, String supplierInvoiceNumber, String dateText,
-                                   String amountText, String remainingText, double amount, String currency,
-                                   boolean paid, String statusText) {
+                                   String amountText, String remainingText, double amount, double remainingDue,
+                                   String currency, boolean fullyPaid, boolean partiallyPaid, String statusText) {
             this.voucherId = voucherId;
             this.voucherNumber = voucherNumber;
             this.supplierInvoiceNumber = supplierInvoiceNumber;
@@ -780,8 +812,10 @@ public class PaymentVoucherController implements Initializable {
             this.amountText = amountText;
             this.remainingText = remainingText;
             this.amount = amount;
+            this.remainingDue = remainingDue;
             this.currency = currency;
-            this.paid = paid;
+            this.fullyPaid = fullyPaid;
+            this.partiallyPaid = partiallyPaid;
             this.statusText = statusText;
         }
     }

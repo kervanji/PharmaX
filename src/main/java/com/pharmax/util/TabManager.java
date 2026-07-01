@@ -2,7 +2,9 @@ package com.pharmax.util;
 
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Tab;
+import javafx.application.Platform;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -102,6 +104,18 @@ public class TabManager {
      */
     public <T> T openTab(String tabId, String title, String iconPath, String fxmlPath,
             Consumer<T> controllerInitializer) {
+        if (!DashboardAccessService.canOpenFxml(fxmlPath)) {
+            logger.warn("Access denied opening tab {} via {}", tabId, fxmlPath);
+            Platform.runLater(() -> {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("غير مسموح");
+                alert.setHeaderText(null);
+                alert.setContentText("لا تملك صلاحية الوصول لهذه الواجهة");
+                alert.showAndWait();
+            });
+            return null;
+        }
+
         // التحقق إذا كان التبويب مفتوحاً بالفعل
         if (openTabs.containsKey(tabId)) {
             Tab existingTab = openTabs.get(tabId);
