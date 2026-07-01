@@ -181,11 +181,25 @@ Copy-Item (Join-Path $PROJECT_DIR "pharmax.db") $DIST_DIR -ErrorAction SilentlyC
 
 # Google Drive OAuth credentials (required for cloud backup)
 $credSource = Join-Path $PROJECT_DIR "src\main\resources\credentials.json"
-if (Test-Path $credSource) {
-    Copy-Item $credSource (Join-Path $DIST_DIR "credentials.json") -Force
-    Write-Host "Included credentials.json in distribution" -ForegroundColor Green
-} else {
-    Write-Host "Warning: credentials.json not found - Google Drive backup will not work until it is added" -ForegroundColor Yellow
+if (-not (Test-Path $credSource)) {
+    Write-Host "ERROR: credentials.json is missing at src\main\resources\credentials.json" -ForegroundColor Red
+    Write-Host "Google Drive will NOT work on customer devices without this file." -ForegroundColor Red
+    exit 1
+}
+Copy-Item $credSource (Join-Path $DIST_DIR "credentials.json") -Force
+Write-Host "Included credentials.json in distribution" -ForegroundColor Green
+
+# Verify credentials.json is inside the packaged jar
+$distJar = Join-Path $DIST_DIR "$APP_NAME.jar"
+$jarExe = Join-Path $env:JAVA_HOME "bin\jar.exe"
+if ((Test-Path $distJar) -and (Test-Path $jarExe)) {
+    $jarListing = & $jarExe tf $distJar
+    if ($jarListing -notcontains "credentials.json") {
+        Write-Host "ERROR: credentials.json is NOT bundled inside $APP_NAME.jar" -ForegroundColor Red
+        Write-Host "Rebuild with mvn package after placing credentials.json in src\main\resources" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Verified credentials.json is inside $APP_NAME.jar" -ForegroundColor Green
 }
 
 # -----------------------------

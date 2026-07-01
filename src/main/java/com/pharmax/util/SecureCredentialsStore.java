@@ -1,5 +1,8 @@
 package com.pharmax.util;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.json.gson.GsonFactory;
+import com.pharmax.MainApp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,11 +15,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 /**
  * Stores Google OAuth credentials encrypted on disk, bound to this machine.
@@ -41,7 +49,12 @@ public final class SecureCredentialsStore {
         if (storeFile.isFile() && storeFile.length() > GCM_IV_LENGTH) {
             try {
                 byte[] encrypted = Files.readAllBytes(storeFile.toPath());
-                return decrypt(encrypted);
+                byte[] decrypted = decrypt(encrypted);
+                if (isValidJsonBytes(decrypted)) {
+                    return decrypted;
+                }
+                logger.warn("Encrypted Google Drive credentials are invalid, removing store file");
+                storeFile.delete();
             } catch (Exception e) {
                 logger.warn("Failed to decrypt stored credentials, will restore from application bundle", e);
                 storeFile.delete();
@@ -54,12 +67,13 @@ public final class SecureCredentialsStore {
             return plain;
         }
 
-        throw new IOException("ملف credentials.json غير موجود. تأكد من تثبيت البرنامج بشكل صحيح.");
+        throw new IOException(
+                "ملف credentials.json غير موجود في البرنامج. أعد تثبيت النسخة الكاملة أو تواصل مع الدعم الفني.");
     }
 
     public static void saveCredentialsBytes(byte[] plainJson) throws IOException {
-        if (plainJson == null || plainJson.length == 0) {
-            throw new IOException("بيانات credentials فارغة");
+        if (!isValidJsonBytes(plainJson)) {
+            throw new IOException("بيانات credentials غير صالحة");
         }
 
         File storeFile = getStoreFile();
@@ -83,12 +97,23 @@ public final class SecureCredentialsStore {
             return fromClasspath;
         }
 
+        File installCredentials = AppInstallPaths.getBundledCredentialsFile();
+        if (installCredentials.isFile()) {
+            byte[] fromInstall = Files.readAllBytes(installCredentials.toPath());
+            if (isValidJsonBytes(fromInstall)) {
+                return fromInstall;
+            }
+            logger.warn("Invalid credentials.json in install directory: {}", installCredentials.getAbsolutePath());
+        }
+
         File appDataPlain = PharmaXAppDirs.getCredentialsFile();
         if (appDataPlain.isFile()) {
             byte[] fromAppData = Files.readAllBytes(appDataPlain.toPath());
             if (isValidJsonBytes(fromAppData)) {
                 return fromAppData;
             }
+            logger.warn("Removing invalid AppData credentials.json");
+            appDataPlain.delete();
         }
 
         for (String relativePath : new String[] {
@@ -113,7 +138,7 @@ public final class SecureCredentialsStore {
         for (Class<?> anchor : new Class<?>[] {
                 SecureCredentialsStore.class,
                 com.pharmax.service.drive.GoogleDriveService.class,
-                com.pharmax.MainApp.class
+                MainApp.class
         }) {
             byte[] bytes = readResource(anchor, resourcePath);
             if (isValidJsonBytes(bytes)) {
@@ -133,6 +158,38 @@ public final class SecureCredentialsStore {
             }
         }
 
+        return readCredentialsFromJarFile();
+    }
+
+    private static byte[] readCredentialsFromJarFile() throws IOException {
+        for (Class<?> anchor : new Class<?>[] { MainApp.class, SecureCredentialsStore.class }) {
+            try {
+                URL location = anchor.getProtectionDomain().getCodeSource().getLocation();
+                if (location == null) {
+                    continue;
+                }
+                URI uri = location.toURI();
+                File code = new File(uri);
+                if (!code.isFile() || !code.getName().toLowerCase().endsWith(".jar")) {
+                    continue;
+                }
+                try (JarFile jarFile = new JarFile(code)) {
+                    JarEntry entry = jarFile.getJarEntry("credentials.json");
+                    if (entry == null) {
+                        continue;
+                    }
+                    try (InputStream in = jarFile.getInputStream(entry)) {
+                        byte[] bytes = in.readAllBytes();
+                        if (isValidJsonBytes(bytes)) {
+                            logger.info("Loaded credentials.json directly from {}", code.getAbsolutePath());
+                            return bytes;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Could not read credentials.json from jar for {}", anchor.getSimpleName(), e);
+            }
+        }
         return null;
     }
 
@@ -158,7 +215,15 @@ public final class SecureCredentialsStore {
 
     private static boolean isValidJsonBytes(byte[] bytes) {
         String content = normalizeJsonContent(bytes);
-        return !content.isEmpty() && content.startsWith("{") && content.contains("client_id");
+        if (content.isEmpty() || !content.startsWith("{")) {
+            return false;
+        }
+        try {
+            GoogleClientSecrets.load(GsonFactory.getDefaultInstance(), new StringReader(content));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static byte[] encrypt(byte[] plain) throws IOException {

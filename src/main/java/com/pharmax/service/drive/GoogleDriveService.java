@@ -111,7 +111,7 @@ public class GoogleDriveService {
 
     private GoogleClientSecrets loadClientSecrets(InputStream in) throws IOException {
         byte[] bytes = in.readAllBytes();
-        String content = new String(bytes, StandardCharsets.UTF_8).trim();
+        String content = normalizeCredentialContent(bytes);
         if (content.isEmpty() || !content.startsWith("{")) {
             throw new IOException(
                     "ملف credentials.json غير صالح. أعد تثبيت البرنامج أو تواصل مع الدعم الفني.");
@@ -121,8 +121,16 @@ public class GoogleDriveService {
             return GoogleClientSecrets.load(JSON_FACTORY, new StringReader(content));
         } catch (Exception e) {
             throw new IOException(
-                    "تعذر قراءة credentials.json: " + e.getMessage(), e);
+                    "ملف credentials.json غير صالح. أعد تثبيت البرنامج أو تواصل مع الدعم الفني.", e);
         }
+    }
+
+    private static String normalizeCredentialContent(byte[] bytes) {
+        String content = new String(bytes, StandardCharsets.UTF_8).trim();
+        if (content.startsWith("\uFEFF")) {
+            content = content.substring(1).trim();
+        }
+        return content;
     }
 
     private Credential loadStoredCredential(GoogleAuthorizationCodeFlow flow) throws IOException {
