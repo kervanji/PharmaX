@@ -1,7 +1,7 @@
 package com.pharmax.update;
 
 public final class AppVersion {
-    private static final String FALLBACK = "1.3.0";
+    private static final String FALLBACK = "1.3.1";
 
     private AppVersion() {
     }
