@@ -1,7 +1,9 @@
 package com.pharmax.controller;
 
 import com.pharmax.model.Product;
+import com.pharmax.model.ProductUnit;
 import com.pharmax.service.InventoryService;
+import com.pharmax.service.ProductUnitService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -10,7 +12,12 @@ import javafx.scene.control.*;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class AddStockController {
     @FXML
@@ -24,13 +31,25 @@ public class AddStockController {
     @FXML
     private TextField quantityField;
     @FXML
+    private ComboBox<String> quantityUnitComboBox;
+    @FXML
+    private Label quantityBreakdownLabel;
+    @FXML
     private Label newStockLabel;
 
     private Stage dialogStage;
     private final InventoryService inventoryService = new InventoryService();
+    private final ProductUnitService productUnitService = new ProductUnitService();
+    private final DecimalFormat numberFormat;
     private boolean tabMode = false;
     private FilteredList<Product> filteredProducts;
     private ObservableList<Product> allProducts;
+
+    public AddStockController() {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
+        symbols.setGroupingSeparator(',');
+        numberFormat = new DecimalFormat("#,##0.##", symbols);
+    }
 
     @FXML
     private void initialize() {
@@ -120,6 +139,9 @@ public class AddStockController {
                     if (rendered.equals(newText))
                         return;
                 }
+                if (isProductSelectionText(newText)) {
+                    return;
+                }
                 applyProductFilters();
             });
         }
@@ -129,30 +151,57 @@ public class AddStockController {
 
     private void setupQuantityListener() {
         quantityField.textProperty().addListener((obs, oldVal, newVal) -> updateNewStock());
+        if (quantityUnitComboBox != null) {
+            quantityUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> updateNewStock());
+        }
     }
 
     private void updateProductInfo() {
         Product selected = productComboBox.getValue();
         if (selected != null) {
-            currentStockLabel.setText(String.valueOf(selected.getQuantityInStock()));
-            minimumStockLabel.setText(String.valueOf(selected.getMinimumStock()));
+            refreshQuantityUnitOptions(selected);
+            currentStockLabel.setText(formatInventoryQuantity(selected, safe(selected.getQuantityInStock())));
+            minimumStockLabel.setText(formatInventoryQuantity(selected, safe(selected.getMinimumStock())));
             updateNewStock();
         } else {
+            if (quantityUnitComboBox != null) {
+                quantityUnitComboBox.hide();
+                quantityUnitComboBox.getItems().clear();
+            }
             currentStockLabel.setText("0");
             minimumStockLabel.setText("0");
             newStockLabel.setText("0");
+            if (quantityBreakdownLabel != null) {
+                quantityBreakdownLabel.setText("اختر المنتج ثم أدخل الكمية ووحدتها");
+            }
         }
+    }
+
+    private boolean isProductSelectionText(String text) {
+        if (text == null || allProducts == null || productComboBox == null || productComboBox.getConverter() == null) {
+            return false;
+        }
+
+        String normalized = text.trim();
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        return allProducts.stream()
+                .anyMatch(product -> normalized.equals(productComboBox.getConverter().toString(product)));
     }
 
     private void updateNewStock() {
         Product selected = productComboBox.getValue();
         if (selected != null) {
             try {
-                double quantity = Double.parseDouble(quantityField.getText().trim());
-                double newStock = selected.getQuantityInStock() + quantity;
-                newStockLabel.setText(String.valueOf(newStock));
+                double enteredQuantity = Double.parseDouble(quantityField.getText().trim());
+                double baseQuantity = convertQuantityToBase(selected, enteredQuantity, getSelectedInputUnit(selected));
+                double newStock = safe(selected.getQuantityInStock()) + baseQuantity;
+                newStockLabel.setText(formatInventoryQuantity(selected, newStock));
+                updateQuantityBreakdown(selected, enteredQuantity, baseQuantity);
 
-                if (newStock > selected.getMinimumStock()) {
+                if (newStock > safe(selected.getMinimumStock())) {
                     newStockLabel
                             .setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-success-dark;");
                 } else {
@@ -160,7 +209,10 @@ public class AddStockController {
                             .setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: -fx-warning-text;");
                 }
             } catch (NumberFormatException e) {
-                newStockLabel.setText(String.valueOf(selected.getQuantityInStock()));
+                newStockLabel.setText(formatInventoryQuantity(selected, safe(selected.getQuantityInStock())));
+                if (quantityBreakdownLabel != null) {
+                    quantityBreakdownLabel.setText("أدخل الكمية ليظهر التحويل قبل الإضافة");
+                }
             }
         }
     }
@@ -196,14 +248,17 @@ public class AddStockController {
         }
 
         try {
-            double quantity = Double.parseDouble(quantityText);
-            if (quantity <= 0) {
+            double enteredQuantity = Double.parseDouble(quantityText);
+            if (enteredQuantity <= 0) {
                 showError("خطأ", "الكمية يجب أن تكون أكبر من صفر");
                 return;
             }
 
-            inventoryService.addStock(selected.getId(), quantity);
-            showInfo("تم", "تمت إضافة " + quantity + " وحدة إلى مخزون " + selected.getName());
+            String inputUnit = getSelectedInputUnit(selected);
+            double baseQuantity = convertQuantityToBase(selected, enteredQuantity, inputUnit);
+            inventoryService.addStock(selected.getId(), baseQuantity);
+            showInfo("تم", "تمت إضافة " + numberFormat.format(enteredQuantity) + " " + inputUnit
+                    + " (" + formatInventoryQuantity(selected, baseQuantity) + ") إلى مخزون " + selected.getName());
             closeForm();
 
         } catch (NumberFormatException e) {
@@ -211,6 +266,105 @@ public class AddStockController {
         } catch (Exception e) {
             showError("خطأ", e.getMessage());
         }
+    }
+
+    private void refreshQuantityUnitOptions(Product product) {
+        if (quantityUnitComboBox == null || product == null) {
+            return;
+        }
+        String currentValue = quantityUnitComboBox.getValue();
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        Set<String> units = new LinkedHashSet<>();
+        addUnitOption(units, baseUnit);
+        for (ProductUnit unit : productUnitService.getUnitsForProductOrDefault(product)) {
+            if (unit == null || Boolean.FALSE.equals(unit.getIsActive())) {
+                continue;
+            }
+            addUnitOption(units, unit.getUnitName());
+        }
+
+        ObservableList<String> options = FXCollections.observableArrayList(units);
+        quantityUnitComboBox.hide();
+        quantityUnitComboBox.setItems(options);
+        if (currentValue != null && options.contains(currentValue)) {
+            quantityUnitComboBox.setValue(currentValue);
+        } else if (options.contains(baseUnit)) {
+            quantityUnitComboBox.setValue(baseUnit);
+        } else if (!options.isEmpty()) {
+            quantityUnitComboBox.setValue(options.get(0));
+        }
+    }
+
+    private void addUnitOption(Set<String> units, String unitName) {
+        if (unitName == null) {
+            return;
+        }
+        String trimmed = unitName.trim();
+        if (!trimmed.isEmpty()) {
+            units.add(trimmed);
+        }
+    }
+
+    private String getSelectedInputUnit(Product product) {
+        String selectedUnit = quantityUnitComboBox != null ? quantityUnitComboBox.getValue() : null;
+        if (selectedUnit != null && !selectedUnit.trim().isEmpty()) {
+            return selectedUnit.trim();
+        }
+        return productUnitService.resolveBaseUnit(product);
+    }
+
+    private double convertQuantityToBase(Product product, double quantity, String unitName) {
+        if (quantity <= 0) {
+            return quantity;
+        }
+        return quantity * resolveConversionFactor(product, unitName);
+    }
+
+    private double resolveConversionFactor(Product product, String unitName) {
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        if (unitName == null || unitName.trim().isEmpty() || unitName.equals(baseUnit)) {
+            return 1.0;
+        }
+        return productUnitService.getUnitsForProductOrDefault(product).stream()
+                .filter(unit -> unit.getUnitName() != null && unit.getUnitName().equals(unitName))
+                .findFirst()
+                .map(ProductUnit::getEffectiveConversionFactor)
+                .orElse(1.0);
+    }
+
+    private void updateQuantityBreakdown(Product product, double enteredQuantity, double baseQuantity) {
+        if (quantityBreakdownLabel == null) {
+            return;
+        }
+        String inputUnit = getSelectedInputUnit(product);
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        if (inputUnit.equals(baseUnit)) {
+            quantityBreakdownLabel.setText("الإضافة: " + formatInventoryQuantity(product, baseQuantity));
+        } else {
+            quantityBreakdownLabel.setText("أدخلت " + numberFormat.format(enteredQuantity) + " " + inputUnit
+                    + "، ستُضاف داخلياً: " + formatInventoryQuantity(product, baseQuantity));
+        }
+    }
+
+    private String formatInventoryQuantity(Product product, double quantity) {
+        String baseUnit = productUnitService.resolveBaseUnit(product);
+        String baseDisplay = numberFormat.format(quantity) + " " + baseUnit;
+        ProductUnit largestUnit = productUnitService.getUnitsForProductOrDefault(product).stream()
+                .filter(unit -> unit != null && !Boolean.FALSE.equals(unit.getIsActive()))
+                .filter(unit -> unit.getUnitName() != null && !unit.getUnitName().equals(baseUnit))
+                .filter(unit -> unit.getEffectiveConversionFactor() > 1.0)
+                .max((left, right) -> Double.compare(left.getEffectiveConversionFactor(), right.getEffectiveConversionFactor()))
+                .orElse(null);
+        if (largestUnit == null) {
+            return baseDisplay;
+        }
+        return baseDisplay + " = "
+                + numberFormat.format(quantity / largestUnit.getEffectiveConversionFactor())
+                + " " + largestUnit.getUnitName();
+    }
+
+    private double safe(Double value) {
+        return value != null ? value : 0.0;
     }
 
     @FXML

@@ -22,6 +22,7 @@
         <hibernate.version>5.6.15.Final</hibernate.version>
         <pdf.version>2.0.30</pdf.version>
         <jackson.version>2.15.2</jackson.version>
+        <log4j2.version>2.21.1</log4j2.version>
         <exec.mainClass>com.pharmax.MainApp</exec.mainClass>
         <exec.args></exec.args>
         
@@ -109,6 +110,11 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.4.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>${log4j2.version}</version>
         </dependency>
 
         <!-- Testing -->

@@ -26,8 +26,10 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class ProductController {
     private static final String STRIP_UNIT = "شريط";
@@ -73,6 +75,8 @@ public class ProductController {
     private Label profitMarginSpecialLabel;
     @FXML
     private TextField quantityField;
+    @FXML
+    private ComboBox<String> quantityInputUnitComboBox;
     @FXML
     private Label stockBreakdownLabel;
     @FXML
@@ -139,6 +143,8 @@ public class ProductController {
     private TextField openingBatchNumberField;
     @FXML
     private TextField openingBatchQuantityField;
+    @FXML
+    private ComboBox<String> openingBatchInputUnitComboBox;
     @FXML
     private Label openingBatchBreakdownLabel;
     @FXML
@@ -248,9 +254,6 @@ public class ProductController {
                 "حبة", "قرص", "كبسولة", "شريط", "علبة", "كرتون",
                 "أمبولة", "فيال", "قارورة", "عبوة", "أنبوب", "كيس",
                 "حقنة", "مل", "جرام", "قطعة");
-        // Only these units are offered as new selectable packaging/sale units
-        List<String> selectablePackagingUnits = Arrays.asList("شريط", "علبة");
-
         if (unitOfMeasureComboBox != null) {
             unitOfMeasureComboBox.setItems(FXCollections.observableArrayList(allUnits));
         }
@@ -259,11 +262,12 @@ public class ProductController {
             baseUnitComboBox.setValue("حبة");
         }
         if (packagingUnitComboBox != null) {
-            packagingUnitComboBox.setItems(FXCollections.observableArrayList(selectablePackagingUnits));
+            packagingUnitComboBox.setItems(FXCollections.observableArrayList(allUnits));
         }
         if (unitOfMeasureComboBox != null && unitOfMeasureComboBox.getValue() == null) {
             unitOfMeasureComboBox.setValue(STRIP_UNIT);
         }
+        refreshQuantityInputUnitOptions();
     }
 
     private void setupPackagingSection() {
@@ -308,6 +312,7 @@ public class ProductController {
             if (BOX_UNIT.equals(row.getUnitName()) && stripsPerBoxField != null && row.getConversionFactor() > 0) {
                 stripsPerBoxField.setText(formatQuantity(row.getConversionFactor()));
             }
+            refreshQuantityInputUnitOptions();
             refreshUnitBreakdownLabels();
         });
     }
@@ -316,18 +321,28 @@ public class ProductController {
         if (quantityField != null) {
             quantityField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
         }
+        if (quantityInputUnitComboBox != null) {
+            quantityInputUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
         if (openingBatchQuantityField != null) {
             openingBatchQuantityField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+        }
+        if (openingBatchInputUnitComboBox != null) {
+            openingBatchInputUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
         }
         if (stripsPerBoxField != null) {
             stripsPerBoxField.textProperty().addListener((obs, oldVal, newVal) -> {
                 syncPackagingEditorWithStripBox();
                 syncStripBoxRowFromShortcut();
+                refreshQuantityInputUnitOptions();
                 refreshUnitBreakdownLabels();
             });
         }
         if (baseUnitComboBox != null) {
-            baseUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
+            baseUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+                refreshQuantityInputUnitOptions();
+                refreshUnitBreakdownLabels();
+            });
         }
         if (packagingUnitComboBox != null) {
             packagingUnitComboBox.valueProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
@@ -335,6 +350,7 @@ public class ProductController {
         if (packagingConversionField != null) {
             packagingConversionField.textProperty().addListener((obs, oldVal, newVal) -> refreshUnitBreakdownLabels());
         }
+        refreshQuantityInputUnitOptions();
         refreshUnitBreakdownLabels();
     }
 
@@ -597,6 +613,7 @@ public class ProductController {
         loadBoxSellingPriceFields(product);
         syncPackagingEditorWithStripBox();
         syncStripBoxRowFromShortcut();
+        selectDisplayUnitForStoredQuantity();
 
         // Hide opening batch section in edit mode
         hideOpeningBatchSection();
@@ -632,6 +649,7 @@ public class ProductController {
         for (ProductUnit unit : units) {
             packagingRows.add(ProductUnitRow.fromUnit(unit));
         }
+        refreshQuantityInputUnitOptions();
         refreshUnitBreakdownLabels();
     }
 
@@ -714,6 +732,7 @@ public class ProductController {
                 unitPriceUsdField.setText(String.valueOf(row.getSalePriceUsd()));
             }
         }
+        refreshQuantityInputUnitOptions();
         clearPackagingInputs();
         refreshUnitBreakdownLabels();
     }
@@ -725,6 +744,7 @@ public class ProductController {
             packagingRows.remove(selected);
             packagingTable.refresh();
             clearPackagingInputs();
+            refreshQuantityInputUnitOptions();
             refreshUnitBreakdownLabels();
         }
     }
@@ -804,7 +824,7 @@ public class ProductController {
                 product.setSpecialPrice(parseDoubleOrNull(specialPriceField.getText()));
                 product.setSpecialPriceUsd(parseDoubleOrNull(specialPriceUsdField.getText()));
             }
-            double requestedStockQuantity = parseDouble(quantityField.getText());
+            double requestedStockQuantity = parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
             product.setQuantityInStock(requestedStockQuantity);
             product.setMinimumStock(parseDouble(minimumStockField.getText()));
             product.setMaximumStock(parseDoubleOrNull(maximumStockField.getText()));
@@ -947,7 +967,7 @@ public class ProductController {
         }
 
         double quantity = explicitOpeningBatch
-                ? parseDouble(openingBatchQuantityField.getText())
+                ? parseQuantityInputAsBase(openingBatchQuantityField, openingBatchInputUnitComboBox)
                 : requestedStockQuantity;
         if (quantity <= 0) {
             return;
@@ -1083,7 +1103,8 @@ public class ProductController {
             return false;
         }
 
-        if (expiryDatePicker != null && expiryDatePicker.getValue() != null && parseDouble(quantityField.getText()) <= 0) {
+        if (expiryDatePicker != null && expiryDatePicker.getValue() != null
+                && parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox) <= 0) {
             showError("خطأ", "تاريخ الانتهاء يحتاج كمية افتتاحية أكبر من صفر");
             quantityField.requestFocus();
             return false;
@@ -1091,7 +1112,7 @@ public class ProductController {
 
         // Validate opening batch fields if enabled
         if (openingBatchCheckBox != null && openingBatchCheckBox.isSelected()) {
-            double openingQty = parseDouble(openingBatchQuantityField.getText());
+            double openingQty = parseQuantityInputAsBase(openingBatchQuantityField, openingBatchInputUnitComboBox);
             if (openingQty <= 0) {
                 showError("خطأ", "الكمية الأولية للدفعة الافتتاحية يجب أن تكون أكبر من صفر");
                 openingBatchQuantityField.requestFocus();
@@ -1108,7 +1129,7 @@ public class ProductController {
         }
 
         if (isEditMode && product != null && product.getId() != null) {
-            double requestedStockQuantity = parseDouble(quantityField.getText());
+            double requestedStockQuantity = parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
             double currentBatchTotal = productBatchService.getTotalBatchQuantity(product.getId());
             if (requestedStockQuantity < currentBatchTotal - 1e-9) {
                 showError("خطأ", "لا يمكن تقليل الكمية يدوياً لأنها أقل من إجمالي الدفعات الحالية (" + numberFormat.format(currentBatchTotal) + "). يرجى استخدام شاشة البيع أو التسوية.");
@@ -1238,6 +1259,7 @@ public class ProductController {
         upsertPackagingRow(updatedStrip);
         upsertPackagingRow(updatedBox);
         syncSelectedPackagingEditorPrices(stripPrice, stripPriceUsd, boxPrice, boxPriceUsd);
+        refreshQuantityInputUnitOptions();
 
         if (packagingTable != null) {
             packagingTable.refresh();
@@ -1279,23 +1301,31 @@ public class ProductController {
     }
 
     private void refreshUnitBreakdownLabels() {
-        updateBreakdownLabel(stockBreakdownLabel, parseDouble(quantityField != null ? quantityField.getText() : null), false);
-        updateBreakdownLabel(openingBatchBreakdownLabel,
-                parseDouble(openingBatchQuantityField != null ? openingBatchQuantityField.getText() : null), true);
+        updateBreakdownLabel(stockBreakdownLabel, quantityField, quantityInputUnitComboBox, false);
+        updateBreakdownLabel(openingBatchBreakdownLabel, openingBatchQuantityField, openingBatchInputUnitComboBox, true);
         updatePackagingSummaryLabel();
     }
 
-    private void updateBreakdownLabel(Label label, double quantity, boolean openingBatch) {
+    private void updateBreakdownLabel(Label label, TextField field, ComboBox<String> unitComboBox, boolean openingBatch) {
         if (label == null) {
             return;
         }
+        double quantity = parseDouble(field != null ? field.getText() : null);
         if (quantity <= 0) {
             label.setText(openingBatch
-                    ? "أدخل كمية ابتدائية ليظهر تحويلها بين الشريط والعلبة."
-                    : "أدخل الكمية الحالية ليظهر مجموعها بالشرائط والعلب.");
+                    ? "أدخل كمية ابتدائية واختر وحدتها ليظهر تحويلها."
+                    : "أدخل الكمية الحالية واختر هل هي بوحدة الأساس أو وحدة تعبئة.");
             return;
         }
-        label.setText(formatUnitBreakdown(quantity));
+        String inputUnit = resolveQuantityInputUnit(unitComboBox);
+        double baseQuantity = convertQuantityToBase(quantity, inputUnit);
+        String baseUnit = resolveSelectedBaseUnit();
+        if (inputUnit != null && !inputUnit.equals(baseUnit)) {
+            label.setText("أدخلت " + numberFormat.format(quantity) + " " + inputUnit
+                    + "، سيُحفظ داخلياً: " + formatUnitBreakdown(baseQuantity));
+        } else {
+            label.setText(formatUnitBreakdown(baseQuantity));
+        }
     }
 
     private void updatePackagingSummaryLabel() {
@@ -1303,19 +1333,15 @@ public class ProductController {
             return;
         }
         double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
-        String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
-                ? baseUnitComboBox.getValue()
-                : "شريط";
+        String baseUnit = resolveSelectedBaseUnit();
 
-        if (stripsPerBox <= 0) {
-            packagingSummaryLabel.setText("حدد عدد الشرائط داخل العلبة ليتم تجهيز التحويل تلقائيًا.");
-            return;
-        }
-
-        double stockQuantity = parseDouble(quantityField != null ? quantityField.getText() : null);
+        double stockQuantity = parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
         StringBuilder summary = new StringBuilder();
-        summary.append("سيُحسب المخزون على أساس ").append(baseUnit)
-                .append(". كل 1 علبة = ").append(formatQuantity(stripsPerBox)).append(" شريط.");
+        summary.append("سيُحفظ المخزون على أساس ").append(baseUnit)
+                .append(". وحدات التعبئة والباركود تعريف للتحويل والبيع.");
+        if (STRIP_UNIT.equals(baseUnit) && stripsPerBox > 0) {
+            summary.append(" كل 1 علبة = ").append(formatQuantity(stripsPerBox)).append(" شريط.");
+        }
         if (stockQuantity > 0) {
             summary.append(" المجموع الحالي: ").append(formatUnitBreakdown(stockQuantity));
         }
@@ -1323,18 +1349,156 @@ public class ProductController {
     }
 
     private String formatUnitBreakdown(double baseQuantity) {
-        String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
-                ? baseUnitComboBox.getValue()
-                : "شريط";
-        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        String baseUnit = resolveSelectedBaseUnit();
+        String baseDisplay = numberFormat.format(baseQuantity) + " " + baseUnit;
 
-        if (!"شريط".equals(baseUnit) || stripsPerBox <= 0) {
-            return numberFormat.format(baseQuantity) + " " + baseUnit;
+        ProductUnitRow largestUnit = packagingRows.stream()
+                .filter(row -> row != null && row.isActiveUnit())
+                .filter(row -> row.getUnitName() != null && !row.getUnitName().equals(baseUnit))
+                .filter(row -> row.getConversionFactor() > 1.0)
+                .max((left, right) -> Double.compare(left.getConversionFactor(), right.getConversionFactor()))
+                .orElse(null);
+
+        if (largestUnit == null && STRIP_UNIT.equals(baseUnit)) {
+            double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+            if (stripsPerBox > 1.0) {
+                double boxes = baseQuantity / stripsPerBox;
+                return baseDisplay + " = " + numberFormat.format(boxes) + " " + BOX_UNIT;
+            }
         }
 
-        double boxes = baseQuantity / stripsPerBox;
-        return numberFormat.format(baseQuantity) + " شريط"
-                + " = " + numberFormat.format(boxes) + " علبة";
+        if (largestUnit == null) {
+            return baseDisplay;
+        }
+
+        double convertedQuantity = baseQuantity / largestUnit.getConversionFactor();
+        return baseDisplay + " = " + numberFormat.format(convertedQuantity) + " " + largestUnit.getUnitName();
+    }
+
+    private void refreshQuantityInputUnitOptions() {
+        updateQuantityInputUnitOptions(quantityInputUnitComboBox);
+        updateQuantityInputUnitOptions(openingBatchInputUnitComboBox);
+    }
+
+    private void selectDisplayUnitForStoredQuantity() {
+        String baseUnit = resolveSelectedBaseUnit();
+        double baseQuantity = parseDouble(quantityField != null ? quantityField.getText() : null);
+        refreshQuantityInputUnitOptions();
+        ProductUnitRow displayUnit = findLargestPackagingDisplayUnit(baseUnit);
+        if (quantityInputUnitComboBox != null) {
+            if (displayUnit != null) {
+                quantityInputUnitComboBox.setValue(displayUnit.getUnitName());
+            } else {
+                quantityInputUnitComboBox.setValue(baseUnit);
+            }
+        }
+        if (quantityField != null && displayUnit != null && displayUnit.getConversionFactor() > 0) {
+            quantityField.setText(formatQuantity(baseQuantity / displayUnit.getConversionFactor()));
+        }
+        if (openingBatchInputUnitComboBox != null) {
+            openingBatchInputUnitComboBox.setValue(baseUnit);
+        }
+    }
+
+    private ProductUnitRow findLargestPackagingDisplayUnit(String baseUnit) {
+        return packagingRows.stream()
+                .filter(row -> row != null && row.isActiveUnit())
+                .filter(row -> row.getUnitName() != null && !row.getUnitName().equals(baseUnit))
+                .filter(row -> row.getConversionFactor() > 1.0)
+                .max((left, right) -> Double.compare(left.getConversionFactor(), right.getConversionFactor()))
+                .orElse(null);
+    }
+
+    private void updateQuantityInputUnitOptions(ComboBox<String> comboBox) {
+        if (comboBox == null) {
+            return;
+        }
+
+        String currentValue = comboBox.getValue();
+        Set<String> units = new LinkedHashSet<>();
+        String baseUnit = resolveSelectedBaseUnit();
+        addUnitOption(units, baseUnit);
+
+        for (ProductUnitRow row : packagingRows) {
+            if (row == null || !row.isActiveUnit()) {
+                continue;
+            }
+            addUnitOption(units, row.getUnitName());
+        }
+
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        if (STRIP_UNIT.equals(baseUnit) && stripsPerBox > 0) {
+            addUnitOption(units, STRIP_UNIT);
+            addUnitOption(units, BOX_UNIT);
+        }
+
+        ObservableList<String> options = FXCollections.observableArrayList(units);
+        comboBox.setItems(options);
+        if (currentValue != null && options.contains(currentValue)) {
+            comboBox.setValue(currentValue);
+        } else if (options.contains(baseUnit)) {
+            comboBox.setValue(baseUnit);
+        } else if (!options.isEmpty()) {
+            comboBox.setValue(options.get(0));
+        }
+    }
+
+    private void addUnitOption(Set<String> units, String unitName) {
+        if (unitName == null) {
+            return;
+        }
+        String trimmed = unitName.trim();
+        if (!trimmed.isEmpty()) {
+            units.add(trimmed);
+        }
+    }
+
+    private double parseQuantityInputAsBase(TextField field, ComboBox<String> unitComboBox) {
+        double quantity = parseDouble(field != null ? field.getText() : null);
+        return convertQuantityToBase(quantity, resolveQuantityInputUnit(unitComboBox));
+    }
+
+    private double convertQuantityToBase(double quantity, String unitName) {
+        if (quantity <= 0) {
+            return quantity;
+        }
+        return quantity * resolveConversionFactorForUnit(unitName);
+    }
+
+    private String resolveQuantityInputUnit(ComboBox<String> unitComboBox) {
+        String selected = unitComboBox != null ? unitComboBox.getValue() : null;
+        return selected != null && !selected.trim().isEmpty() ? selected.trim() : resolveSelectedBaseUnit();
+    }
+
+    private double resolveConversionFactorForUnit(String unitName) {
+        String baseUnit = resolveSelectedBaseUnit();
+        if (unitName == null || unitName.trim().isEmpty() || unitName.equals(baseUnit)) {
+            return 1.0;
+        }
+
+        ProductUnitRow row = findPackagingRow(unitName);
+        if (row != null && row.getConversionFactor() > 0) {
+            return row.getConversionFactor();
+        }
+
+        double stripsPerBox = parseDouble(stripsPerBoxField != null ? stripsPerBoxField.getText() : null);
+        if (STRIP_UNIT.equals(baseUnit) && BOX_UNIT.equals(unitName) && stripsPerBox > 0) {
+            return stripsPerBox;
+        }
+
+        return 1.0;
+    }
+
+    private String resolveSelectedBaseUnit() {
+        String baseUnit = baseUnitComboBox != null ? baseUnitComboBox.getValue() : null;
+        if (baseUnit != null && !baseUnit.trim().isEmpty()) {
+            return baseUnit.trim();
+        }
+        String legacyUnit = unitOfMeasureComboBox != null ? unitOfMeasureComboBox.getValue() : null;
+        if (legacyUnit != null && !legacyUnit.trim().isEmpty()) {
+            return legacyUnit.trim();
+        }
+        return STRIP_UNIT;
     }
 
     private String safeTrim(TextField field) {

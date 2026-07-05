@@ -36,8 +36,15 @@
     
     <VBox spacing="8">
         <Label text="الكمية المراد إضافتها:*" style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-        <TextField fx:id="quantityField" promptText="أدخل الكمية"
-                   style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 12; -fx-font-size: 16px;"/>
+        <HBox spacing="8">
+            <TextField fx:id="quantityField" HBox.hgrow="ALWAYS" promptText="أدخل الكمية"
+                       style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 12; -fx-font-size: 16px;"/>
+            <ComboBox fx:id="quantityUnitComboBox" prefWidth="150" promptText="الوحدة"
+                      style="-fx-background-radius: 8; -fx-border-radius: 8;"/>
+        </HBox>
+        <Label fx:id="quantityBreakdownLabel" text="اختر المنتج ثم أدخل الكمية ووحدتها"
+               wrapText="true"
+               style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
     </VBox>
     
     <VBox spacing="4" style="-fx-background-color: -fx-success-bg; -fx-padding: 12; -fx-background-radius: 8;">

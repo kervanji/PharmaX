@@ -150,19 +150,23 @@
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="quantityField" GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="0"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                <Label text="وحدة الإدخال:" GridPane.rowIndex="0" GridPane.columnIndex="2"
+                       style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
+                <ComboBox fx:id="quantityInputUnitComboBox" GridPane.rowIndex="0" GridPane.columnIndex="3"
+                          maxWidth="Infinity" promptText="اختر الوحدة"/>
                 <Label fx:id="stockBreakdownLabel" text="سيظهر هنا التحويل بين الشريط والعلبة"
-                       GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.columnSpan="2"
+                       GridPane.rowIndex="1" GridPane.columnIndex="0" GridPane.columnSpan="4"
                        wrapText="true"
                        style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>
 
-                <Label text="الحد الأدنى:" GridPane.rowIndex="0" GridPane.columnIndex="2"
+                <Label text="الحد الأدنى:" GridPane.rowIndex="0" GridPane.columnIndex="4"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="minimumStockField" GridPane.rowIndex="0" GridPane.columnIndex="3" promptText="0"
+                <TextField fx:id="minimumStockField" GridPane.rowIndex="0" GridPane.columnIndex="5" promptText="0"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
 
-                <Label text="الحد الأقصى:" GridPane.rowIndex="0" GridPane.columnIndex="4"
+                <Label text="الحد الأقصى:" GridPane.rowIndex="1" GridPane.columnIndex="4"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="maximumStockField" GridPane.rowIndex="0" GridPane.columnIndex="5" promptText="غير محدد"
+                <TextField fx:id="maximumStockField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="غير محدد"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
             </GridPane>
         </VBox>
@@ -190,9 +194,12 @@
 
                 <Label text="الكمية الأولية:*" GridPane.rowIndex="0" GridPane.columnIndex="2"
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
-                <TextField fx:id="openingBatchQuantityField" GridPane.rowIndex="0" GridPane.columnIndex="3"
-                           promptText="0"
-                           style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                <HBox spacing="6" GridPane.rowIndex="0" GridPane.columnIndex="3">
+                    <TextField fx:id="openingBatchQuantityField" HBox.hgrow="ALWAYS"
+                               promptText="0"
+                               style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+                    <ComboBox fx:id="openingBatchInputUnitComboBox" prefWidth="130" promptText="الوحدة"/>
+                </HBox>
                 <Label fx:id="openingBatchBreakdownLabel" text="سيظهر هنا تحويل الكمية الافتتاحية"
                        GridPane.rowIndex="1" GridPane.columnIndex="2" GridPane.columnSpan="2"
                        wrapText="true"
@@ -239,7 +246,7 @@
 
                 <Label text="وحدة الأساس:" GridPane.rowIndex="0" GridPane.columnIndex="0" style="-fx-text-fill: -fx-form-label;"/>
                 <ComboBox fx:id="baseUnitComboBox" GridPane.rowIndex="0" GridPane.columnIndex="1" prefWidth="180" promptText="وحدة الأساس"/>
-                <Label text="وحدة الأساس هي أصغر وحدة يتم حساب المخزون بها. معامل التحويل يعني كم وحدة أساس داخل الوحدة المختارة."
+                <Label text="وحدة الأساس هي أصغر وحدة يتم حساب المخزون بها. وحدات التعبئة والباركود تعريف للبيع والتحويل فقط، ولا تغيّر الكمية إلا عند اختيارها كوحدة إدخال."
                        GridPane.rowIndex="0" GridPane.columnIndex="2" GridPane.columnSpan="5"
                        wrapText="true"
                        style="-fx-font-size: 12px; -fx-text-fill: -fx-form-sublabel;"/>

@@ -97,20 +97,34 @@ public class ProductBatchAvailabilityDialogController {
         dosageFormLabel.setText("-");
         categoryLabel.setText(safe(product.getCategory()));
         storageLocationLabel.setText("-");
-        salePriceLabel.setText(salePrice != null && salePrice > 0
-                ? numberFormat.format(salePrice) + " " + safe(currency)
-                : "-");
-
         List<ProductBatch> availableBatches = productBatchService.getAvailableBatches(product.getId());
         double totalAvailableBase = availableBatches.stream().mapToDouble(ProductBatch::getQuantity).sum();
         String baseUnit = productUnitService.resolveBaseUnit(product);
         String saleUnit = selectedUnit != null && selectedUnit.getUnitName() != null
                 ? selectedUnit.getUnitName()
                 : baseUnit;
-        double factor = selectedUnit != null ? selectedUnit.getEffectiveConversionFactor() : 1.0;
-        double totalAvailableSelected = factor > 0 ? totalAvailableBase / factor : totalAvailableBase;
-        totalAvailableLabel.setText(numberFormat.format(totalAvailableBase) + " " + baseUnit
-                + " / " + numberFormat.format(totalAvailableSelected) + " " + saleUnit);
+        salePriceLabel.setText(salePrice != null && salePrice > 0
+                ? numberFormat.format(salePrice) + " " + safe(currency) + " / " + saleUnit
+                : "-");
+
+        ProductUnit displayUnit = resolveDisplayUnit(product, selectedUnit, baseUnit);
+        String displayUnitName = displayUnit != null && displayUnit.getUnitName() != null
+                ? displayUnit.getUnitName()
+                : baseUnit;
+        double displayFactor = displayUnit != null ? displayUnit.getEffectiveConversionFactor() : 1.0;
+        double totalAvailableDisplay = displayFactor > 0 ? totalAvailableBase / displayFactor : totalAvailableBase;
+        if (displayUnitName.equals(baseUnit)) {
+            totalAvailableLabel.setText(numberFormat.format(totalAvailableBase) + " " + baseUnit);
+        } else {
+            totalAvailableLabel.setText(numberFormat.format(totalAvailableBase) + " " + baseUnit
+                    + " = " + numberFormat.format(totalAvailableDisplay) + " " + displayUnitName);
+        }
+        if (baseQuantityColumn != null) {
+            baseQuantityColumn.setText("كمية الأساس (" + baseUnit + ")");
+        }
+        if (selectedUnitQuantityColumn != null) {
+            selectedUnitQuantityColumn.setText("كمية " + displayUnitName);
+        }
 
         Map<Long, Integer> fefoOrderByBatchId = new HashMap<>();
         for (int i = 0; i < availableBatches.size(); i++) {
@@ -126,9 +140,21 @@ public class ProductBatchAvailabilityDialogController {
                 .sorted(Comparator
                         .comparing(ProductBatch::getExpiryDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(ProductBatch::getBatchNumber, Comparator.nullsLast(String::compareTo)))
-                .map(batch -> toRow(batch, fefoOrderByBatchId, today, factor))
+                .map(batch -> toRow(batch, fefoOrderByBatchId, today, displayFactor))
                 .toList();
         batchesTable.setItems(FXCollections.observableArrayList(rows));
+    }
+
+    private ProductUnit resolveDisplayUnit(Product product, ProductUnit selectedUnit, String baseUnit) {
+        if (selectedUnit != null && selectedUnit.getEffectiveConversionFactor() > 1.0) {
+            return selectedUnit;
+        }
+        return productUnitService.getUnitsForProductOrDefault(product).stream()
+                .filter(unit -> unit != null && !Boolean.FALSE.equals(unit.getIsActive()))
+                .filter(unit -> unit.getUnitName() != null && !unit.getUnitName().equals(baseUnit))
+                .filter(unit -> unit.getEffectiveConversionFactor() > 1.0)
+                .max(Comparator.comparingDouble(ProductUnit::getEffectiveConversionFactor))
+                .orElse(selectedUnit);
     }
 
     private BatchRow toRow(ProductBatch batch, Map<Long, Integer> fefoOrderByBatchId, LocalDate today, double factor) {

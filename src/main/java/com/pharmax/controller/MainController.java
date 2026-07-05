@@ -341,7 +341,7 @@ public class MainController {
                     "linear-gradient(to bottom right, #6d28d9, #7c3aed)", "handlePurchase"),
             new TileDef("purchase-return", "↩️", "returns.png", "مرتجع شراء",
                     "linear-gradient(to bottom right, #a16207, #ca8a04)", "handlePurchaseReturn"),
-            new TileDef("payment-voucher", "📤", "payment_voucher.svg", "سند دفع",
+            new TileDef("payment-voucher", "📤", "payment_voucher.png", "سند دفع",
                     "linear-gradient(to bottom right, #dc2626, #ef4444)", "handlePaymentVoucher"),
             new TileDef("cashbox", "💵", "settings.png", "الصندوق",
                     "linear-gradient(to bottom right, #15803d, #16a34a)", "handleCashbox"),

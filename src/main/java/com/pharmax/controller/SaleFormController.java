@@ -917,6 +917,9 @@ public class SaleFormController {
                         return;
                     }
                 }
+                if (isProductSelectionText(newText)) {
+                    return;
+                }
 
                 productSearchQuery = newText == null ? "" : newText.trim().toLowerCase();
                 applyProductFilters();
@@ -942,6 +945,20 @@ public class SaleFormController {
                 }
             }
         });
+    }
+
+    private boolean isProductSelectionText(String text) {
+        if (text == null || filteredProducts == null || productComboBox == null || productComboBox.getConverter() == null) {
+            return false;
+        }
+
+        String normalized = text.trim();
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        return filteredProducts.getSource().stream()
+                .anyMatch(product -> normalized.equals(productComboBox.getConverter().toString(product)));
     }
 
     private void refreshData() {
@@ -1168,14 +1185,15 @@ public class SaleFormController {
 
     private void clearProductPreviewPanel() {
         setPreviewText(productAvailabilitySummaryLabel, "المتاح: - | أقرب انتهاء: -");
-        if (medicineDetailsButton != null) {
-            medicineDetailsButton.setDisable(true);
-        }
+        updateMedicineDetailsButtonState();
     }
 
     @FXML
     private void handleOpenProductBatchDetails() {
-        Product product = selectedProduct != null ? selectedProduct : productComboBox.getValue();
+        SaleItemRow selectedRow = getSelectedSaleItemForDetails();
+        Product product = selectedRow != null
+                ? resolveProductForSaleRow(selectedRow)
+                : selectedProduct != null ? selectedProduct : productComboBox.getValue();
         if (product == null) {
             showInfo("تفاصيل الدواء والدفعات", "اختر منتجاً أولاً لعرض التفاصيل");
             return;
@@ -1188,9 +1206,14 @@ public class SaleFormController {
             Parent content = loader.load();
 
             ProductBatchAvailabilityDialogController controller = loader.getController();
-            ProductUnit saleUnit = getSelectedSaleUnit();
-            Double salePrice = getSelectedPrice(product, saleUnit, IQD_CURRENCY);
-            controller.setProduct(product, saleUnit, salePrice, IQD_CURRENCY);
+            ProductUnit saleUnit = selectedRow != null
+                    ? resolveSaleUnitForRow(product, selectedRow)
+                    : getSelectedSaleUnit();
+            String currency = selectedRow != null ? selectedRow.getCurrency() : IQD_CURRENCY;
+            Double salePrice = selectedRow != null
+                    ? selectedRow.getUnitPrice()
+                    : getSelectedPrice(product, saleUnit, currency);
+            controller.setProduct(product, saleUnit, salePrice, currency);
 
             Stage stage = new Stage();
             stage.setTitle("تفاصيل الدواء والدفعات");
@@ -1210,6 +1233,50 @@ public class SaleFormController {
             logger.error("Failed to open product batch availability dialog", e);
             showError("خطأ", "تعذر فتح تفاصيل الدواء والدفعات: " + e.getMessage());
         }
+    }
+
+    private void updateMedicineDetailsButtonState() {
+        if (medicineDetailsButton == null) {
+            return;
+        }
+        boolean hasSelectedCartRow = getSelectedSaleItemForDetails() != null;
+        boolean hasSelectedInputProduct = selectedProduct != null || (productComboBox != null && productComboBox.getValue() != null);
+        medicineDetailsButton.setDisable(!hasSelectedCartRow && !hasSelectedInputProduct);
+    }
+
+    private SaleItemRow getSelectedSaleItemForDetails() {
+        if (itemsTable == null || itemsTable.getSelectionModel() == null) {
+            return null;
+        }
+        SaleItemRow selectedRow = itemsTable.getSelectionModel().getSelectedItem();
+        if (selectedRow != null) {
+            return selectedRow;
+        }
+        ObservableList<SaleItemRow> selectedRows = itemsTable.getSelectionModel().getSelectedItems();
+        return selectedRows == null || selectedRows.isEmpty() ? null : selectedRows.get(0);
+    }
+
+    private Product resolveProductForSaleRow(SaleItemRow row) {
+        if (row == null || row.getProductId() == null) {
+            return null;
+        }
+        if (selectedProduct != null && row.getProductId().equals(selectedProduct.getId())) {
+            return selectedProduct;
+        }
+        return productRepository.findById(row.getProductId()).orElse(null);
+    }
+
+    private ProductUnit resolveSaleUnitForRow(Product product, SaleItemRow row) {
+        if (product == null || row == null) {
+            return null;
+        }
+        String soldUnit = row.getSoldUnit();
+        List<ProductUnit> units = unitsByProduct.computeIfAbsent(product.getId(),
+                id -> productUnitService.getUnitsForProductOrDefault(product));
+        return units.stream()
+                .filter(unit -> unit.getUnitName() != null && unit.getUnitName().equals(soldUnit))
+                .findFirst()
+                .orElseGet(() -> new ProductUnit(product, soldUnit, row.getConversionFactor()));
     }
 
     private void setPreviewText(Label label, String value) {
@@ -1865,9 +1932,13 @@ public class SaleFormController {
         itemsTable.setItems(saleItems);
         itemsTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         itemsTable.getSelectionModel().getSelectedItems()
-                .addListener((javafx.collections.ListChangeListener<SaleItemRow>) change -> updateSelectedItemsTotal());
+                .addListener((javafx.collections.ListChangeListener<SaleItemRow>) change -> {
+                    updateSelectedItemsTotal();
+                    updateMedicineDetailsButtonState();
+                });
         itemsTable.setEditable(true);
         updateSelectedItemsTotal();
+        updateMedicineDetailsButtonState();
         setupItemsTableColumnMenu();
     }
 
