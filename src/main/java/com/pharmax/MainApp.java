@@ -17,6 +17,7 @@ import com.pharmax.controller.ActivationController;
 import com.pharmax.model.User;
 import com.pharmax.model.UserRole;
 import com.pharmax.service.LicenseService;
+import com.pharmax.util.AppIconUtil;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import com.pharmax.util.ThemeManager;
@@ -64,6 +65,7 @@ public class MainApp extends Application {
 
         registerStage(primaryStage);
         themeManager.registerStage(primaryStage);
+        AppIconUtil.applyToApplicationTaskbar();
 
         // Initialize Services (Drive will be connected on-demand via Settings or Connect button)
         try {
@@ -85,15 +87,6 @@ public class MainApp extends Application {
 
         } catch (Exception e) {
             logger.error("Failed to initialize Backup Service", e);
-        }
-
-        // Set application icon
-        try {
-            javafx.scene.image.Image icon = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/templates/PharmaX.ico"));
-            this.primaryStage.getIcons().add(icon);
-        } catch (Exception e) {
-            logger.warn("Failed to load application icon", e);
         }
 
         // Window size (main window maximized only)
@@ -509,6 +502,7 @@ public class MainApp extends Application {
         if (!managedStages.contains(stage)) {
             managedStages.add(stage);
         }
+        AppIconUtil.applyToStage(stage);
         stage.setOnHidden(e -> managedStages.remove(stage));
     }
 

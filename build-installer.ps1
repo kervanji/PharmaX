@@ -50,7 +50,7 @@ if ($LASTEXITCODE -ne 0) {
 # Step 2: Build the installer
 Write-Host "`n[2/2] Creating installer with Inno Setup..." -ForegroundColor Yellow
 
-$setupScript = "$PSScriptRoot\installer-setup.iss"
+$setupScript = "$PSScriptRoot\installer-setup(exe).iss"
 if (-not (Test-Path $setupScript)) {
     Write-Host "Installer script not found: $setupScript" -ForegroundColor Red
     exit 1

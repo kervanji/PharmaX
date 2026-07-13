@@ -82,17 +82,20 @@ public class ThemeManager {
             return;
         }
         managedStages.add(stage);
+        AppIconUtil.applyToStage(stage);
         stage.setOnHidden(e -> managedStages.remove(stage));
 
         // Apply theme to current scene if exists
         if (stage.getScene() != null) {
             applyTheme(stage.getScene());
         }
+        WindowsTitleBarStyler.install(stage, currentTheme);
 
         // Auto-apply theme when scene changes
         stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
                 applyTheme(newScene);
+                WindowsTitleBarStyler.applyToCurrentProcessWindows(currentTheme);
             }
         });
     }
@@ -160,8 +163,10 @@ public class ThemeManager {
         for (Stage stage : new ArrayList<>(managedStages)) {
             if (stage != null && stage.getScene() != null) {
                 applyTheme(stage.getScene());
+                WindowsTitleBarStyler.install(stage, currentTheme);
             }
         }
+        WindowsTitleBarStyler.applyToCurrentProcessWindows(currentTheme);
     }
 
     public boolean isDarkTheme() {

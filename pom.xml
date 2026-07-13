@@ -23,6 +23,7 @@
         <pdf.version>2.0.30</pdf.version>
         <jackson.version>2.15.2</jackson.version>
         <log4j2.version>2.21.1</log4j2.version>
+        <jna.version>5.14.0</jna.version>
         <exec.mainClass>com.pharmax.MainApp</exec.mainClass>
         <exec.args></exec.args>
         
@@ -115,6 +116,13 @@
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-to-slf4j</artifactId>
             <version>${log4j2.version}</version>
+        </dependency>
+
+        <!-- Windows native title bar theming -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>${jna.version}</version>
         </dependency>
 
         <!-- Testing -->

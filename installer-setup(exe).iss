@@ -72,6 +72,8 @@ Source: "distribution\PharmaX.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "distribution\PharmaX.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "distribution\README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "distribution\credentials.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "distribution\PharmaX.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "distribution\PharmaX.png"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Runtime (Java) - copy everything to avoid missing security/config files
 Source: "distribution\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -81,14 +83,14 @@ Source: "distribution\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Comment: "{#MyAppNameArabic}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\PharmaX.ico"; Comment: "{#MyAppNameArabic}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop Icon
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon; Comment: "{#MyAppNameArabic}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\PharmaX.ico"; Tasks: desktopicon; Comment: "{#MyAppNameArabic}"
 
 ; Quick Launch
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: quicklaunchicon
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\PharmaX.ico"; Tasks: quicklaunchicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent shellexec

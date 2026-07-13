@@ -2,8 +2,8 @@
 <launch4jConfig>
   <dontWrapJar>false</dontWrapJar>
   <headerType>gui</headerType>
-  <jar>C:\Users\smart\Projects\PharmaX\distribution\PharmaX.jar</jar>
-  <outfile>C:\Users\smart\Projects\PharmaX\distribution\PharmaX.exe</outfile>
+  <jar>distribution\PharmaX.jar</jar>
+  <outfile>distribution\PharmaX.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
   <chdir>.</chdir>
@@ -13,7 +13,7 @@
   <stayAlive>false</stayAlive>
   <restartOnCrash>false</restartOnCrash>
   <manifest></manifest>
-  <icon>C:\Users\smart\Projects\PharmaX\src\main\resources\templates\PharmaX.ico</icon>
+  <icon>src\main\resources\templates\PharmaX.ico</icon>
   <classPath>
     <mainClass>com.pharmax.MainApp</mainClass>
     <cp>PharmaX.jar</cp>

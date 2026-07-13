@@ -202,10 +202,40 @@ if ((Test-Path $distJar) -and (Test-Path $jarExe)) {
     Write-Host "Verified credentials.json is inside $APP_NAME.jar" -ForegroundColor Green
 }
 
+# Copy application icons for installer shortcuts and troubleshooting
+Copy-Item (Join-Path $PROJECT_DIR "src\main\resources\templates\PharmaX.ico") (Join-Path $DIST_DIR "PharmaX.ico") -Force
+Copy-Item (Join-Path $PROJECT_DIR "src\main\resources\templates\PharmaX_transparent.png") (Join-Path $DIST_DIR "PharmaX.png") -Force
+
+# Build Launch4j EXE when Launch4j is available. The installer requires this file.
+$launch4jCandidates = @()
+if ($env:LAUNCH4J_HOME) {
+    $launch4jCandidates += (Join-Path $env:LAUNCH4J_HOME "launch4jc.exe")
+}
+$launch4jCandidates += @(
+    (Join-Path $PROJECT_DIR "launch4j\launch4jc.exe"),
+    (Join-Path $PROJECT_DIR "tools\launch4j\launch4jc.exe"),
+    "${env:ProgramFiles}\Launch4j\launch4jc.exe",
+    "${env:ProgramFiles(x86)}\Launch4j\launch4jc.exe"
+)
+
+$launch4j = $launch4jCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if ($launch4j) {
+    Write-Host "Building PharmaX.exe with Launch4j..." -ForegroundColor Yellow
+    & $launch4j (Join-Path $PROJECT_DIR "PharmaX(exe).xml")
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Launch4j failed to create PharmaX.exe" -ForegroundColor Red
+        exit 1
+    }
+} elseif (-not (Test-Path (Join-Path $DIST_DIR "$APP_NAME.exe"))) {
+    Write-Host "ERROR: PharmaX.exe was not created." -ForegroundColor Red
+    Write-Host "Install Launch4j or set LAUNCH4J_HOME, then run this script again." -ForegroundColor Yellow
+    exit 1
+}
+
 # -----------------------------
 # Step 6: Create launchers + README
 # -----------------------------
-Write-Host "`n[6/6] Creating launcher..." -ForegroundColor Yellow
+Write-Host "`n[6/6] Creating launcher scripts..." -ForegroundColor Yellow
 
 # VBS launcher (no console window)
 $vbsLauncherContent = @"
