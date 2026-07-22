@@ -130,7 +130,7 @@
             
             <VBox spacing="10" style="-fx-background-color: -fx-form-section-bg; -fx-padding: 15; -fx-background-radius: 8;">
                 <Label text="معلومات البرنامج" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
-                <Label text="PharmaX v1.3.2"/>
+                <Label text="PharmaX v1.3.3"/>
                 <Label text="نظام إدارة المخازن والمبيعات"/>
                 <Label text="© 2025 PharmaX. جميع الحقوق محفوظة."/>
             </VBox>

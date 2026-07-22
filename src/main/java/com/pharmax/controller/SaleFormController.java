@@ -98,6 +98,8 @@ public class SaleFormController {
     @FXML
     private FlowPane quickSaleButtonsPane;
     @FXML
+    private FlowPane inlineQuickSaleButtonsPane;
+    @FXML
     private VBox quickSaleGroupsPane;
     @FXML
     private HBox quickSaleDrawer;
@@ -1069,11 +1071,45 @@ public class SaleFormController {
     }
 
     private void setupQuickSaleButtons() {
-        if (quickSaleButtonsPane == null || quickSaleGroupsPane == null || quickSaleDrawer == null) {
-            return;
+        List<Product> quickSaleProducts = productRepository.findAll().stream()
+                .filter(product -> Boolean.TRUE.equals(product.getIsActive()))
+                .filter(product -> Boolean.TRUE.equals(product.getIsQuickSale()))
+                .sorted((left, right) -> {
+                    String leftName = left != null && left.getName() != null ? left.getName() : "";
+                    String rightName = right != null && right.getName() != null ? right.getName() : "";
+                    return leftName.compareToIgnoreCase(rightName);
+                })
+                .toList();
+
+        if (inlineQuickSaleButtonsPane != null) {
+            inlineQuickSaleButtonsPane.getChildren().clear();
+            inlineQuickSaleButtonsPane.setVisible(!quickSaleProducts.isEmpty());
+            inlineQuickSaleButtonsPane.setManaged(!quickSaleProducts.isEmpty());
         }
-        initializeQuickSaleDrawerInteraction();
-        loadQuickSaleGroups();
+
+        for (Product product : quickSaleProducts) {
+            Button quickSaleButton = new Button(product.getName());
+            quickSaleButton.setMnemonicParsing(false);
+            quickSaleButton.setWrapText(true);
+            quickSaleButton.setFocusTraversable(false);
+            quickSaleButton.setPrefWidth(150);
+            quickSaleButton.setPrefHeight(42);
+            quickSaleButton.setStyle(
+                    "-fx-background-color: -fx-bg-surface; " +
+                    "-fx-text-fill: -fx-form-label; " +
+                    "-fx-border-color: -fx-border-input; " +
+                    "-fx-border-radius: 10; " +
+                    "-fx-background-radius: 10; " +
+                    "-fx-font-weight: bold; " +
+                    "-fx-padding: 8 12;");
+            quickSaleButton.setOnAction(event -> handleQuickSaleProduct(product));
+            if (inlineQuickSaleButtonsPane != null) inlineQuickSaleButtonsPane.getChildren().add(quickSaleButton);
+        }
+
+        if (quickSaleButtonsPane != null && quickSaleGroupsPane != null && quickSaleDrawer != null) {
+            initializeQuickSaleDrawerInteraction();
+            loadQuickSaleGroups();
+        }
     }
 
     private void initializeQuickSaleDrawerInteraction() {

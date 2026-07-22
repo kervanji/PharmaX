@@ -78,6 +78,12 @@
                                 style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8;"/>
                         <Button text="+ إضافة" onAction="#handleAddItem" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;" prefWidth="170"/>
                     </HBox>
+                    <VBox spacing="6" nodeOrientation="RIGHT_TO_LEFT">
+                        <Label text="أزرار البيع السريع" textAlignment="RIGHT"
+                               style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: -fx-form-sublabel;"/>
+                        <FlowPane fx:id="inlineQuickSaleButtonsPane" id="inlineQuickSaleButtonsPane" hgap="8" vgap="8" prefWrapLength="780"
+                                  nodeOrientation="RIGHT_TO_LEFT" visible="false" managed="false"/>
+                    </VBox>
                 </VBox>
 
             </VBox>
@@ -251,11 +257,9 @@
                           styleClass="quick-sale-groups-pane"/>
                 </ScrollPane>
                 <StackPane HBox.hgrow="ALWAYS">
-                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER"
-                                styleClass="quick-sale-cards-scroll">
+                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="quick-sale-cards-scroll">
                         <FlowPane fx:id="quickSaleButtonsPane" hgap="8" vgap="8" prefWrapLength="276"
-                                  alignment="TOP_CENTER"
-                                  nodeOrientation="RIGHT_TO_LEFT" styleClass="quick-sale-cards-pane"/>
+                                  alignment="TOP_CENTER" nodeOrientation="RIGHT_TO_LEFT" styleClass="quick-sale-cards-pane"/>
                     </ScrollPane>
                     <Label fx:id="quickSaleEmptyLabel" text="لا توجد منتجات في هذه المجموعة"
                            visible="false" managed="false" wrapText="true" maxWidth="220"

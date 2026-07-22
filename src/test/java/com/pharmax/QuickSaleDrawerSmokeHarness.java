@@ -29,11 +29,16 @@ public final class QuickSaleDrawerSmokeHarness {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Platform.startup(() -> {
             try {
-                Parent sale = FXMLLoader.load(QuickSaleDrawerSmokeHarness.class.getResource("/views/SaleForm.fxml"));
+                FXMLLoader saleLoader = new FXMLLoader(QuickSaleDrawerSmokeHarness.class.getResource("/views/SaleForm.fxml"));
+                Parent sale = saleLoader.load();
                 Parent manager = FXMLLoader.load(QuickSaleDrawerSmokeHarness.class.getResource("/views/QuickSaleManager.fxml"));
                 Parent product = FXMLLoader.load(QuickSaleDrawerSmokeHarness.class.getResource("/views/ProductForm.fxml"));
-                require(sale.lookup("#quickSaleDrawer") != null, "Sale drawer was not created");
-                require(sale.lookup("#quickSaleDrawerToggle") != null, "Sale drawer toggle was not created");
+                require(saleLoader.getNamespace().get("inlineQuickSaleButtonsPane") != null,
+                        "Inline quick-sale product buttons pane was not restored");
+                require(saleLoader.getNamespace().get("quickSaleDrawer") != null,
+                        "Quick-sale side drawer was not restored");
+                require(saleLoader.getNamespace().get("quickSaleDrawerToggle") != null,
+                        "Quick-sale side drawer toggle was not restored");
                 require(manager != null, "Quick sale manager was not created");
                 require(product != null, "Product form with unlimited stock option was not created");
                 if (args.length > 0) {
@@ -43,7 +48,6 @@ public final class QuickSaleDrawerSmokeHarness {
                     stage.setScene(scene);
                     stage.show();
                     sale.applyCss(); sale.layout();
-                    sale.lookup("#quickSaleDrawer").setTranslateX(0);
                     sale.applyCss(); sale.layout();
                     WritableImage image = sale.snapshot(null, null);
                     ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", new File(args[0]));
