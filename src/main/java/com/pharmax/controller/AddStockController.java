@@ -59,7 +59,9 @@ public class AddStockController {
     }
 
     private void loadProducts() {
-        List<Product> products = inventoryService.getActiveProducts();
+        List<Product> products = inventoryService.getActiveProducts().stream()
+                .filter(product -> !Boolean.TRUE.equals(product.getIsUnlimitedStock()))
+                .toList();
         allProducts = FXCollections.observableArrayList(products);
         filteredProducts = new FilteredList<>(allProducts, p -> true);
         productComboBox.setItems(filteredProducts);

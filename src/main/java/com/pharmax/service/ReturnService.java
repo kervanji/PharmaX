@@ -79,7 +79,9 @@ public class ReturnService {
 
                 validateReturnRequest(session, managedSale, originalSaleItem, item);
                 List<BatchRestorePlan> restorePlans = List.of();
-                boolean restoreToStock = "GOOD".equalsIgnoreCase(item.getConditionStatus());
+                boolean restoreToStock = "GOOD".equalsIgnoreCase(item.getConditionStatus())
+                        && originalSaleItem.getProduct() != null
+                        && !Boolean.TRUE.equals(originalSaleItem.getProduct().getIsUnlimitedStock());
                 if (restoreToStock) {
                     restorePlans = buildRestorePlan(session, originalSaleItem, item.getQuantity());
                 }

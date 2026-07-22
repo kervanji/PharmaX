@@ -173,6 +173,9 @@ public class InventoryListController {
         statusColumn.setCellValueFactory(cellData -> {
             Product p = cellData.getValue();
             boolean active = Boolean.TRUE.equals(p.getIsActive());
+            if (active && Boolean.TRUE.equals(p.getIsUnlimitedStock())) {
+                return new SimpleStringProperty("غير محدودة");
+            }
             double qty = p.getQuantityInStock() == null ? 0 : p.getQuantityInStock();
             double min = p.getMinimumStock() == null ? 0 : p.getMinimumStock();
             if (!active)
@@ -227,6 +230,10 @@ public class InventoryListController {
                 if (empty) {
                     setGraphic(null);
                 } else {
+                    Product product = getTableView().getItems().get(getIndex());
+                    stockBtn.setDisable(Boolean.TRUE.equals(product.getIsUnlimitedStock()));
+                    stockBtn.setTooltip(Boolean.TRUE.equals(product.getIsUnlimitedStock())
+                            ? new Tooltip("الكمية غير محدودة ولا تحتاج إلى إضافة مخزون") : null);
                     javafx.scene.layout.HBox box = new javafx.scene.layout.HBox(4, editBtn, stockBtn);
                     setGraphic(box);
                 }
@@ -235,6 +242,9 @@ public class InventoryListController {
     }
 
     private String formatInventoryQuantity(Product product, double quantity) {
+        if (product != null && Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return "غير محدودة";
+        }
         String baseUnit = productUnitService.resolveBaseUnit(product);
         String baseDisplay = numberFormat.format(quantity) + " " + baseUnit;
         if (product == null || product.getId() == null) {

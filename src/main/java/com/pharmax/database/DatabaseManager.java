@@ -33,7 +33,12 @@ public class DatabaseManager {
             "db/migrations/20260502_permissions_audit.sql",
             "db/migrations/20260503_batch_production_date.sql",
             "db/migrations/20260504_supplier_invoice_number.sql",
-            "db/migrations/20260701_cashbox_enhancements.sql");
+            "db/migrations/20260504_quick_sale_products.sql",
+            "db/migrations/20260701_cashbox_enhancements.sql",
+            "db/migrations/20260713_quick_sale_drawer.sql",
+            "db/migrations/20260713_unlimited_stock.sql",
+            "db/migrations/20260713_remove_accidental_barcode_free_group.sql",
+            "db/migrations/20260714_unlimited_stock_sale_movements.sql");
     private static SessionFactory sessionFactory;
 
     public static void initialize() {
@@ -965,6 +970,8 @@ public class DatabaseManager {
             configuration.addAnnotatedClass(com.pharmax.model.CashboxManualOpening.class);
             configuration.addAnnotatedClass(com.pharmax.model.DailyClosing.class);
             configuration.addAnnotatedClass(com.pharmax.model.AuditLog.class);
+            configuration.addAnnotatedClass(com.pharmax.model.QuickSaleGroup.class);
+            configuration.addAnnotatedClass(com.pharmax.model.QuickSaleItem.class);
 
             sessionFactory = configuration.buildSessionFactory();
             logger.info("Hibernate configured successfully");

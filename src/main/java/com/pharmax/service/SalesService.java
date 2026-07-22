@@ -131,7 +131,26 @@ public class SalesService {
                             sale.getCreatedBy());
                 }
 
-                productBatchService.syncProductSummaryQuantity(session, prepared.product.getId());
+                if (Boolean.TRUE.equals(prepared.product.getIsUnlimitedStock())) {
+                    inventoryMovementService.recordMovement(
+                            session,
+                            prepared.product,
+                            null,
+                            "sale",
+                            "sale",
+                            sale.getId(),
+                            prepared.saleItem.getId(),
+                            -prepared.saleItem.getEffectiveBaseQuantity(),
+                            null,
+                            null,
+                            prepared.saleItem.getUnitCostSnapshot(),
+                            buildUnlimitedStockSaleMovementNote(sale, prepared.saleItem),
+                            sale.getCreatedBy());
+                }
+
+                if (!Boolean.TRUE.equals(prepared.product.getIsUnlimitedStock())) {
+                    productBatchService.syncProductSummaryQuantity(session, prepared.product.getId());
+                }
                 savedItems.add(prepared.saleItem);
             }
 
@@ -209,6 +228,9 @@ public class SalesService {
             
             // Restore inventory
             for (SaleItem item : sale.getSaleItems()) {
+                if (item.getProduct() != null && Boolean.TRUE.equals(item.getProduct().getIsUnlimitedStock())) {
+                    continue;
+                }
                 if (item.getBatchAllocations() != null && !item.getBatchAllocations().isEmpty()) {
                     for (SaleItemBatch allocation : item.getBatchAllocations()) {
                         ProductBatch batch = allocation.getBatch();
@@ -335,12 +357,17 @@ public class SalesService {
                     ? itemRequest.getBaseQuantity()
                     : itemRequest.getQuantity() * conversionFactor;
 
-            List<ProductBatch> availableBatches = availableBatchesByProduct.computeIfAbsent(
-                    product.getId(),
-                    id -> productBatchService.getAvailableBatches(session, id, LocalDate.now()));
-
-            List<BatchAllocationPlan> allocations = allocateAcrossBatches(product, availableBatches, remainingByBatchId, baseQuantity);
-            if (allocations.isEmpty()) {
+            boolean unlimitedStock = Boolean.TRUE.equals(product.getIsUnlimitedStock());
+            List<BatchAllocationPlan> allocations;
+            if (unlimitedStock) {
+                allocations = List.of();
+            } else {
+                List<ProductBatch> availableBatches = availableBatchesByProduct.computeIfAbsent(
+                        product.getId(),
+                        id -> productBatchService.getAvailableBatches(session, id, LocalDate.now()));
+                allocations = allocateAcrossBatches(product, availableBatches, remainingByBatchId, baseQuantity);
+            }
+            if (!unlimitedStock && allocations.isEmpty()) {
                 throw new IllegalArgumentException("الكمية غير متوفرة للمنتج: " + product.getName());
             }
 
@@ -403,6 +430,13 @@ public class SalesService {
     }
 
     private void applySaleItemSnapshot(SaleItem saleItem, List<BatchAllocationPlan> allocations) {
+        if (allocations == null || allocations.isEmpty()) {
+            saleItem.setBatch(null);
+            saleItem.setBatchNumberSnapshot(null);
+            saleItem.setExpirationDateSnapshot(null);
+            saleItem.setUnitCostSnapshot(saleItem.getProduct() != null ? saleItem.getProduct().getCostPrice() : null);
+            return;
+        }
         if (allocations.size() == 1) {
             ProductBatch batch = allocations.get(0).batch;
             saleItem.setBatch(batch);
@@ -422,6 +456,11 @@ public class SalesService {
         String productName = saleItem.getProduct() != null ? saleItem.getProduct().getName() : "-";
         String batchNumber = allocation.batch != null ? allocation.batch.getBatchNumber() : "-";
         return "Sale " + sale.getSaleCode() + " - " + productName + " - batch " + batchNumber;
+    }
+
+    private String buildUnlimitedStockSaleMovementNote(Sale sale, SaleItem saleItem) {
+        String productName = saleItem.getProduct() != null ? saleItem.getProduct().getName() : "-";
+        return "Sale " + sale.getSaleCode() + " - " + productName + " - unlimited stock";
     }
 
     private void updateCustomerBalanceInSession(Customer customer, Double amount, String currency) {

@@ -168,6 +168,10 @@
                        style="-fx-font-size: 14px; -fx-text-fill: -fx-form-label;"/>
                 <TextField fx:id="maximumStockField" GridPane.rowIndex="1" GridPane.columnIndex="5" promptText="غير محدد"
                            style="-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 10;"/>
+
+                <CheckBox fx:id="unlimitedStockCheckBox" text="كمية غير محدودة — لا يتم فحص أو خصم المخزون لهذا المنتج"
+                          GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.columnSpan="6"
+                          style="-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: -fx-accent-text;"/>
             </GridPane>
         </VBox>
 

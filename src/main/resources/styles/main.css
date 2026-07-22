@@ -1206,3 +1206,147 @@
     -fx-font-size: 1.23em;
     -fx-font-weight: bold;
 }
+
+/* ===== Quick sale drawer and manager ===== */
+.quick-sale-drawer-shell {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.30), 20, 0.15, 5, 0);
+}
+
+.quick-sale-drawer-panel {
+    -fx-background-color: -fx-bg-surface;
+    -fx-border-color: -fx-border-main;
+    -fx-border-width: 1 1 1 0;
+}
+
+.quick-sale-drawer-header,
+.quick-sale-manager-header {
+    -fx-background-color: -fx-bg-header;
+    -fx-border-color: -fx-border-main;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 12;
+}
+
+.quick-sale-drawer-title,
+.quick-sale-manager-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-form-label;
+}
+
+.quick-sale-header-button,
+.quick-sale-icon-button {
+    -fx-background-color: -fx-accent-bg;
+    -fx-text-fill: -fx-accent-text;
+    -fx-background-radius: 8;
+    -fx-border-color: -fx-border-input;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+}
+
+.quick-sale-header-button:selected {
+    -fx-background-color: -fx-accent-light;
+    -fx-text-fill: white;
+}
+
+.quick-sale-drawer-toggle {
+    -fx-min-width: 18;
+    -fx-pref-width: 18;
+    -fx-max-width: 18;
+    -fx-min-height: 68;
+    -fx-pref-height: 68;
+    -fx-padding: 0;
+    -fx-background-color: -fx-accent-light;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 0 9 9 0;
+    -fx-cursor: hand;
+}
+
+.quick-sale-groups-scroll,
+.quick-sale-cards-scroll,
+.quick-sale-groups-scroll > .viewport,
+.quick-sale-cards-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.quick-sale-groups-pane {
+    -fx-padding: 10 6;
+    -fx-background-color: -fx-bg-header;
+}
+
+.quick-sale-group-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-main;
+    -fx-padding: 9 6;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+}
+
+.quick-sale-group-button:hover { -fx-background-color: -fx-accent-bg; }
+.quick-sale-group-button.selected {
+    -fx-background-color: -fx-accent-light;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.quick-sale-cards-pane {
+    -fx-padding: 12;
+    -fx-background-color: -fx-bg-main;
+    -fx-alignment: top-center;
+}
+.quick-sale-product-card {
+    -fx-background-color: -fx-bg-surface;
+    -fx-text-fill: -fx-text-main;
+    -fx-border-color: -fx-border-input;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-padding: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 7, 0.1, 0, 2);
+}
+
+.quick-sale-product-card:hover { -fx-border-color: -fx-accent-light; -fx-translate-y: -1; }
+.quick-sale-product-card:disabled { -fx-opacity: 0.58; }
+.quick-sale-product-card.accent-blue { -fx-border-color: #3b82f6; }
+.quick-sale-product-card.accent-green { -fx-border-color: #22c55e; }
+.quick-sale-product-card.accent-orange { -fx-border-color: #f59e0b; }
+.quick-sale-product-card.accent-pink { -fx-border-color: #ec4899; }
+.quick-sale-product-card.accent-purple { -fx-border-color: #8b5cf6; }
+
+.quick-sale-card-placeholder {
+    -fx-min-width: 64;
+    -fx-min-height: 64;
+    -fx-alignment: center;
+    -fx-background-color: -fx-accent-bg;
+    -fx-text-fill: -fx-accent-text;
+    -fx-background-radius: 12;
+    -fx-font-size: 27px;
+    -fx-font-weight: bold;
+}
+
+.quick-sale-card-name { -fx-text-fill: -fx-form-label; -fx-font-weight: bold; -fx-alignment: center; }
+.quick-sale-card-price { -fx-text-fill: -fx-accent-text; -fx-font-size: 11px; }
+.quick-sale-card-stock { -fx-text-fill: -fx-success-text; -fx-font-size: 10px; }
+.quick-sale-card-out { -fx-text-fill: -fx-danger-text; -fx-font-size: 10px; }
+.quick-sale-card-badge {
+    -fx-background-color: -fx-accent-bg;
+    -fx-text-fill: -fx-accent-text;
+    -fx-padding: 2 7;
+    -fx-background-radius: 9;
+    -fx-font-size: 10px;
+}
+
+.quick-sale-empty-label { -fx-padding: 18; -fx-text-fill: -fx-text-hint; -fx-alignment: center; }
+.quick-sale-emoji-picker { -fx-pref-width: 285; -fx-font-size: 18px; }
+.quick-sale-emoji-cell { -fx-font-size: 22px; -fx-padding: 7 12; -fx-alignment: center; }
+.quick-sale-icon-hint { -fx-font-size: 11px; -fx-max-width: 285; }
+.quick-sale-manager { -fx-background-color: -fx-bg-main; }
+.quick-sale-manager-panel { -fx-background-color: -fx-bg-surface; }
+.quick-sale-section-title { -fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: -fx-form-label; }
+.quick-sale-muted { -fx-text-fill: -fx-text-hint; }
+.quick-sale-primary-button { -fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold; }
+.quick-sale-secondary-button { -fx-background-color: -fx-accent-bg; -fx-text-fill: -fx-accent-text; }
+.quick-sale-danger-button { -fx-background-color: -fx-danger; -fx-text-fill: white; }

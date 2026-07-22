@@ -962,6 +962,9 @@ public class VoucherService {
         if (product == null) {
             throw new IllegalArgumentException("المنتج غير موجود");
         }
+        if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return;
+        }
         double current = product.getQuantityInStock() == null ? 0.0 : product.getQuantityInStock();
         product.setQuantityInStock(current + quantity);
         session.saveOrUpdate(product);
@@ -995,6 +998,13 @@ public class VoucherService {
             Product product = session.get(Product.class, item.getProduct().getId());
             if (product == null) {
                 throw new IllegalArgumentException("المنتج غير موجود");
+            }
+
+            if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+                item.setAddToInventory(false);
+                item.setBatch(null);
+                session.saveOrUpdate(item);
+                continue;
             }
 
             LocalDate expiryDate = parseOptionalExpirationDate(item.getExpirationDate());

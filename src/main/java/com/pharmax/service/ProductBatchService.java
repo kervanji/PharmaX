@@ -250,6 +250,9 @@ public class ProductBatchService {
         if (product == null) {
             throw new IllegalArgumentException("المنتج غير موجود");
         }
+        if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return product;
+        }
         product.setQuantityInStock(getTotalBatchQuantity(session, productId));
         product.setUpdatedAt(LocalDateTime.now());
         session.saveOrUpdate(product);
@@ -332,6 +335,9 @@ public class ProductBatchService {
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("المنتج غير موجود"));
+        if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return product;
+        }
         product.setQuantityInStock(getTotalBatchQuantity(productId));
         product.setUpdatedAt(LocalDateTime.now());
         return productRepository.save(product);

@@ -1919,7 +1919,7 @@ public class MainController {
     private void handleAbout() {
         if (!guardTileAccess("about")) return;
         showInfo("عن البرنامج",
-                "PharmaX v1.3.1\n\n" +
+                "PharmaX v1.3.2\n\n" +
                         "من تطوير: KervanjiHolding\n" +
                         "الموقع: Kervanjiholding.com\n\n" +
                         "نظام متكامل لإدارة الصيدليات\n\n" +

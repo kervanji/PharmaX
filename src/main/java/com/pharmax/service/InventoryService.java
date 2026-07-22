@@ -100,7 +100,8 @@ public class InventoryService {
             double batchTotal = productBatchService.getTotalBatchQuantity(product.getId());
             List<ProductBatch> allBatches = productBatchService.getAllBatches(product.getId());
 
-            if (isBlank(product.getBarcode())) {
+            boolean unlimitedStock = Boolean.TRUE.equals(product.getIsUnlimitedStock());
+            if (!unlimitedStock && isBlank(product.getBarcode())) {
                 alerts.add(new DataQualityAlert(
                         "MISSING_BARCODE",
                         "بدون باركود",
@@ -137,6 +138,10 @@ public class InventoryService {
                         allBatches.size(),
                         null
                 ));
+            }
+
+            if (unlimitedStock) {
+                continue;
             }
 
             if (quantityInStock > 0 && allBatches.isEmpty()) {
@@ -206,6 +211,9 @@ public class InventoryService {
         Optional<Product> productOpt = productRepository.findById(productId);
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
+            if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+                throw new IllegalArgumentException("هذا المنتج محدد بكمية غير محدودة ولا يحتاج إلى إضافة مخزون");
+            }
             product.setQuantityInStock(product.getQuantityInStock() + quantity);
             auditLogService.record("MANUAL_STOCK_ADJUSTMENT", "product", product.getId(),
                     "إضافة مخزون يدوي بمقدار " + quantity + " للمنتج " + product.getName());
@@ -224,6 +232,9 @@ public class InventoryService {
         Optional<Product> productOpt = productRepository.findById(productId);
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
+            if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+                throw new IllegalArgumentException("هذا المنتج محدد بكمية غير محدودة ولا يتم خصم مخزونه يدويًا");
+            }
             
             double currentStock = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
             if (currentStock < quantity) {
@@ -244,6 +255,9 @@ public class InventoryService {
             return false;
         }
         Product product = productOpt.get();
+        if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return Boolean.TRUE.equals(product.getIsActive());
+        }
         double stock = product.getQuantityInStock() != null ? product.getQuantityInStock() : 0.0;
         return stock >= requiredQuantity && Boolean.TRUE.equals(product.getIsActive());
     }
@@ -324,6 +338,7 @@ public class InventoryService {
     public List<Product> getProductsNeedingRestock() {
         return productRepository.findAll().stream()
                 .filter(product -> Boolean.TRUE.equals(product.getIsActive()))
+                .filter(product -> !Boolean.TRUE.equals(product.getIsUnlimitedStock()))
                 .filter(product -> {
                     double qty = product.getQuantityInStock() == null ? 0 : product.getQuantityInStock();
                     double min = product.getMinimumStock() == null ? 0 : product.getMinimumStock();
@@ -335,6 +350,7 @@ public class InventoryService {
     public double getTotalInventoryValue() {
         return productRepository.findAll().stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .filter(p -> !Boolean.TRUE.equals(p.getIsUnlimitedStock()))
                 .mapToDouble(product -> {
                     double qty = product.getQuantityInStock() == null ? 0 : product.getQuantityInStock();
                     double cost = product.getCostPrice() == null ? 0.0 : product.getCostPrice();
@@ -346,6 +362,7 @@ public class InventoryService {
     public double getTotalStockCount() {
         return productRepository.findAll().stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+                .filter(p -> !Boolean.TRUE.equals(p.getIsUnlimitedStock()))
                 .mapToDouble(p -> p.getQuantityInStock() == null ? 0 : p.getQuantityInStock())
                 .sum();
     }

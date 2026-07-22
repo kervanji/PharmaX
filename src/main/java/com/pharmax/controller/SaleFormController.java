@@ -18,18 +18,27 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
 import javafx.stage.Modality;
 import javafx.util.StringConverter;
+import javafx.util.Duration;
+import javafx.animation.PauseTransition;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import com.pharmax.util.AppConfigStore;
+import com.pharmax.util.MedicalEmojiIcons;
 import com.pharmax.util.SessionManager;
 import com.pharmax.util.TabManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.nio.charset.StandardCharsets;
@@ -61,6 +70,8 @@ public class SaleFormController {
     @FXML
     private VBox root;
     @FXML
+    private StackPane saleRoot;
+    @FXML
     private VBox customerSelectionBox;
     @FXML
     private ComboBox<Customer> customerComboBox;
@@ -86,6 +97,20 @@ public class SaleFormController {
     private Button medicineDetailsButton;
     @FXML
     private FlowPane quickSaleButtonsPane;
+    @FXML
+    private VBox quickSaleGroupsPane;
+    @FXML
+    private HBox quickSaleDrawer;
+    @FXML
+    private VBox quickSaleDrawerPanel;
+    @FXML
+    private Button quickSaleDrawerToggle;
+    @FXML
+    private ToggleButton quickSalePinButton;
+    @FXML
+    private Button quickSaleManageButton;
+    @FXML
+    private Label quickSaleEmptyLabel;
     @FXML
     private TableView<SaleItemRow> itemsTable;
     @FXML
@@ -172,6 +197,7 @@ public class SaleFormController {
     private final ProductBatchService productBatchService;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final QuickSaleService quickSaleService;
     private final ObservableList<SaleItemRow> saleItems = FXCollections.observableArrayList();
     private FilteredList<Product> filteredProducts;
     private String productSearchQuery = "";
@@ -179,6 +205,11 @@ public class SaleFormController {
     private boolean globalProductSearchInstalled = false;
     private boolean suppressProductAutoAdd = false;
     private boolean categoryFilterListenerInstalled = false;
+    private boolean quickSaleDrawerInitialized = false;
+    private boolean quickSaleDrawerOpen = false;
+    private Long selectedQuickSaleGroupId;
+    private PauseTransition quickSaleHideDelay;
+    private TranslateTransition quickSaleDrawerAnimation;
     private boolean refreshingComboData = false;
     private Product selectedProduct = null;
     private ProductUnit selectedUnit = null;
@@ -199,6 +230,7 @@ public class SaleFormController {
         this.productBatchService = new ProductBatchService();
         this.customerRepository = new CustomerRepository();
         this.productRepository = new ProductRepository();
+        this.quickSaleService = new QuickSaleService();
 
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.US);
         symbols.setGroupingSeparator(',');
@@ -1037,41 +1069,218 @@ public class SaleFormController {
     }
 
     private void setupQuickSaleButtons() {
-        if (quickSaleButtonsPane == null) {
+        if (quickSaleButtonsPane == null || quickSaleGroupsPane == null || quickSaleDrawer == null) {
             return;
         }
+        initializeQuickSaleDrawerInteraction();
+        loadQuickSaleGroups();
+    }
 
-        List<Product> quickSaleProducts = productRepository.findAll().stream()
-                .filter(product -> Boolean.TRUE.equals(product.getIsActive()))
-                .filter(product -> Boolean.TRUE.equals(product.getIsQuickSale()))
-                .sorted((left, right) -> {
-                    String leftName = left != null && left.getName() != null ? left.getName() : "";
-                    String rightName = right != null && right.getName() != null ? right.getName() : "";
-                    return leftName.compareToIgnoreCase(rightName);
-                })
-                .toList();
+    private void initializeQuickSaleDrawerInteraction() {
+        if (quickSaleDrawerInitialized) return;
+        quickSaleDrawerInitialized = true;
+        quickSaleHideDelay = new PauseTransition(Duration.seconds(3));
+        quickSaleHideDelay.setOnFinished(event -> {
+            if (quickSalePinButton == null || !quickSalePinButton.isSelected()) closeQuickSaleDrawer(true);
+        });
+        quickSaleDrawer.setOnMouseEntered(event -> {
+            quickSaleHideDelay.stop();
+            openQuickSaleDrawer(true);
+        });
+        quickSaleDrawer.setOnMouseExited(event -> {
+            if (quickSalePinButton == null || !quickSalePinButton.isSelected()) quickSaleHideDelay.playFromStart();
+        });
+        if (quickSaleManageButton != null) {
+            boolean admin = SessionManager.getInstance().isAdmin();
+            quickSaleManageButton.setVisible(admin);
+            quickSaleManageButton.setManaged(admin);
+        }
+        Platform.runLater(() -> closeQuickSaleDrawer(false));
+    }
 
+    private void loadQuickSaleGroups() {
+        try {
+            List<QuickSaleGroup> groups = quickSaleService.getGroups(true);
+            quickSaleGroupsPane.getChildren().clear();
+            if (groups.isEmpty()) {
+                selectedQuickSaleGroupId = null;
+                renderQuickSaleItems(null);
+                return;
+            }
+            if (selectedQuickSaleGroupId == null || groups.stream().noneMatch(g -> g.getId().equals(selectedQuickSaleGroupId))) {
+                selectedQuickSaleGroupId = groups.get(0).getId();
+            }
+            for (QuickSaleGroup group : groups) {
+                ImageView coloredIcon = MedicalEmojiIcons.createView(group.getIconKey(), 22);
+                Button button = new Button(coloredIcon == null ? group.toString() : group.getName());
+                button.setGraphic(coloredIcon);
+                button.setGraphicTextGap(7);
+                button.setWrapText(true);
+                button.setMaxWidth(Double.MAX_VALUE);
+                button.setFocusTraversable(false);
+                button.getStyleClass().add("quick-sale-group-button");
+                if (group.getId().equals(selectedQuickSaleGroupId)) button.getStyleClass().add("selected");
+                button.setOnAction(event -> {
+                    selectedQuickSaleGroupId = group.getId();
+                    loadQuickSaleGroups();
+                });
+                quickSaleGroupsPane.getChildren().add(button);
+            }
+            QuickSaleGroup selected = groups.stream().filter(g -> g.getId().equals(selectedQuickSaleGroupId))
+                    .findFirst().orElse(groups.get(0));
+            renderQuickSaleItems(selected);
+        } catch (Exception e) {
+            logger.error("Failed to load quick sale drawer", e);
+            quickSaleButtonsPane.getChildren().clear();
+            quickSaleEmptyLabel.setText("تعذر تحميل المنتجات السريعة");
+            quickSaleEmptyLabel.setVisible(true);
+            quickSaleEmptyLabel.setManaged(true);
+        }
+    }
+
+    private void renderQuickSaleItems(QuickSaleGroup group) {
+        List<QuickSaleItem> items = group == null ? List.of() : quickSaleService.getItems(group.getId());
         quickSaleButtonsPane.getChildren().clear();
-        quickSaleButtonsPane.setVisible(!quickSaleProducts.isEmpty());
-        quickSaleButtonsPane.setManaged(!quickSaleProducts.isEmpty());
+        boolean empty = items.isEmpty();
+        quickSaleEmptyLabel.setText(group == null ? "لا توجد مجموعات مفعلة" : "لا توجد منتجات في هذه المجموعة");
+        quickSaleEmptyLabel.setVisible(empty);
+        quickSaleEmptyLabel.setManaged(empty);
+        for (QuickSaleItem item : items) quickSaleButtonsPane.getChildren().add(createQuickSaleCard(item));
+        resizeQuickSaleDrawer(items.size());
+        Platform.runLater(() -> resizeQuickSaleDrawer(items.size()));
+    }
 
-        for (Product product : quickSaleProducts) {
-            Button quickSaleButton = new Button(product.getName());
-            quickSaleButton.setMnemonicParsing(false);
-            quickSaleButton.setWrapText(true);
-            quickSaleButton.setFocusTraversable(false);
-            quickSaleButton.setPrefWidth(150);
-            quickSaleButton.setPrefHeight(42);
-            quickSaleButton.setStyle(
-                    "-fx-background-color: -fx-bg-surface; " +
-                    "-fx-text-fill: -fx-form-label; " +
-                    "-fx-border-color: -fx-border-input; " +
-                    "-fx-border-radius: 10; " +
-                    "-fx-background-radius: 10; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 8 12;");
-            quickSaleButton.setOnAction(event -> handleQuickSaleProduct(product));
-            quickSaleButtonsPane.getChildren().add(quickSaleButton);
+    private void resizeQuickSaleDrawer(int itemCount) {
+        int rows = Math.max(1, (itemCount + 1) / 2);
+        double cardsHeight = 76 + rows * 184.0;
+        double groupsHeight = 76 + Math.max(1, quickSaleGroupsPane.getChildren().size()) * 46.0;
+        double desiredHeight = Math.max(270, Math.max(cardsHeight, groupsHeight));
+        double sceneHeight = quickSaleDrawer.getScene() == null ? 720 : quickSaleDrawer.getScene().getHeight();
+        double availableHeight = Math.max(320, sceneHeight - 16);
+        double drawerHeight = Math.min(desiredHeight, availableHeight);
+        quickSaleDrawer.setMinHeight(Region.USE_PREF_SIZE);
+        quickSaleDrawer.setPrefHeight(drawerHeight);
+        quickSaleDrawer.setMaxHeight(Region.USE_PREF_SIZE);
+        quickSaleDrawerPanel.setPrefHeight(drawerHeight);
+    }
+
+    private Button createQuickSaleCard(QuickSaleItem item) {
+        Product product = item.getProduct();
+        ProductUnit unit = item.getProductUnit() != null ? item.getProductUnit() : resolveQuickSaleUnit(product);
+        VBox content = new VBox(4);
+        content.setAlignment(javafx.geometry.Pos.CENTER);
+        content.setFillWidth(true);
+
+        if (item.getImageData() != null && item.getImageData().length > 0) {
+            ImageView image = new ImageView(new Image(new ByteArrayInputStream(item.getImageData())));
+            image.setFitWidth(82); image.setFitHeight(64); image.setPreserveRatio(true); image.setSmooth(true);
+            content.getChildren().add(image);
+        } else {
+            Label placeholder = new Label(product.getName() == null || product.getName().isBlank()
+                    ? "💊" : product.getName().substring(0, 1));
+            placeholder.getStyleClass().add("quick-sale-card-placeholder");
+            content.getChildren().add(placeholder);
+        }
+
+        Label name = new Label(product.getName());
+        name.setWrapText(true); name.setMaxWidth(112); name.getStyleClass().add("quick-sale-card-name");
+        Double price = unit != null && unit.getSalePrice() != null ? unit.getSalePrice() : product.getUnitPrice();
+        String unitName = unit == null ? productUnitService.resolveBaseUnit(product) : unit.getUnitName();
+        Label priceLabel = new Label((price == null ? "—" : numberFormatter.format(price) + " د.ع") + " • " + unitName);
+        priceLabel.getStyleClass().add("quick-sale-card-price");
+        boolean unlimitedStock = Boolean.TRUE.equals(product.getIsUnlimitedStock());
+        double stock = product.getQuantityInStock() == null ? 0 : product.getQuantityInStock();
+        Label stockLabel = new Label(unlimitedStock ? "الكمية: غير محدودة"
+                : stock > 0 ? "المتوفر: " + numberFormatter.format(stock) : "غير متوفر");
+        stockLabel.getStyleClass().add(unlimitedStock || stock > 0 ? "quick-sale-card-stock" : "quick-sale-card-out");
+        double inCart = saleItems.stream().filter(row -> Objects.equals(row.getProductId(), product.getId()))
+                .mapToDouble(SaleItemRow::getQuantity).sum();
+        content.getChildren().addAll(name, priceLabel, stockLabel);
+        if (inCart > 0) {
+            Label badge = new Label("في الفاتورة: " + numberFormatter.format(inCart));
+            badge.getStyleClass().add("quick-sale-card-badge"); content.getChildren().add(badge);
+        }
+
+        Button card = new Button();
+        card.setGraphic(content); card.setMnemonicParsing(false); card.setFocusTraversable(false);
+        card.setPrefWidth(126); card.setMinWidth(126); card.setMaxWidth(126);
+        card.setPrefHeight(176); card.setMinHeight(176); card.setMaxHeight(176);
+        card.getStyleClass().add("quick-sale-product-card");
+        if (item.getAccentColor() != null && !item.getAccentColor().isBlank()) {
+            card.getStyleClass().add("accent-" + item.getAccentColor());
+        }
+        double requiredStock = unit == null ? 1.0 : unit.getEffectiveConversionFactor();
+        boolean available = Boolean.TRUE.equals(product.getIsActive())
+                && (unlimitedStock || stock + 1e-9 >= requiredStock);
+        card.setDisable(!available);
+        card.setTooltip(new Tooltip(available ? "إضافة وحدة واحدة إلى الفاتورة" : "المنتج غير متوفر للبيع"));
+        card.setOnAction(event -> {
+            Product fresh = productRepository.findById(product.getId()).orElse(product);
+            ProductUnit selectedUnit = item.getProductUnit() != null ? item.getProductUnit() : resolveQuickSaleUnit(fresh);
+            addProductToSale(fresh, 1.0, selectedUnit);
+            renderQuickSaleItems(groupForSelectedId());
+        });
+        return card;
+    }
+
+    private QuickSaleGroup groupForSelectedId() {
+        if (selectedQuickSaleGroupId == null) return null;
+        return quickSaleService.getGroups(true).stream()
+                .filter(g -> g.getId().equals(selectedQuickSaleGroupId)).findFirst().orElse(null);
+    }
+
+    @FXML
+    private void handleToggleQuickSaleDrawer() {
+        if (quickSaleDrawerOpen) closeQuickSaleDrawer(true); else openQuickSaleDrawer(true);
+    }
+
+    @FXML
+    private void handleToggleQuickSalePin() {
+        if (quickSalePinButton.isSelected()) {
+            quickSaleHideDelay.stop(); openQuickSaleDrawer(true);
+        } else if (!quickSaleDrawer.isHover()) {
+            quickSaleHideDelay.playFromStart();
+        }
+    }
+
+    private void openQuickSaleDrawer(boolean animated) { animateQuickSaleDrawer(0, animated, true); }
+    private void closeQuickSaleDrawer(boolean animated) {
+        double hiddenOffset = -(quickSaleDrawerPanel == null ? 402 : quickSaleDrawerPanel.getWidth());
+        if (hiddenOffset >= 0) hiddenOffset = -402;
+        animateQuickSaleDrawer(hiddenOffset, animated, false);
+    }
+
+    private void animateQuickSaleDrawer(double targetX, boolean animated, boolean open) {
+        if (quickSaleDrawerAnimation != null) quickSaleDrawerAnimation.stop();
+        quickSaleDrawerOpen = open;
+        if (quickSaleDrawerToggle != null) quickSaleDrawerToggle.setText(open ? "❮" : "❯");
+        if (!animated) { quickSaleDrawer.setTranslateX(targetX); return; }
+        quickSaleDrawerAnimation = new TranslateTransition(Duration.millis(260), quickSaleDrawer);
+        quickSaleDrawerAnimation.setToX(targetX);
+        quickSaleDrawerAnimation.setInterpolator(javafx.animation.Interpolator.EASE_BOTH);
+        quickSaleDrawerAnimation.play();
+    }
+
+    @FXML
+    private void handleManageQuickSales() {
+        if (!SessionManager.getInstance().isAdmin()) return;
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/QuickSaleManager.fxml"));
+            Parent view = loader.load();
+            QuickSaleManagerController controller = loader.getController();
+            controller.setOnChanged(this::loadQuickSaleGroups);
+            Stage stage = new Stage();
+            stage.setTitle("إدارة المنتجات السريعة");
+            stage.initModality(Modality.WINDOW_MODAL);
+            if (quickSaleDrawer.getScene() != null) stage.initOwner(quickSaleDrawer.getScene().getWindow());
+            stage.setScene(new Scene(view));
+            stage.setMinWidth(860); stage.setMinHeight(580);
+            com.pharmax.util.ThemeManager.getInstance().registerStage(stage);
+            stage.showAndWait();
+            loadQuickSaleGroups();
+        } catch (Exception e) {
+            logger.error("Failed to open quick sale manager", e);
+            showError("خطأ", "تعذر فتح إدارة المنتجات السريعة: " + e.getMessage());
         }
     }
 
@@ -1295,6 +1504,11 @@ public class SaleFormController {
         }
 
         ProductUnit unit = getSelectedSaleUnit();
+        if (Boolean.TRUE.equals(selectedProduct.getIsUnlimitedStock())) {
+            stockLabel.setText("المخزون المتاح: كمية غير محدودة");
+            stockLabel.setStyle("-fx-text-fill: -fx-success-text; -fx-font-weight: bold;");
+            return;
+        }
         String baseUnit = productUnitService.resolveBaseUnit(selectedProduct);
         String saleUnit = unit != null && unit.getUnitName() != null ? unit.getUnitName() : baseUnit;
         double factor = unit != null ? unit.getEffectiveConversionFactor() : 1.0;
@@ -2333,6 +2547,11 @@ public class SaleFormController {
             return "-";
         }
 
+        Product previewProduct = productRepository.findById(row.getProductId()).orElse(null);
+        if (previewProduct != null && Boolean.TRUE.equals(previewProduct.getIsUnlimitedStock())) {
+            return "كمية غير محدودة — لا تخصم من المخزون";
+        }
+
         try {
             List<ProductBatch> batches = batchesByProductId.computeIfAbsent(row.getProductId(),
                     productBatchService::getAvailableBatches);
@@ -2385,6 +2604,9 @@ public class SaleFormController {
         }
 
         Product product = productRepository.findById(row.getProductId()).orElse(null);
+        if (product != null && Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return false;
+        }
         double availableStock = getSellableStockQuantity(product);
         return getRequiredQuantityForProduct(row.getProductId()) > availableStock + 1e-9;
     }
@@ -2417,6 +2639,9 @@ public class SaleFormController {
     }
 
     private boolean validateStockAvailable(Product product, double requestedQuantity) {
+        if (product != null && Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return true;
+        }
         double availableStock = getSellableStockQuantity(product);
         if (requestedQuantity > availableStock + 1e-9) {
             showError("خطأ",
@@ -2431,6 +2656,9 @@ public class SaleFormController {
     private double getSellableStockQuantity(Product product) {
         if (product == null || product.getId() == null) {
             return 0.0;
+        }
+        if (Boolean.TRUE.equals(product.getIsUnlimitedStock())) {
+            return Double.POSITIVE_INFINITY;
         }
 
         try {

@@ -223,7 +223,8 @@ public class Repository<T> {
         public List<Product> findLowStock() {
             try (Session session = DatabaseManager.getSessionFactory().openSession()) {
                 Query<Product> query = session.createQuery(
-                    "FROM Product WHERE quantityInStock <= minimumStock AND isActive = true", Product.class);
+                    "FROM Product WHERE quantityInStock <= minimumStock AND isActive = true " +
+                    "AND (isUnlimitedStock IS NULL OR isUnlimitedStock = false)", Product.class);
                 return query.list();
             } catch (Exception e) {
                 logger.error("Failed to find low stock products", e);

@@ -4,12 +4,16 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import javafx.scene.image.*?>
 
-<ScrollPane xmlns="http://javafx.com/javafx/17"
+<StackPane xmlns="http://javafx.com/javafx/17"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.pharmax.controller.SaleFormController"
-            fitToWidth="true" fitToHeight="true"
-            style="-fx-background-color: transparent; -fx-background: transparent;">
+            fx:id="saleRoot" stylesheets="@../styles/main.css"
+            style="-fx-background-color: transparent;">
+    <children>
+    <ScrollPane fitToWidth="true" fitToHeight="true"
+                style="-fx-background-color: transparent; -fx-background: transparent;">
     
     <VBox fx:id="root"
           stylesheets="@../styles/main.css"
@@ -74,11 +78,6 @@
                                 style="-fx-background-color: -fx-bg-surface; -fx-text-fill: -fx-form-label; -fx-border-color: -fx-border-input; -fx-border-radius: 8; -fx-background-radius: 8;"/>
                         <Button text="+ إضافة" onAction="#handleAddItem" nodeOrientation="RIGHT_TO_LEFT" style="-fx-background-color: -fx-accent-light; -fx-text-fill: white; -fx-font-weight: bold;" prefWidth="170"/>
                     </HBox>
-                    <VBox spacing="6" nodeOrientation="RIGHT_TO_LEFT">
-                        <Label text="أزرار البيع السريع" textAlignment="RIGHT" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: -fx-form-sublabel;"/>
-                        <FlowPane fx:id="quickSaleButtonsPane" hgap="8" vgap="8" prefWrapLength="780"
-                                  nodeOrientation="RIGHT_TO_LEFT" visible="false" managed="false"/>
-                    </VBox>
                 </VBox>
 
             </VBox>
@@ -223,7 +222,7 @@
                         style="-fx-background-color: -fx-danger; -fx-text-fill: white; -fx-font-size: 13px;"/>
                 <CheckBox fx:id="printCheckbox" text="طباعة الفاتورة بعد البيع" selected="true"
                           nodeOrientation="RIGHT_TO_LEFT"/>
-                <CheckBox fx:id="quickSaleCheckbox" text="بيع سريع" visible="false" managed="false"
+                <CheckBox fx:id="quickSaleCheckbox" text="حفظ البيع دون إيصال" visible="false" managed="false"
                           nodeOrientation="RIGHT_TO_LEFT"/>
             </VBox>
                 </VBox>
@@ -232,3 +231,40 @@
     </HBox>
 </VBox>
 </ScrollPane>
+    <HBox fx:id="quickSaleDrawer" prefWidth="420" maxWidth="420" minWidth="420"
+          prefHeight="460" maxHeight="-Infinity"
+          nodeOrientation="LEFT_TO_RIGHT" mouseTransparent="false" alignment="CENTER_LEFT"
+          StackPane.alignment="TOP_LEFT" styleClass="quick-sale-drawer-shell">
+        <VBox fx:id="quickSaleDrawerPanel" prefWidth="402" minWidth="402" maxWidth="402"
+              maxHeight="Infinity" HBox.hgrow="ALWAYS" styleClass="quick-sale-drawer-panel">
+            <HBox alignment="CENTER_RIGHT" spacing="8" nodeOrientation="RIGHT_TO_LEFT" styleClass="quick-sale-drawer-header">
+                <Label text="المنتجات السريعة" styleClass="quick-sale-drawer-title" HBox.hgrow="ALWAYS"/>
+                <ToggleButton fx:id="quickSalePinButton" text="📌" onAction="#handleToggleQuickSalePin"
+                              styleClass="quick-sale-header-button" focusTraversable="false"/>
+                <Button fx:id="quickSaleManageButton" text="⚙" onAction="#handleManageQuickSales"
+                        styleClass="quick-sale-header-button" focusTraversable="false"/>
+            </HBox>
+            <HBox VBox.vgrow="ALWAYS" nodeOrientation="LEFT_TO_RIGHT">
+                <ScrollPane prefWidth="110" minWidth="110" maxWidth="110" fitToWidth="true"
+                            hbarPolicy="NEVER" styleClass="quick-sale-groups-scroll">
+                    <VBox fx:id="quickSaleGroupsPane" spacing="6" nodeOrientation="RIGHT_TO_LEFT"
+                          styleClass="quick-sale-groups-pane"/>
+                </ScrollPane>
+                <StackPane HBox.hgrow="ALWAYS">
+                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER"
+                                styleClass="quick-sale-cards-scroll">
+                        <FlowPane fx:id="quickSaleButtonsPane" hgap="8" vgap="8" prefWrapLength="276"
+                                  alignment="TOP_CENTER"
+                                  nodeOrientation="RIGHT_TO_LEFT" styleClass="quick-sale-cards-pane"/>
+                    </ScrollPane>
+                    <Label fx:id="quickSaleEmptyLabel" text="لا توجد منتجات في هذه المجموعة"
+                           visible="false" managed="false" wrapText="true" maxWidth="220"
+                           StackPane.alignment="CENTER" styleClass="quick-sale-empty-label"/>
+                </StackPane>
+            </HBox>
+        </VBox>
+        <Button fx:id="quickSaleDrawerToggle" text="❯" onAction="#handleToggleQuickSaleDrawer"
+                focusTraversable="false" styleClass="quick-sale-drawer-toggle"/>
+    </HBox>
+    </children>
+</StackPane>

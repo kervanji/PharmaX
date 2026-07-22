@@ -9,6 +9,7 @@ import com.pharmax.service.InventoryMovementService;
 import com.pharmax.service.InventoryService;
 import com.pharmax.service.ProductBatchService;
 import com.pharmax.service.ProductUnitService;
+import com.pharmax.service.QuickSaleService;
 import com.pharmax.util.SessionManager;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleDoubleProperty;
@@ -132,6 +133,8 @@ public class ProductController {
     @FXML
     private CheckBox quickSaleProductCheckBox;
     @FXML
+    private CheckBox unlimitedStockCheckBox;
+    @FXML
     private Button deleteButton;
     @FXML
     private VBox openingBatchSection;
@@ -186,6 +189,7 @@ public class ProductController {
         setupPriceListeners();
         setupPricingModeToggle();
         setupOpeningBatchToggle();
+        setupUnlimitedStockToggle();
         applyRoleRestrictions();
     }
 
@@ -226,6 +230,11 @@ public class ProductController {
             if (!canManageQuickSaleProducts) {
                 quickSaleProductCheckBox.setSelected(false);
             }
+        }
+        if (unlimitedStockCheckBox != null) {
+            unlimitedStockCheckBox.setVisible(canManageQuickSaleProducts);
+            unlimitedStockCheckBox.setManaged(canManageQuickSaleProducts);
+            unlimitedStockCheckBox.setDisable(!canManageQuickSaleProducts);
         }
 
         applySellingPriceEditRestriction();
@@ -609,6 +618,10 @@ public class ProductController {
         if (quickSaleProductCheckBox != null) {
             quickSaleProductCheckBox.setSelected(Boolean.TRUE.equals(product.getIsQuickSale()));
         }
+        if (unlimitedStockCheckBox != null) {
+            unlimitedStockCheckBox.setSelected(Boolean.TRUE.equals(product.getIsUnlimitedStock()));
+            updateUnlimitedStockControls();
+        }
         loadPackagingRows(product);
         loadBoxSellingPriceFields(product);
         syncPackagingEditorWithStripBox();
@@ -824,10 +837,12 @@ public class ProductController {
                 product.setSpecialPrice(parseDoubleOrNull(specialPriceField.getText()));
                 product.setSpecialPriceUsd(parseDoubleOrNull(specialPriceUsdField.getText()));
             }
-            double requestedStockQuantity = parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
+            boolean unlimitedStock = unlimitedStockCheckBox != null && unlimitedStockCheckBox.isSelected();
+            double requestedStockQuantity = unlimitedStock ? 0.0
+                    : parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
             product.setQuantityInStock(requestedStockQuantity);
-            product.setMinimumStock(parseDouble(minimumStockField.getText()));
-            product.setMaximumStock(parseDoubleOrNull(maximumStockField.getText()));
+            product.setMinimumStock(unlimitedStock ? 0.0 : parseDouble(minimumStockField.getText()));
+            product.setMaximumStock(unlimitedStock ? null : parseDoubleOrNull(maximumStockField.getText()));
             String baseUnit = baseUnitComboBox != null && baseUnitComboBox.getValue() != null
                     ? baseUnitComboBox.getValue()
                     : unitOfMeasureComboBox != null ? unitOfMeasureComboBox.getValue() : null;
@@ -836,6 +851,7 @@ public class ProductController {
             product.setIsActive(isActiveCheckBox.isSelected());
             if (SessionManager.getInstance().isAdmin()) {
                 product.setIsQuickSale(quickSaleProductCheckBox != null && quickSaleProductCheckBox.isSelected());
+                product.setIsUnlimitedStock(unlimitedStock);
             } else if (product.getIsQuickSale() == null) {
                 product.setIsQuickSale(false);
             }
@@ -845,14 +861,21 @@ public class ProductController {
             if (isEditMode) {
                 savedProduct = inventoryService.updateProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
-                syncProductStockState(savedProduct, requestedStockQuantity);
+                if (!Boolean.TRUE.equals(savedProduct.getIsUnlimitedStock())) {
+                    syncProductStockState(savedProduct, requestedStockQuantity);
+                }
                 showInfo("تم التحديث", "تم تحديث المنتج بنجاح");
             } else {
                 savedProduct = inventoryService.createProduct(product);
                 productUnitService.replaceUnitsForProduct(savedProduct, buildProductUnits(savedProduct));
-                syncProductStockState(savedProduct, requestedStockQuantity);
+                if (!Boolean.TRUE.equals(savedProduct.getIsUnlimitedStock())) {
+                    syncProductStockState(savedProduct, requestedStockQuantity);
+                }
                 showInfo("تم الإضافة", "تم إضافة المنتج بنجاح");
             }
+
+            new QuickSaleService().syncDefaultMembership(
+                    savedProduct.getId(), Boolean.TRUE.equals(savedProduct.getIsQuickSale()));
 
             if (afterSaveCallback != null) {
                 afterSaveCallback.run();
@@ -1049,6 +1072,44 @@ public class ProductController {
         });
     }
 
+    private void setupUnlimitedStockToggle() {
+        if (unlimitedStockCheckBox == null) {
+            return;
+        }
+        unlimitedStockCheckBox.selectedProperty().addListener((obs, oldValue, selected) -> updateUnlimitedStockControls());
+        updateUnlimitedStockControls();
+    }
+
+    private void updateUnlimitedStockControls() {
+        boolean unlimited = unlimitedStockCheckBox != null && unlimitedStockCheckBox.isSelected();
+        if (quantityField != null) {
+            quantityField.setDisable(unlimited);
+            if (unlimited) quantityField.setText("0");
+        }
+        if (quantityInputUnitComboBox != null) quantityInputUnitComboBox.setDisable(unlimited);
+        if (minimumStockField != null) {
+            minimumStockField.setDisable(unlimited);
+            if (unlimited) minimumStockField.setText("0");
+        }
+        if (maximumStockField != null) {
+            maximumStockField.setDisable(unlimited);
+            if (unlimited) maximumStockField.clear();
+        }
+        if (openingBatchCheckBox != null) {
+            if (unlimited) openingBatchCheckBox.setSelected(false);
+            openingBatchCheckBox.setDisable(unlimited);
+        }
+        if (openingBatchGrid != null && unlimited) {
+            openingBatchGrid.setDisable(true);
+            openingBatchGrid.setOpacity(0.5);
+        }
+        if (stockBreakdownLabel != null && unlimited) {
+            stockBreakdownLabel.setText("هذا المنتج متاح دائمًا ولا يدخل ضمن كميات أو قيمة المخزون");
+        } else {
+            refreshUnitBreakdownLabels();
+        }
+    }
+
     private void hideOpeningBatchSection() {
         if (openingBatchSection != null) {
             openingBatchSection.setVisible(false);
@@ -1080,6 +1141,7 @@ public class ProductController {
     }
 
     private boolean validateInput() {
+        boolean unlimitedStock = unlimitedStockCheckBox != null && unlimitedStockCheckBox.isSelected();
         if (safeTrim(nameField).isEmpty()) {
             showError("خطأ", "اسم المنتج مطلوب");
             nameField.requestFocus();
@@ -1103,7 +1165,7 @@ public class ProductController {
             return false;
         }
 
-        if (expiryDatePicker != null && expiryDatePicker.getValue() != null
+        if (!unlimitedStock && expiryDatePicker != null && expiryDatePicker.getValue() != null
                 && parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox) <= 0) {
             showError("خطأ", "تاريخ الانتهاء يحتاج كمية افتتاحية أكبر من صفر");
             quantityField.requestFocus();
@@ -1111,7 +1173,7 @@ public class ProductController {
         }
 
         // Validate opening batch fields if enabled
-        if (openingBatchCheckBox != null && openingBatchCheckBox.isSelected()) {
+        if (!unlimitedStock && openingBatchCheckBox != null && openingBatchCheckBox.isSelected()) {
             double openingQty = parseQuantityInputAsBase(openingBatchQuantityField, openingBatchInputUnitComboBox);
             if (openingQty <= 0) {
                 showError("خطأ", "الكمية الأولية للدفعة الافتتاحية يجب أن تكون أكبر من صفر");
@@ -1128,7 +1190,7 @@ public class ProductController {
             }
         }
 
-        if (isEditMode && product != null && product.getId() != null) {
+        if (!unlimitedStock && isEditMode && product != null && product.getId() != null) {
             double requestedStockQuantity = parseQuantityInputAsBase(quantityField, quantityInputUnitComboBox);
             double currentBatchTotal = productBatchService.getTotalBatchQuantity(product.getId());
             if (requestedStockQuantity < currentBatchTotal - 1e-9) {
@@ -1301,7 +1363,11 @@ public class ProductController {
     }
 
     private void refreshUnitBreakdownLabels() {
-        updateBreakdownLabel(stockBreakdownLabel, quantityField, quantityInputUnitComboBox, false);
+        if (unlimitedStockCheckBox != null && unlimitedStockCheckBox.isSelected()) {
+            stockBreakdownLabel.setText("هذا المنتج متاح دائمًا ولا يدخل ضمن كميات أو قيمة المخزون");
+        } else {
+            updateBreakdownLabel(stockBreakdownLabel, quantityField, quantityInputUnitComboBox, false);
+        }
         updateBreakdownLabel(openingBatchBreakdownLabel, openingBatchQuantityField, openingBatchInputUnitComboBox, true);
         updatePackagingSummaryLabel();
     }

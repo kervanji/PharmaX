@@ -1,9 +1,9 @@
 ﻿; PharmaX Installer Script for Inno Setup
-; نظام إدارة المخازن والمبيعات
+; نظام إدارة صيدليات  والمبيعات
 
 #define MyAppName "PharmaX"
-#define MyAppNameArabic "حساب إكس - نظام إدارة المخازن والمبيعات"
-#define MyAppVersion "1.3.1"
+#define MyAppNameArabic "فارما اكس- نظام أدارة المبيعات و الصدليات"
+#define MyAppVersion "1.3.2"
 #define MyAppPublisher "PharmaX"
 #define MyAppExeName "PharmaX.exe"
 #define MyAppIcon "src\main\resources\templates\PharmaX.ico"
@@ -50,7 +50,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ; Version Info
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=نظام إدارة المخازن والمبيعات
+VersionInfoDescription=فارما اكس- نظام أدارة المبيعات 
 VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
 
 ; Architecture
